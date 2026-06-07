@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<uidefinition xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://prd-use-rad-assets.azurewebsites.net/ExtensionsSchemaDefinition.xsd">
+  <version ver="2.0" />
+  <tile icon="{tileIcon}" status="{currentTemperatureLabel}" navigation="show:MainPage" showinhomepage="#false" showinroompage="#true" />
+  <layouts>
+    <layout id="MainPage" title="{deviceLabel}" subtitle="{scheduleSummary}" isdefaultlayout="#true">
+      <controls>
+        <thermostat id="RoomThermostat" toplefticon="{tileIcon}" title="^ThermostatTitle|{deviceLabel}" setpointauto="{targetTemperature}" heatmodeenabled="#false" coolmodeenabled="#false" automodeenabled="#true" modeicon="{tileIcon}" currenttemperature="{currentTemperature}" currenttemperaturelabel="{currentTemperatureLabel}" temperatureunits="{temperatureUnits}" />
+        <statusandbutton id="BoostButton" label="^BoostLabel" status="{boostStateLabel}" buttonlabel="{boostActionLabel}" buttonaction="command:boost" />
+        <statusandbutton id="ScheduleButton" label="^ScheduleLabel" status="{scheduleSummary}" buttonlabel="^ScheduleActionLabel" buttonaction="command:openSchedule" navigation="show:SchedulePage" />
+      </controls>
+    </layout>
+    <layout id="SchedulePage" title="^ScheduleTitle" subtitle="{deviceLabel}">
+      <controls>
+        <textdisplay id="ScheduleSummaryDisplay" title="^ScheduleSummaryTitle" line1label="{scheduleSummary}" line2label="^ScheduleSimpleHint" />
+        <buttongroup>
+          <button id="AdvanceScheduleBtn" label="^AdvanceScheduleLabel" action="command:advanceSchedule" />
+          <button id="AdvancedScheduleBtn" label="^AdvancedScheduleLabel" navigation="show:AdvancedSchedulePage" />
+        </buttongroup>
+      </controls>
+    </layout>
+    <layout id="AdvancedSchedulePage" title="^AdvancedScheduleTitle" subtitle="{deviceLabel}">
+      <controls>
+        <textdisplay id="AdvancedScheduleText" title="^AdvancedScheduleTitle" line1label="^AdvancedScheduleHint1" line2label="^AdvancedScheduleHint2" line3label="{scheduleSummary}" />
+      </controls>
+    </layout>
+  </layouts>
+  <alerts />
+</uidefinition>

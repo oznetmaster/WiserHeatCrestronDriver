@@ -1,0 +1,94 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <OutputType>Library</OutputType>
+    <AssemblyName>Thermostat_WiserHeat_IP_V2</AssemblyName>
+    <RootNamespace>WiserHeat.CrestronDriver</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <NoWarn>$(NoWarn);ILLink1005</NoWarn>
+    <Description></Description>
+    <Company></Company>
+    <Product>WiserHeatCrestronDriver</Product>
+    <Copyright>Copyright © 2026 Neil Colvin</Copyright>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="WiserHeatAPIv2" Version="1.1.0.1" />
+    <PackageReference Include="Crestron.DeviceDrivers.DevKit" Version="27.0.24" />
+    <PackageReference Include="Hafner.Compatibility.MetaPackage" Version="1.9.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Thermostat_WiserHeat_IP_V2.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="IncludeInPkg\UiDefinitions\UiDefinition.xml" />
+    <None Include="IncludeInPkg\room\uidefinitions\UiDefinition.xml" />
+    <None Include="IncludeInPkg\Translations\en-US.json" />
+    <None Include="BumpDriverVersion.ps1" />
+    <None Include="Deploy.ps1" />
+    <None Include="FetchLatestLog.ps1" />
+    <None Include="ParseLatestLog.ps1" />
+    <None Include="ResetAndWait.ps1" />
+    <None Include="StartReleaseCycle.ps1" />
+    <None Include="WiserHeatCrestronDriver.csproj.user" />
+  </ItemGroup>
+  <PropertyGroup>
+    <LocalCrestronSdkLibDir Condition="'$(LocalCrestronSdkLibDir)' == ''">$(CRESTRON_DRIVER_SDK_LIBRARIES)</LocalCrestronSdkLibDir>
+    <LocalNet472ReferenceAssemblies Condition="'$(LocalNet472ReferenceAssemblies)' == ''">$(NET472_REFERENCE_ASSEMBLIES)</LocalNet472ReferenceAssemblies>
+    <LocalNetFxRuntimeDir Condition="'$(LocalNetFxRuntimeDir)' == ''">$(NETFX_RUNTIME_DIR)</LocalNetFxRuntimeDir>
+    <ManifestUtilExe Condition="'$(ManifestUtilExe)' == ''">ManifestUtil.exe</ManifestUtilExe>
+    <MergeDependenciesContinueOnError Condition="'$(MergeDependenciesContinueOnError)' == ''">true</MergeDependenciesContinueOnError>
+    <PackageDriverContinueOnError Condition="'$(PackageDriverContinueOnError)' == ''">true</PackageDriverContinueOnError>
+    <PackageDriverIgnoreExitCode Condition="'$(PackageDriverIgnoreExitCode)' == ''">true</PackageDriverIgnoreExitCode>
+  </PropertyGroup>
+
+  <Target Name="BumpDriverVersion" BeforeTargets="BeforeBuild">
+    <Exec Command="pwsh -NoProfile -NonInteractive -File &quot;$(MSBuildProjectDirectory)\BumpDriverVersion.ps1&quot; -ManifestPath &quot;$(MSBuildProjectDirectory)\Thermostat_WiserHeat_IP_V2.json&quot; -Configuration &quot;$(Configuration)&quot;" />
+  </Target>
+
+  <Target Name="MergeDependencies" AfterTargets="Build">
+    <ItemGroup>
+      <MergeInputs Include="$(TargetPath)" />
+      <MergeInputs Include="$(TargetDir)WiserHeatAPIv2.dll" />
+      <MergeInputs Include="$(TargetDir)Newtonsoft.Json.dll" />
+      <MergeInputs Include="$(TargetDir)YamlDotNet.dll" />
+      <MergeInputs Include="$(TargetDir)log4net.dll" />
+      <MergeInputs Include="$(TargetDir)Microsoft.Bcl.AsyncInterfaces.dll" />
+      <MergeInputs Include="$(TargetDir)Microsoft.Bcl.HashCode.dll" />
+      <MergeInputs Include="$(TargetDir)Microsoft.Bcl.Memory.dll" />
+      <MergeInputs Include="$(TargetDir)System.Runtime.CompilerServices.Unsafe.dll" />
+      <MergeInputs Include="$(TargetDir)System.Threading.Tasks.Extensions.dll" />
+      <MergeInputs Include="$(TargetDir)Hafner.Compatibility.MetaPackage.dll" />
+      <MergeInputs Include="$(TargetDir)Hafner.Compatibility.CallerInformationAttributes.G2.dll" />
+      <MergeInputs Include="$(TargetDir)Hafner.Compatibility.ConstantExpectedAttribute.dll" />
+      <MergeInputs Include="$(TargetDir)Hafner.Compatibility.DynamicallyAccessedMembersAttribute.dll" />
+      <MergeInputs Include="$(TargetDir)Hafner.Compatibility.ExperimentalAttribute.dll" />
+      <MergeInputs Include="$(TargetDir)Hafner.Compatibility.FeatureGuardAttribute.dll" />
+      <MergeInputs Include="$(TargetDir)Hafner.Compatibility.NullableReferenceTypeAttributes.G1.dll" />
+      <MergeInputs Include="$(TargetDir)Hafner.Compatibility.NullableReferenceTypeAttributes.G2.dll" />
+      <MergeInputs Include="$(TargetDir)Hafner.Compatibility.NullableReferenceTypeAttributes.G3.dll" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(TargetDir)merge_inputs.txt" Lines="@(MergeInputs)" Overwrite="true" />
+    <Exec Command="pwsh -NoProfile -NonInteractive -File &quot;$(MSBuildProjectDirectory)\ILRepackMerge.ps1&quot; -TargetPath &quot;$(TargetPath)&quot; -InputListFile &quot;$(TargetDir)merge_inputs.txt&quot; -LibDir &quot;$(TargetDir.TrimEnd('\'))&quot; -SdkLibDir &quot;$(LocalCrestronSdkLibDir)&quot; -FxRefDir &quot;$(LocalNet472ReferenceAssemblies)&quot; -FxRuntimeDir &quot;$(LocalNetFxRuntimeDir)&quot;" ContinueOnError="$(MergeDependenciesContinueOnError)" />
+    <Exec Command="pwsh -NoProfile -NonInteractive -File &quot;$(MSBuildProjectDirectory)\PatchMergedAssembly.ps1&quot; -AssemblyPath &quot;$(TargetPath)&quot; -OutputPath &quot;$(TargetDir)patched\$(AssemblyName).dll&quot;" ContinueOnError="false" />
+  </Target>
+
+  <Target Name="PackageDriver" AfterTargets="MergeDependencies">
+    <RemoveDir Directories="$(TargetDir)patched\IncludeInPkg" />
+    <ItemGroup>
+      <IncludeInPkgFiles Include="$(MSBuildProjectDirectory)\IncludeInPkg\**\*" Exclude="$(MSBuildProjectDirectory)\IncludeInPkg\**\*.xsd" />
+    </ItemGroup>
+    <Copy SourceFiles="@(IncludeInPkgFiles)" DestinationFiles="@(IncludeInPkgFiles->'$(TargetDir)patched\IncludeInPkg\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Exec Command="&quot;$(ManifestUtilExe)&quot; --file &quot;$(TargetDir)patched\$(AssemblyName).dll&quot; --lib &quot;$(TargetDir.TrimEnd('\'))&quot; --output &quot;$(TargetDir.TrimEnd('\'))&quot;" ContinueOnError="$(PackageDriverContinueOnError)" IgnoreExitCode="$(PackageDriverIgnoreExitCode)" />
+  </Target>
+
+  <Import Project="WiserHeatCrestronDriver.Local.targets" Condition="Exists('WiserHeatCrestronDriver.Local.targets')" />
+</Project>

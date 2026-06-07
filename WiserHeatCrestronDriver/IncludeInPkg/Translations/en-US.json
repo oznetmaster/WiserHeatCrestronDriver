@@ -1,0 +1,22 @@
+{
+  "PlatformTitle": "Wiser Heat",
+  "PlatformSummary": "Discovered Wiser rooms are exposed as thermostat entities.",
+  "ThermostatTitle": "%s Wiser Thermostat",
+  "BoostLabel": "Boost",
+  "BoostOnLabel": "Boost Active",
+  "BoostOffLabel": "Boost Off",
+  "BoostOnActionLabel": "Boost On",
+  "BoostOffActionLabel": "Boost Off",
+  "ScheduleLabel": "Schedule",
+  "ScheduleActionLabel": "Open",
+  "ScheduleTitle": "Schedule",
+  "ScheduleSummaryTitle": "Current Schedule",
+  "ScheduleSimpleHint": "Use Advance for a simple change or Advanced for more options.",
+  "AdvanceScheduleLabel": "Advance",
+  "AdvancedScheduleLabel": "Advanced",
+  "AdvancedScheduleTitle": "Advanced Schedule",
+  "AdvancedScheduleHint1": "Full advanced schedule editing is the next implementation step.",
+  "AdvancedScheduleHint2": "This page is reserved for detailed per-room schedule editing.",
+  "UpLabel": "+",
+  "DownLabel": "-"
+}

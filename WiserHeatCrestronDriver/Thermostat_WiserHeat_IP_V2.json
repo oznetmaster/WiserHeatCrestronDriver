@@ -1,0 +1,93 @@
+{
+  "SchemaVersion": "2.0",
+  "GeneralInformation": {
+    "MinSdkVersion": "21.0000.0000",
+    "Guid": "8f153bae-6a59-44b5-90bc-c73f635a4d90",
+    "DeviceType": "Platform",
+    "Manufacturer": "Drayton Wiser",
+    "BaseModel": "Wiser Heat Gateway",
+    "OtherSupportedModels": [],
+    "SupportedSeries": [ "Wiser" ],
+    "DependencyGroup": "",
+    "Developer": {
+      "Company": "Neil Colvin",
+      "Contact": "Neil Colvin",
+      "Email": "",
+      "Website": "",
+      "PhoneNumber": ""
+    },
+    "DriverVersion": "1.0.000.0035",
+    "VersionDate": "2026-06-07 12:36:39.075"
+  },
+  "ConfigurationSteps": {
+    "Items": [
+      {
+        "Id": "_Host_",
+        "Title": "Hub IP Address / Hostname",
+        "Description": "LAN IP address or hostname of the Wiser hub.",
+        "UsageContext": "Network.Address",
+        "Required": true,
+        "Persistent": true,
+        "ValueType": "String"
+      },
+      {
+        "Id": "HubSecret",
+        "Title": "Hub Secret",
+        "Description": "Required generic string secret used to connect to the Wiser hub.",
+        "UsageContext": "Generic.Prompt",
+        "Required": true,
+        "Persistent": true,
+        "ValueType": "String"
+      },
+      {
+        "Id": "TemperatureUnits",
+        "Title": "Temperature Units",
+        "Description": "Units used for thermostat display and control.",
+        "UsageContext": "Generic.Prompt",
+        "Required": true,
+        "Persistent": true,
+        "ValueType": "String",
+        "DefaultValue": "Celsius",
+        "AvailableValues": [ "Celsius", "Fahrenheit" ]
+      },
+      {
+        "Id": "BoostDelta",
+        "Title": "Boost Delta",
+        "Description": "Temperature increase applied when boost is triggered.",
+        "UsageContext": "Generic.Prompt",
+        "Required": true,
+        "Persistent": true,
+        "ValueType": "Number",
+        "DefaultValue": 2,
+        "MinValue": 1,
+        "MaxValue": 10
+      },
+      {
+        "Id": "BoostDurationMinutes",
+        "Title": "Boost Duration Minutes",
+        "Description": "Length of the timed room boost.",
+        "UsageContext": "Generic.Prompt",
+        "Required": true,
+        "Persistent": true,
+        "ValueType": "Number",
+        "DefaultValue": 60,
+        "MinValue": 5,
+        "MaxValue": 1440
+      }
+    ],
+    "Steps": [
+      {
+        "StepId": "Connection",
+        "Items": [ "_Host_", "HubSecret" ],
+        "NextStep": "HeatSettings"
+      },
+      {
+        "StepId": "HeatSettings",
+        "Items": [ "TemperatureUnits", "BoostDelta", "BoostDurationMinutes" ],
+        "NextStep": null
+      }
+    ],
+    "FirstStep": "Connection"
+  }
+}
+
