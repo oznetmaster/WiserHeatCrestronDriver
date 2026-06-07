@@ -12,8 +12,12 @@
     </layout>
     <layout id="SchedulePage" title="^ScheduleTitle" subtitle="{deviceLabel}">
       <controls>
-        <textdisplay id="ScheduleSummaryDisplay" title="^ScheduleSummaryTitle" line1label="{scheduleSummary}" line2label="^ScheduleSimpleHint" />
+        <textdisplay id="ScheduleSummaryDisplay" title="^ScheduleSummaryTitle" line1label="{selectedScheduleName}" line2label="{scheduleStatusLabel}" line3label="{scheduleSummary}" />
+        <statusandbutton id="EnableScheduleButton" label="^ScheduleEnabledTitle" status="{scheduleStatusLabel}" buttonlabel="^ScheduleEnableActionLabel" buttonaction="command:enableSchedule" visible="{canEnableSchedule}" enabled="{canEnableSchedule}" />
+        <statusandbutton id="DisableScheduleButton" label="^ScheduleEnabledTitle" status="{scheduleStatusLabel}" buttonlabel="^ScheduleDisableActionLabel" buttonaction="command:disableSchedule" visible="{canDisableSchedule}" enabled="{canDisableSchedule}" />
         <buttongroup>
+          <button id="PreviousScheduleBtn" label="^PreviousScheduleLabel" action="command:previousSchedule" enabled="{scheduleSelectorEnabled}" />
+          <button id="NextScheduleBtn" label="^NextScheduleLabel" action="command:nextSchedule" enabled="{scheduleSelectorEnabled}" />
           <button id="AdvanceScheduleBtn" label="^AdvanceScheduleLabel" action="command:advanceSchedule" />
           <button id="AdvancedScheduleBtn" label="^AdvancedScheduleLabel" navigation="show:AdvancedSchedulePage" />
         </buttongroup>
@@ -21,7 +25,7 @@
     </layout>
     <layout id="AdvancedSchedulePage" title="^AdvancedScheduleTitle" subtitle="{deviceLabel}">
       <controls>
-        <textdisplay id="AdvancedScheduleText" title="^AdvancedScheduleTitle" line1label="^AdvancedScheduleHint1" line2label="^AdvancedScheduleHint2" line3label="{scheduleSummary}" />
+        <textdisplay id="AdvancedScheduleText" title="^AdvancedScheduleTitle" line1label="^AdvancedScheduleHint1" line2label="^AdvancedScheduleHint2" line3label="{selectedScheduleName}" />
       </controls>
     </layout>
   </layouts>

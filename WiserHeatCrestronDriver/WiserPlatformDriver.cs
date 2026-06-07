@@ -42,6 +42,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	internal string TemperatureUnits => _temperatureUnits;
 	internal double BoostDelta => _boostDelta;
 	internal int BoostDurationMinutes => _boostDurationMinutes;
+	internal bool HasHeatingSchedules => _api?.Schedules?.HeatingSchedules?.Count > 0;
 
 	[EntityProperty (Id = "platformStatus", FriendlyName = "Platform Status")]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
@@ -439,5 +440,98 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		await room.ScheduleAdvanceAsync (CancellationToken.None).ConfigureAwait (false);
 		await RefreshRoomsAsync ().ConfigureAwait (false);
 		return true;
+		}
+
+	internal async Task<bool> CycleRoomAssignedScheduleAsync (int roomId, int direction)
+		{
+		if (_api == null)
+			return false;
+
+		WiserRoom room = _api.Rooms?.GetById (roomId);
+		List<WiserHeatingSchedule> schedules = _api.Schedules?.HeatingSchedules?
+			.OrderBy (schedule => schedule.Name ?? string.Empty)
+			.ThenBy (schedule => schedule.Id)
+			.ToList () ?? [];
+
+		if (room == null || schedules.Count == 0)
+			return false;
+
+		int currentIndex = schedules.FindIndex (schedule => schedule.Id == room.ScheduleId || schedule.Id == room.Schedule?.Id);
+		int nextIndex;
+		if (currentIndex < 0)
+			nextIndex = direction < 0 ? schedules.Count - 1 : 0;
+		else
+			nextIndex = (currentIndex + (direction < 0 ? -1 : 1) + schedules.Count) % schedules.Count;
+
+		WiserHeatingSchedule targetSchedule = schedules[nextIndex];
+		await targetSchedule.AssignScheduleAsync ([roomId], true, CancellationToken.None).ConfigureAwait (false);
+		await RefreshRoomsAsync ().ConfigureAwait (false);
+		return true;
+		}
+
+	internal async Task<bool> SetRoomScheduleEnabledAsync (int roomId, bool enabled)
+		{
+		if (_api == null)
+			return false;
+
+		WiserRoom room = _api.Rooms?.GetById (roomId);
+		if (room == null)
+			return false;
+
+		if (enabled)
+			{
+			if (room.Schedule == null)
+				{
+				List<WiserHeatingSchedule> schedules = _api.Schedules?.HeatingSchedules?
+					.OrderBy (schedule => schedule.Name ?? string.Empty)
+					.ThenBy (schedule => schedule.Id)
+					.ToList () ?? [];
+
+				if (schedules.Count == 0)
+					return false;
+
+				await schedules[0].AssignScheduleAsync ([roomId], true, CancellationToken.None).ConfigureAwait (false);
+				}
+
+			string autoMode = FindPreferredRoomMode (room, "Auto", "Scheduled", "Schedule");
+			if (!string.IsNullOrWhiteSpace (autoMode))
+				await room.SetModeAsync (autoMode, CancellationToken.None).ConfigureAwait (false);
+			}
+		else
+			{
+			string manualMode = FindPreferredRoomMode (room, "Manual", "Fixed");
+			if (!string.IsNullOrWhiteSpace (manualMode))
+				await room.SetModeAsync (manualMode, CancellationToken.None).ConfigureAwait (false);
+			else
+				await room.SetManualTemperatureAsync (room.CurrentTargetTemperature, CancellationToken.None).ConfigureAwait (false);
+			}
+
+		await RefreshRoomsAsync ().ConfigureAwait (false);
+		return true;
+		}
+
+	private static string FindPreferredRoomMode (WiserRoom room, params string[] preferredModes)
+		{
+		List<string> availableModes = WiserRoom.AvailableModes;
+		if (availableModes == null || availableModes.Count == 0)
+			return preferredModes.FirstOrDefault (mode => !string.IsNullOrWhiteSpace (mode));
+
+		foreach (string preferredMode in preferredModes)
+			{
+			string match = availableModes.FirstOrDefault (mode => string.Equals (mode, preferredMode, StringComparison.OrdinalIgnoreCase));
+			if (!string.IsNullOrWhiteSpace (match))
+				return match;
+			}
+
+		foreach (string preferredMode in preferredModes)
+			{
+			string match = availableModes.FirstOrDefault (mode =>
+				!string.IsNullOrWhiteSpace (mode) &&
+				mode.IndexOf (preferredMode, StringComparison.OrdinalIgnoreCase) >= 0);
+			if (!string.IsNullOrWhiteSpace (match))
+				return match;
+			}
+
+		return null;
 		}
 	}
