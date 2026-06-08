@@ -43,6 +43,13 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	internal double BoostDelta => _boostDelta;
 	internal int BoostDurationMinutes => _boostDurationMinutes;
 	internal bool HasHeatingSchedules => _api?.Schedules?.HeatingSchedules?.Count > 0;
+	internal IReadOnlyList<WiserHeatingSchedule> HeatingSchedules => _api?.Schedules?.HeatingSchedules?
+		.OrderBy (schedule => schedule.Name ?? string.Empty)
+		.ThenBy (schedule => schedule.Id)
+		.ToList () ?? [];
+
+	internal WiserHeatingSchedule GetAssignedScheduleForRoom (int roomId) =>
+		_api?.Schedules?.GetByRoomId (roomId);
 
 	[EntityProperty (Id = "platformStatus", FriendlyName = "Platform Status")]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
@@ -442,30 +449,30 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		return true;
 		}
 
-	internal async Task<bool> CycleRoomAssignedScheduleAsync (int roomId, int direction)
+	internal async Task<bool> SetRoomAssignedScheduleAsync (int roomId, int scheduleId)
 		{
 		if (_api == null)
 			return false;
 
 		WiserRoom room = _api.Rooms?.GetById (roomId);
-		List<WiserHeatingSchedule> schedules = _api.Schedules?.HeatingSchedules?
-			.OrderBy (schedule => schedule.Name ?? string.Empty)
-			.ThenBy (schedule => schedule.Id)
-			.ToList () ?? [];
+		List<WiserHeatingSchedule> schedules = HeatingSchedules.ToList ();
+		Log ($"SetRoomAssignedScheduleAsync requested roomId={roomId}, scheduleId={scheduleId}, roomFound={room != null}, scheduleCount={schedules.Count}");
 
 		if (room == null || schedules.Count == 0)
 			return false;
 
-		int currentIndex = schedules.FindIndex (schedule => schedule.Id == room.ScheduleId || schedule.Id == room.Schedule?.Id);
-		int nextIndex;
-		if (currentIndex < 0)
-			nextIndex = direction < 0 ? schedules.Count - 1 : 0;
-		else
-			nextIndex = (currentIndex + (direction < 0 ? -1 : 1) + schedules.Count) % schedules.Count;
+		WiserHeatingSchedule targetSchedule = schedules.FirstOrDefault (schedule => schedule.Id == scheduleId);
+		if (targetSchedule == null)
+			{
+			Log ($"SetRoomAssignedScheduleAsync could not find scheduleId={scheduleId} for roomId={roomId}");
+			return false;
+			}
 
-		WiserHeatingSchedule targetSchedule = schedules[nextIndex];
+		Log ($"SetRoomAssignedScheduleAsync assigning roomId={roomId} to scheduleId={scheduleId} name='{targetSchedule.Name ?? string.Empty}'");
+
 		await targetSchedule.AssignScheduleAsync ([roomId], true, CancellationToken.None).ConfigureAwait (false);
 		await RefreshRoomsAsync ().ConfigureAwait (false);
+		Log ($"SetRoomAssignedScheduleAsync completed roomId={roomId}, scheduleId={scheduleId}");
 		return true;
 		}
 
@@ -482,10 +489,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			{
 			if (room.Schedule == null)
 				{
-				List<WiserHeatingSchedule> schedules = _api.Schedules?.HeatingSchedules?
-					.OrderBy (schedule => schedule.Name ?? string.Empty)
-					.ThenBy (schedule => schedule.Id)
-					.ToList () ?? [];
+				List<WiserHeatingSchedule> schedules = HeatingSchedules.ToList ();
 
 				if (schedules.Count == 0)
 					return false;

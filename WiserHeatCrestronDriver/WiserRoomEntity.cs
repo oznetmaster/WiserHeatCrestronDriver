@@ -23,6 +23,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	private readonly WiserPlatformDriver _platform;
 	private readonly UiDefinitionProperty _uiDefinition;
 	private readonly Dictionary<string, DriverEntityValue> _propertyCache = [];
+	private DriverEntityAvailableValue[] _scheduleValues = [];
 	private WiserRoom _room;
 
 	public WiserRoomEntity (
@@ -55,6 +56,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		ScheduleStatusLabel = BuildScheduleStatusLabel (room);
 		ScheduleToggleActionLabel = BuildScheduleToggleActionLabel (room);
 		SelectedScheduleName = BuildSelectedScheduleName (room);
+		SelectedScheduleId = BuildSelectedScheduleId (room);
 		ScheduleSelectorEnabled = platform?.HasHeatingSchedules == true;
 		CurrentTemperatureLabel = $"{CurrentTemperature:0.0}°";
 		TileIcon = BuildTileIcon (room);
@@ -210,6 +212,17 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		get; private set;
 		}
 
+	public string SelectedScheduleId
+		{
+		get; private set;
+		}
+
+	private DriverEntityAvailableValue[] ScheduleValues
+		{
+		get => _scheduleValues;
+		set => _scheduleValues = value ?? [];
+		}
+
 	[EntityProperty (Id = "scheduleSelectorEnabled", FriendlyName = "Schedule Selector Enabled")]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public bool ScheduleSelectorEnabled
@@ -272,42 +285,8 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	[EntityCommandMetadata (Programmable = true)]
 	public void OpenSchedule ()
 		{
-		}
-
-	[EntityCommand (Id = "advanceSchedule", FriendlyName = "Advance Schedule")]
-	[EntityCommandMetadata (Programmable = true)]
-	public void AdvanceSchedule ()
-		{
-		if (_room == null)
-			return;
-
-		_ = FireAndForgetAsync (
-			() => _platform.AdvanceRoomScheduleAsync (_room.Id),
-			"advance schedule");
-		}
-
-	[EntityCommand (Id = "previousSchedule", FriendlyName = "Previous Schedule")]
-	[EntityCommandMetadata (Programmable = true)]
-	public void PreviousSchedule ()
-		{
-		if (_room == null)
-			return;
-
-		_ = FireAndForgetAsync (
-			() => _platform.CycleRoomAssignedScheduleAsync (_room.Id, -1),
-			"select previous schedule");
-		}
-
-	[EntityCommand (Id = "nextSchedule", FriendlyName = "Next Schedule")]
-	[EntityCommandMetadata (Programmable = true)]
-	public void NextSchedule ()
-		{
-		if (_room == null)
-			return;
-
-		_ = FireAndForgetAsync (
-			() => _platform.CycleRoomAssignedScheduleAsync (_room.Id, 1),
-			"select next schedule");
+		LogInfo ($"OpenSchedule invoked; frameworkReady={_frameworkReady}, selectorEnabled={ScheduleSelectorEnabled}, selectedScheduleId='{SelectedScheduleId ?? string.Empty}'");
+		RefreshScheduleValues (notify: _frameworkReady != 0);
 		}
 
 	[EntityCommand (Id = "enableSchedule", FriendlyName = "Enable Schedule")]
@@ -340,6 +319,9 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		if (_room == null)
 			return;
 
+		WiserHeatingSchedule assignedSchedule = ResolveAssignedSchedule (_room);
+		LogInfo ($"UpdateFromRoom start; roomId={_room.Id}, mode='{_room.Mode ?? string.Empty}', scheduleId={assignedSchedule?.Id ?? _room.ScheduleId}, scheduleName='{ResolveScheduleNameForLog (_room, assignedSchedule)}', temperatureUnits='{temperatureUnits ?? string.Empty}'");
+
 		DeviceLabel = _room.Name ?? DeviceLabel;
 		CurrentTemperature = _room.CurrentTemperature;
 		TargetTemperature = _room.CurrentTargetTemperature;
@@ -356,6 +338,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		ScheduleStatusLabel = BuildScheduleStatusLabel (_room);
 		ScheduleToggleActionLabel = BuildScheduleToggleActionLabel (_room);
 		SelectedScheduleName = BuildSelectedScheduleName (_room);
+		RefreshScheduleValues (notify: true);
 		ScheduleSelectorEnabled = _platform?.HasHeatingSchedules == true;
 		CurrentTemperatureLabel = $"{CurrentTemperature:0.0}°";
 		TileIcon = BuildTileIcon (_room);
@@ -377,6 +360,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		NotifyPropertyChanged ("scheduleStatusLabel", new DriverEntityValue (ScheduleStatusLabel));
 		NotifyPropertyChanged ("scheduleToggleActionLabel", new DriverEntityValue (ScheduleToggleActionLabel));
 		NotifyPropertyChanged ("selectedScheduleName", new DriverEntityValue (SelectedScheduleName));
+		NotifyPropertyChanged ("selectedScheduleId", new DriverEntityValue (SelectedScheduleId));
 		NotifyPropertyChanged ("scheduleSelectorEnabled", new DriverEntityValue (ScheduleSelectorEnabled));
 		NotifyPropertyChanged ("currentTemperatureLabel", new DriverEntityValue (CurrentTemperatureLabel));
 		NotifyPropertyChanged ("tileIcon", new DriverEntityValue (TileIcon));
@@ -395,9 +379,12 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		{
 		if (Interlocked.CompareExchange (ref _frameworkReady, 1, 0) != 0)
 			{
+			LogInfo ("StartPolling ignored because framework is already ready");
 			SetOnline (true);
 			return;
 			}
+
+		LogInfo ("StartPolling initializing extension surface");
 
 		if (_uiDefinition != null)
 			{
@@ -405,6 +392,8 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			if (uiValue.HasValue)
 				NotifyPropertyChanged (UiDefinitionProperty.Name, uiValue.Value);
 			}
+
+		RefreshScheduleValues (notify: true);
 
 		NotifyPropertyChanged ("readyIndicator:isReady", new DriverEntityValue (ReadyIndicatorIsReady));
 		NotifyPropertyChanged ("deviceLabel", new DriverEntityValue (DeviceLabel));
@@ -423,6 +412,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		NotifyPropertyChanged ("scheduleStatusLabel", new DriverEntityValue (ScheduleStatusLabel));
 		NotifyPropertyChanged ("scheduleToggleActionLabel", new DriverEntityValue (ScheduleToggleActionLabel));
 		NotifyPropertyChanged ("selectedScheduleName", new DriverEntityValue (SelectedScheduleName));
+		NotifyPropertyChanged ("selectedScheduleId", new DriverEntityValue (SelectedScheduleId));
 		NotifyPropertyChanged ("scheduleSelectorEnabled", new DriverEntityValue (ScheduleSelectorEnabled));
 		NotifyPropertyChanged ("currentTemperatureLabel", new DriverEntityValue (CurrentTemperatureLabel));
 		NotifyPropertyChanged ("tileIcon", new DriverEntityValue (TileIcon));
@@ -436,7 +426,8 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		{
 		try
 			{
-			await action ().ConfigureAwait (false);
+			bool succeeded = await action ().ConfigureAwait (false);
+			LogInfo ($"Operation '{operation}' completed with success={succeeded}");
 			}
 		catch (Exception ex)
 			{
@@ -447,23 +438,22 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			}
 		}
 
-	private static string BuildScheduleSummary (WiserRoom room)
+	private string BuildScheduleSummary (WiserRoom room)
 		{
-		if (room?.Schedule == null)
+		WiserHeatingSchedule assignedSchedule = ResolveAssignedSchedule (room);
+		if (assignedSchedule == null)
 			return IsScheduleEnabled (room) ? "Schedule available" : "No schedule assigned";
 
-		string name = string.IsNullOrWhiteSpace (room.Schedule.Name)
-			? $"Schedule {room.Schedule.Id}"
-			: room.Schedule.Name;
+		string name = ResolveScheduleName (room, assignedSchedule);
 		return $"{name} ({room.Mode})";
 		}
 
-	private static bool IsScheduleEnabled (WiserRoom room)
+	private bool IsScheduleEnabled (WiserRoom room)
 		{
 		if (room == null)
 			return false;
 
-		if (room.Schedule == null)
+		if (ResolveAssignedSchedule (room) == null)
 			return false;
 
 		if (string.IsNullOrWhiteSpace (room.Mode))
@@ -472,21 +462,186 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		return room.Mode.IndexOf ("manual", StringComparison.OrdinalIgnoreCase) < 0;
 		}
 
-	private static string BuildScheduleStatusLabel (WiserRoom room) =>
+	private string BuildScheduleStatusLabel (WiserRoom room) =>
 		IsScheduleEnabled (room) ? "^ScheduleEnabledLabel" : "^ScheduleDisabledLabel";
 
-	private static string BuildScheduleToggleActionLabel (WiserRoom room) =>
+	private string BuildScheduleToggleActionLabel (WiserRoom room) =>
 		IsScheduleEnabled (room) ? "^ScheduleDisableActionLabel" : "^ScheduleEnableActionLabel";
 
-	private static string BuildSelectedScheduleName (WiserRoom room)
+	private string BuildSelectedScheduleName (WiserRoom room)
 		{
-		if (room?.Schedule == null)
+		if (ResolveAssignedSchedule (room) == null)
 			return "^NoScheduleAssignedLabel";
 
-		return string.IsNullOrWhiteSpace (room.Schedule.Name)
-			? $"Schedule {room.Schedule.Id}"
-			: room.Schedule.Name;
+		return ResolveScheduleName (room);
 		}
+
+	private string ResolveScheduleName (WiserRoom room, WiserHeatingSchedule assignedSchedule = null)
+		{
+		assignedSchedule ??= ResolveAssignedSchedule (room);
+
+		if (!string.IsNullOrWhiteSpace (assignedSchedule?.Name))
+			return assignedSchedule.Name;
+
+		return $"Schedule {assignedSchedule?.Id ?? room?.ScheduleId ?? 0}";
+		}
+
+	private string BuildSelectedScheduleId (WiserRoom room)
+		{
+		WiserHeatingSchedule assignedSchedule = ResolveAssignedSchedule (room);
+		if (assignedSchedule == null)
+			return string.Empty;
+
+		return assignedSchedule.Id.ToString ();
+		}
+
+	private WiserHeatingSchedule ResolveAssignedSchedule (WiserRoom room)
+		{
+		if (room == null)
+			return null;
+
+		return _platform?.GetAssignedScheduleForRoom (room.Id) ?? room.Schedule as WiserHeatingSchedule;
+		}
+
+	private void SelectSchedule (string scheduleIdText)
+		{
+		LogInfo ($"SelectSchedule requested with value='{scheduleIdText ?? string.Empty}'");
+
+		if (_room == null || string.IsNullOrWhiteSpace (scheduleIdText))
+			{
+			LogInfo ("SelectSchedule ignored because room is null or value is empty");
+			return;
+			}
+
+		int scheduleId = 0;
+		foreach (WiserHeatingSchedule schedule in _platform?.HeatingSchedules ?? [])
+			{
+			if (string.Equals ((schedule?.Id ?? 0).ToString (), scheduleIdText, StringComparison.OrdinalIgnoreCase))
+				{
+				scheduleId = schedule.Id;
+				break;
+				}
+			}
+
+		if (scheduleId == 0 && !int.TryParse (scheduleIdText, out scheduleId))
+			{
+			LogInfo ($"SelectSchedule could not resolve value='{scheduleIdText}' to a schedule id");
+			return;
+			}
+
+		LogInfo ($"SelectSchedule resolved value='{scheduleIdText}' to scheduleId={scheduleId}");
+
+		_ = FireAndForgetAsync (
+			() => _platform.SetRoomAssignedScheduleAsync (_room.Id, scheduleId),
+			"select schedule");
+		}
+
+	private DriverEntityCommandResult SetExtensionPropertyValue (IDictionary<string, DriverEntityValue> args)
+		{
+		if (args == null)
+			return new DriverEntityCommandResult (true, null);
+
+		string propertyId = TryReadStringValue (args, "propertyId") ?? TryReadStringValue (args, "propertyName");
+		string propertyValue = TryReadStringValue (args, "value") ?? TryReadStringValue (args, "propertyValue");
+
+		LogInfo ($"SetExtensionPropertyValue propertyId='{propertyId ?? string.Empty}', value='{propertyValue ?? string.Empty}'");
+
+		if (!string.IsNullOrWhiteSpace (propertyValue))
+			SelectSchedule (propertyValue);
+
+		return new DriverEntityCommandResult (false, null);
+		}
+
+	private void RefreshScheduleValues (bool notify)
+		{
+		string previousSelectedScheduleId = SelectedScheduleId ?? string.Empty;
+		DriverEntityAvailableValue[] nextScheduleValues = BuildScheduleAvailableValues ();
+		string nextSelectedScheduleId = BuildSelectedScheduleId (_room);
+
+		ScheduleValues = nextScheduleValues;
+		SelectedScheduleId = nextSelectedScheduleId;
+		_propertyCache["selectedScheduleId"] = new DriverEntityValue (SelectedScheduleId ?? string.Empty);
+		LogScheduleValues ($"RefreshScheduleValues(notify={notify})");
+		RebuildSelectedScheduleProperty ();
+
+		if (notify)
+			{
+			NotifyPropertyChanged (
+				"selectedScheduleId",
+				new DriverEntityValue (previousSelectedScheduleId),
+				new DriverEntityValue (SelectedScheduleId ?? string.Empty));
+			LogInfo ($"Published schedule selector state; newCount={ScheduleValues?.Length ?? 0}, previousSelectedScheduleId='{previousSelectedScheduleId}', newSelectedScheduleId='{SelectedScheduleId ?? string.Empty}'");
+			}
+		}
+
+	private static string TryReadStringValue (IDictionary<string, DriverEntityValue> args, string key)
+		{
+		if (args == null || !args.TryGetValue (key, out DriverEntityValue value))
+			return null;
+
+		try
+			{
+			return value.GetValue<string> ();
+			}
+		catch
+			{
+			return null;
+			}
+		}
+
+	private DriverEntityAvailableValue[] BuildScheduleAvailableValues ()
+		{
+		var values = new List<DriverEntityAvailableValue> ();
+		var diagnostics = new List<string> ();
+		foreach (WiserHeatingSchedule schedule in _platform?.HeatingSchedules ?? [])
+			{
+			string labelText = BuildScheduleOptionValue (schedule);
+			string value = (schedule?.Id ?? 0).ToString ();
+			// Crestron Home app renders SelectorButton available values using
+			// LocalizationKey only, never falls back to Text. Setting both to
+			// the display string ensures the label is visible even without a
+			// translation dictionary entry.
+			var label = new DriverEntityLocalizedString (labelText, labelText);
+			diagnostics.Add ($"{value}:{labelText}(text='{label.Text}',key='{label.LocalizationKey ?? "<null>"}')");
+			values.Add (new DriverEntityAvailableValue (
+				value,
+				label,
+				false));
+			}
+
+		LogInfo ($"BuildScheduleAvailableValues produced count={values.Count}; schedules={(diagnostics.Count == 0 ? "<none>" : string.Join (", ", diagnostics))}");
+
+		return [.. values];
+		}
+
+	private void LogScheduleValues (string context)
+		{
+		var diagnostics = new List<string> ();
+		foreach (WiserHeatingSchedule schedule in _platform?.HeatingSchedules ?? [])
+			diagnostics.Add ($"{schedule?.Id ?? 0}:{BuildScheduleOptionValue (schedule)}");
+
+		WiserHeatingSchedule assignedSchedule = ResolveAssignedSchedule (_room);
+		LogInfo ($"{context}; availableCount={_scheduleValues?.Length ?? 0}, selectedScheduleId='{SelectedScheduleId ?? string.Empty}', roomScheduleId={assignedSchedule?.Id ?? _room?.ScheduleId ?? 0}, roomScheduleName='{ResolveScheduleNameForLog (_room, assignedSchedule)}', platformSchedules={(diagnostics.Count == 0 ? "<none>" : string.Join (", ", diagnostics))}");
+		}
+
+	private void LogInfo (string message) =>
+		_logger?.Log (_driverLogId, LogEntryLevel.Info, $"Room '{DeviceLabel ?? ControllerId}': {message}");
+
+	private static string ResolveScheduleNameForLog (WiserRoom room, WiserHeatingSchedule assignedSchedule)
+		{
+		if (assignedSchedule == null)
+			return string.Empty;
+
+		if (!string.IsNullOrWhiteSpace (assignedSchedule.Name))
+			return assignedSchedule.Name;
+
+		return $"Schedule {assignedSchedule.Id}";
+		}
+
+	private static string BuildScheduleOptionValue (WiserHeatingSchedule schedule) =>
+		string.IsNullOrWhiteSpace (schedule?.Name)
+			? $"Schedule {schedule?.Id ?? 0}"
+			: schedule.Name;
 
 	private static bool IsRoomBoostActive (WiserRoom room)
 		{
@@ -494,6 +649,40 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			return false;
 
 		return room.BoostTimeRemaining > 0;
+		}
+
+	private void RebuildSelectedScheduleProperty ()
+		{
+		RemoveProperty ("selectedScheduleId");
+
+		var noName = new DriverEntityLocalizedString (null, null);
+		var writableMeta = new DriverEntityPropertyMetadata (true, true, false);
+		var scheduleIdType = new DriverEntityTypeDefinition (
+			DriverEntityValueType.String,
+			DriverEntityValueType.Uninitialized,
+			null,
+			null,
+			null,
+			_scheduleValues,
+			null);
+		var selectedScheduleDefinition = new DriverEntityPropertyDefinition (
+			noName,
+			null,
+			scheduleIdType,
+			null,
+			null,
+			null,
+			null);
+		AddProperty (this, "selectedScheduleId", new DelegatePropertyInstance (
+			selectedScheduleDefinition,
+			writableMeta,
+			(inst, lookup) =>
+				{
+				_ = _propertyCache.TryGetValue ("selectedScheduleId", out DriverEntityValue value);
+				return value;
+				}));
+		RaiseDefinitionChangedEvent ();
+		LogInfo ($"Rebuilt selectedScheduleId property definition with available value count={_scheduleValues?.Length ?? 0}");
 		}
 
 	private void RegisterExtensionSurface ()
@@ -525,6 +714,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		RegisterCachedProperty ("canEnableSchedule", boolType, readableMeta, noName);
 		RegisterCachedProperty ("canDisableSchedule", boolType, readableMeta, noName);
 		RegisterCachedProperty ("scheduleSelectorEnabled", boolType, readableMeta, noName);
+		RebuildSelectedScheduleProperty ();
 
 		var noResult = new DriverEntityCommandResult (false, null);
 		var commandMeta = new DriverEntityCommandMetadata (true, false);
@@ -574,39 +764,6 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 				},
 			null));
 
-		AddCommand (this, "advanceSchedule", new DelegateCommandInstance (
-			"advanceSchedule",
-			emptyDef,
-			commandMeta,
-			(id, inst, args, lookup, cb) =>
-				{
-				AdvanceSchedule ();
-				cb?.Invoke (noResult);
-				},
-			null));
-
-		AddCommand (this, "previousSchedule", new DelegateCommandInstance (
-			"previousSchedule",
-			emptyDef,
-			commandMeta,
-			(id, inst, args, lookup, cb) =>
-				{
-				PreviousSchedule ();
-				cb?.Invoke (noResult);
-				},
-			null));
-
-		AddCommand (this, "nextSchedule", new DelegateCommandInstance (
-			"nextSchedule",
-			emptyDef,
-			commandMeta,
-			(id, inst, args, lookup, cb) =>
-				{
-				NextSchedule ();
-				cb?.Invoke (noResult);
-				},
-			null));
-
 		AddCommand (this, "enableSchedule", new DelegateCommandInstance (
 			"enableSchedule",
 			emptyDef,
@@ -627,6 +784,13 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 				DisableSchedule ();
 				cb?.Invoke (noResult);
 				},
+			null));
+
+		AddCommand (this, ExtensionSetPropertyValueExecutor.CommandName, new DelegateCommandInstance (
+			ExtensionSetPropertyValueExecutor.CommandName,
+			ExtensionSetPropertyValueExecutor.CommandDefinition,
+			commandMeta,
+			(id, inst, args, lookup, cb) => cb?.Invoke (SetExtensionPropertyValue (args)),
 			null));
 		}
 
@@ -660,6 +824,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		_propertyCache["scheduleToggleActionLabel"] = new DriverEntityValue (BuildScheduleToggleActionLabel (_room) ?? string.Empty);
 		_propertyCache["scheduleStatusLabel"] = new DriverEntityValue (ScheduleStatusLabel ?? string.Empty);
 		_propertyCache["selectedScheduleName"] = new DriverEntityValue (SelectedScheduleName ?? string.Empty);
+		_propertyCache["selectedScheduleId"] = new DriverEntityValue (SelectedScheduleId ?? string.Empty);
 		_propertyCache["currentTemperatureLabel"] = new DriverEntityValue (CurrentTemperatureLabel ?? string.Empty);
 		_propertyCache["tileIcon"] = new DriverEntityValue (TileIcon ?? string.Empty);
 		_propertyCache["isBoostActive"] = new DriverEntityValue (IsBoostActive);
