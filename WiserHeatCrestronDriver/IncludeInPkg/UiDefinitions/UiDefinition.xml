@@ -3,11 +3,12 @@
 <!-- Licensed under the MIT License with Commons Clause. See LICENSE file in the project root for full license information. -->
 <uidefinition xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://prd-use-rad-assets.azurewebsites.net/ExtensionsSchemaDefinition.xsd">
   <version ver="2.0" />
-  <tile icon="#icClimateRegular" navigation="show:MainPage" showinhomepage="#false" showinroompage="#true" />
+  <tile icon="{platformTileIcon}" status="{platformTileStatus}" navigation="show:MainPage" showinhomepage="#true" showinroompage="#false" />
   <layouts>
     <layout id="MainPage" title="^PlatformTitle" isdefaultlayout="#true">
       <controls>
-        <textdisplay id="HubSummary" title="^PlatformTitle" line1label="^PlatformSummary" />
+        <statusandbutton id="HotWaterButton" label="^HotWaterTitle" status="{hotWaterStateLabel}" buttonlabel="{hotWaterActionLabel}" buttonaction="command:toggleHotWater" visible="{hotWaterVisible}" enabled="{hotWaterActionEnabled}" />
+        <statusandbutton id="AwayModeButton" label="^AwayTitle" status="{awayModeStateLabel}" buttonlabel="{awayModeActionLabel}" buttonaction="command:toggleAwayMode" visible="{awayModeVisible}" enabled="{awayModeActionEnabled}" />
       </controls>
     </layout>
   </layouts>

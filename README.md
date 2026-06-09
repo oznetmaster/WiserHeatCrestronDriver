@@ -27,6 +27,8 @@ The driver is implemented using the **Crestron Home SDK V2 Entity Model**. It de
 - Schedule assignment and schedule selection UI
 - Shared schedule day editing from the Crestron Home UI
 - Dynamic room tile icons reflecting heating, scheduled, or regular state
+- Optional whole-house hot water control on the platform options page
+- Optional global Away Mode control on the platform options page
 
 ---
 
@@ -56,6 +58,14 @@ Preferred download source: use the attached `Thermostat_WiserHeat_IP_V2.pkg` ass
 | Temperature Units | `Celsius` or `Fahrenheit` for thermostat display |
 | Boost Delta | Temperature increase applied when boost is triggered |
 | Boost Duration Minutes | Duration of a timed room boost |
+| Enable Whole House Hot Water Control | Adds a platform-level domestic hot water toggle |
+| Allow Away Mode | Adds a platform-level Away Mode toggle |
+
+When either platform option is enabled, the root platform tile opens a `Wiser Heat Options` page. The verified behavior is:
+
+- Whole-house hot water and Away Mode both work from the platform options page.
+- Away Mode is a global system mode, but individual room and hot water settings can still be overridden afterward.
+- State-changing controls reject repeat presses while a command is already in flight to avoid double-push races.
 
 ### Obtaining the Wiser Secret
 
@@ -107,6 +117,8 @@ Typical release flow:
 1. Push the release commit and tag.
 2. Publish a GitHub Release for that tag.
 3. Let the workflow build and attach the `.pkg` asset.
+
+When publishing a release, include release notes mentioning the verified platform options behavior, specifically that whole-house hot water and Away Mode both work and that Away Mode does not prevent later individual overrides.
 
 ---
 

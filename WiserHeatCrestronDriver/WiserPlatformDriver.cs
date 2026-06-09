@@ -27,6 +27,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	private readonly DriverControllerLogger _logger;
 	private readonly string _driverLogId;
 	private readonly WiserWorkQueue _workQueue = new ();
+	private readonly UiDefinitionProperty _uiDefinition;
 	private readonly Dictionary<string, WiserRoomEntity> _roomEntities = new (StringComparer.OrdinalIgnoreCase);
 	private readonly Dictionary<string, ConfigurableDriverEntity> _roomControllers = new (StringComparer.OrdinalIgnoreCase);
 	private readonly object _entitiesLock = new ();
@@ -37,6 +38,10 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	private string _temperatureUnits = "Celsius";
 	private double _boostDelta = 2.0;
 	private int _boostDurationMinutes = 60;
+	private bool _enableWholeHouseHotWater;
+	private bool _allowAwayMode;
+	private int _hotWaterCommandInProgress;
+	private int _awayModeCommandInProgress;
 
 	internal DataDrivenConfigurationController ConfigurationController
 		{
@@ -115,6 +120,118 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		private set => SetAndNotify ("readyIndicator:isReady", value, ref field);
 		}
 
+	[EntityProperty (Id = "hotWaterVisible", FriendlyName = "Hot Water Visible", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool HotWaterVisible
+		{
+		get;
+		private set => SetAndNotify ("hotWaterVisible", value, ref field);
+		}
+
+	[EntityProperty (Id = "hotWaterActionEnabled", FriendlyName = "Hot Water Action Enabled", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool HotWaterActionEnabled
+		{
+		get;
+		private set => SetAndNotify ("hotWaterActionEnabled", value, ref field);
+		}
+
+	[EntityProperty (Id = "hotWaterIsOn", FriendlyName = "Hot Water Is On", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool HotWaterIsOn
+		{
+		get;
+		private set => SetAndNotify ("hotWaterIsOn", value, ref field);
+		}
+
+	[EntityProperty (Id = "hotWaterStateLabel", FriendlyName = "Hot Water State Label", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string HotWaterStateLabel
+		{
+		get;
+		private set => SetAndNotify ("hotWaterStateLabel", value, ref field);
+		} = string.Empty;
+
+	[EntityProperty (Id = "hotWaterActionLabel", FriendlyName = "Hot Water Action Label", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string HotWaterActionLabel
+		{
+		get;
+		private set => SetAndNotify ("hotWaterActionLabel", value, ref field);
+		} = string.Empty;
+
+	[EntityProperty (Id = "hotWaterTileIcon", FriendlyName = "Hot Water Tile Icon", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string HotWaterTileIcon
+		{
+		get;
+		private set => SetAndNotify ("hotWaterTileIcon", value, ref field);
+		} = "icFireOff";
+
+	[EntityProperty (Id = "platformOptionsVisible", FriendlyName = "Platform Options Visible", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool PlatformOptionsVisible
+		{
+		get;
+		private set => SetAndNotify ("platformOptionsVisible", value, ref field);
+		}
+
+	[EntityProperty (Id = "platformTileIcon", FriendlyName = "Platform Tile Icon", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string PlatformTileIcon
+		{
+		get;
+		private set => SetAndNotify ("platformTileIcon", value, ref field);
+		} = "icClimateRegular";
+
+	[EntityProperty (Id = "platformTileStatus", FriendlyName = "Platform Tile Status", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string PlatformTileStatus
+		{
+		get;
+		private set => SetAndNotify ("platformTileStatus", value, ref field);
+		} = string.Empty;
+
+	[EntityProperty (Id = "awayModeVisible", FriendlyName = "Away Mode Visible", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool AwayModeVisible
+		{
+		get;
+		private set => SetAndNotify ("awayModeVisible", value, ref field);
+		}
+
+	[EntityProperty (Id = "awayModeActionEnabled", FriendlyName = "Away Mode Action Enabled", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool AwayModeActionEnabled
+		{
+		get;
+		private set => SetAndNotify ("awayModeActionEnabled", value, ref field);
+		}
+
+	[EntityProperty (Id = "awayModeIsEnabled", FriendlyName = "Away Mode Is Enabled", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool AwayModeIsEnabled
+		{
+		get;
+		private set => SetAndNotify ("awayModeIsEnabled", value, ref field);
+		}
+
+	[EntityProperty (Id = "awayModeStateLabel", FriendlyName = "Away Mode State Label", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string AwayModeStateLabel
+		{
+		get;
+		private set => SetAndNotify ("awayModeStateLabel", value, ref field);
+		} = string.Empty;
+
+	[EntityProperty (Id = "awayModeActionLabel", FriendlyName = "Away Mode Action Label", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string AwayModeActionLabel
+		{
+		get;
+		private set => SetAndNotify ("awayModeActionLabel", value, ref field);
+		} = string.Empty;
+
 	public WiserPlatformDriver (
 		DriverControllerCreationArgs args,
 		DriverImplementationResources resources)
@@ -124,6 +241,25 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		_resources = resources;
 		_logger = args.Logger;
 		_driverLogId = args.DriverId;
+
+		try
+			{
+			_uiDefinition = UiDefinitionProperty.LoadFromDirectoryIfExists (_args.DriverDataDirectoryPath, resources.InitLogger, LogEntryLevel.Error)
+				?? throw new InvalidOperationException ($"UiDefinition is required but was not found at '{_args.DriverDataDirectoryPath}'.");
+			}
+		catch (Exception ex)
+			{
+			_logger.Log (_driverLogId, LogEntryLevel.Error, "UiDefinition load failed: " + ex.Message);
+			throw;
+			}
+
+		AddProperty (this, UiDefinitionProperty.Name, _uiDefinition);
+
+		var doCommand = new ExtensionDoCommandExecutor (GetCommand, resources.Logger);
+		AddCommand (this, ExtensionDoCommandExecutor.CommandName, doCommand);
+
+		var setPropertyValue = new ExtensionSetPropertyValueExecutor (GetCommand, resources.Logger);
+		AddCommand (this, ExtensionSetPropertyValueExecutor.CommandName, setPropertyValue);
 
 		var cfgArgs = DataDrivenConfigurationControllerArgs.FromResources (args, resources, ControllerId);
 		ConfigurationController = new DelegateDataDrivenConfigurationController (
@@ -198,6 +334,12 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 	private void SetReady (bool ready) => ReadyIndicatorIsReady = ready;
 
+	[EntityCommand (Id = "toggleHotWater", FriendlyName = "Toggle Hot Water")]
+	public void ToggleHotWater () => _ = ToggleHotWaterAsync ();
+
+	[EntityCommand (Id = "toggleAwayMode", FriendlyName = "Toggle Away Mode")]
+	public void ToggleAwayMode () => _ = ToggleAwayModeAsync ();
+
 	private ConfigurationItemErrors? ApplyConfigurationItems (
 		DataDrivenConfigurationController.ApplyConfigurationAction action,
 		string stepId,
@@ -219,6 +361,14 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 			if (values.TryGetValue ("BoostDurationMinutes", out DriverEntityValue? boostMinutes) && boostMinutes.HasValue)
 				_boostDurationMinutes = ReadIntValue (boostMinutes.Value, _boostDurationMinutes);
+
+			if (values.TryGetValue ("EnableWholeHouseHotWater", out DriverEntityValue? enableWholeHouseHotWater) && enableWholeHouseHotWater.HasValue)
+				_enableWholeHouseHotWater = ReadBooleanValue (enableWholeHouseHotWater.Value, _enableWholeHouseHotWater);
+
+			if (values.TryGetValue ("AllowAwayMode", out DriverEntityValue? allowAwayMode) && allowAwayMode.HasValue)
+				_allowAwayMode = ReadBooleanValue (allowAwayMode.Value, _allowAwayMode);
+
+			UpdatePlatformOptionsState ();
 			}
 
 		ConfigurationItemErrors? ValidateConnectionItems ()
@@ -258,7 +408,14 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 					return ValidateConnectionItems ();
 
 				if (string.Equals (stepId, "HeatSettings", StringComparison.OrdinalIgnoreCase))
+					{
+					ConfigurationItemErrors? heatSettingsErrors = ValidateConnectionItems ();
+					if (heatSettingsErrors != null)
+						return heatSettingsErrors;
+
+					_ = ConnectAndDiscoverAsync ();
 					return null;
+					}
 
 				return null;
 
@@ -266,8 +423,11 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				Log ("ApplyConfigurationItems: action=ClearValues");
 				DisposeApi ();
 				_workQueue.ClearClient ();
+				_enableWholeHouseHotWater = false;
+				_allowAwayMode = false;
 				SetReady (false);
 				SetOnline (false);
+				UpdatePlatformOptionsState ();
 				UpdateStatus ("Configuration cleared", string.Empty);
 				return null;
 
@@ -334,6 +494,196 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			}
 		}
 
+	private static bool ReadBooleanValue (DriverEntityValue value, bool fallback)
+		{
+		try
+			{
+			return value.GetValue<bool> ();
+			}
+		catch
+			{
+			try
+				{
+				return value.GetValue<int> () != 0;
+				}
+			catch
+				{
+				try
+					{
+					string text = value.GetValue<string> ();
+					if (bool.TryParse (text, out bool parsedBool))
+						return parsedBool;
+
+					if (int.TryParse (text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedInt))
+						return parsedInt != 0;
+
+					return fallback;
+					}
+				catch
+					{
+					return fallback;
+					}
+				}
+			}
+		}
+
+	private void UpdatePlatformOptionsState ()
+		{
+		HotWaterVisible = _enableWholeHouseHotWater;
+		AwayModeVisible = _allowAwayMode;
+		PlatformOptionsVisible = HotWaterVisible || AwayModeVisible;
+
+		if (!_enableWholeHouseHotWater)
+			{
+			HotWaterActionEnabled = false;
+			HotWaterIsOn = false;
+			HotWaterStateLabel = string.Empty;
+			HotWaterActionLabel = string.Empty;
+			HotWaterTileIcon = "icFireOff";
+			}
+		else
+			{
+			WiserHotwater? hotwater = _api?.Hotwater;
+			if (hotwater == null)
+				{
+				HotWaterActionEnabled = false;
+				HotWaterIsOn = false;
+				HotWaterStateLabel = "^HotWaterUnavailableLabel";
+				HotWaterActionLabel = "^HotWaterUnavailableActionLabel";
+				HotWaterTileIcon = "icFireOff";
+				}
+			else
+				{
+				bool isOn = hotwater.IsHeating || string.Equals (hotwater.CurrentState, "On", StringComparison.OrdinalIgnoreCase);
+				HotWaterActionEnabled = OnlineIndicatorIsOnline && Interlocked.CompareExchange (ref _hotWaterCommandInProgress, 0, 0) == 0;
+				HotWaterIsOn = isOn;
+				HotWaterStateLabel = isOn ? "^HotWaterOnLabel" : "^HotWaterOffLabel";
+				HotWaterActionLabel = isOn ? "^HotWaterTurnOffLabel" : "^HotWaterTurnOnLabel";
+				HotWaterTileIcon = isOn ? "icFireOn" : "icFireOff";
+				}
+			}
+
+		if (!_allowAwayMode)
+			{
+			AwayModeActionEnabled = false;
+			AwayModeIsEnabled = false;
+			AwayModeStateLabel = string.Empty;
+			AwayModeActionLabel = string.Empty;
+			}
+		else
+			{
+			WiserSystem? system = _api?.System;
+			if (system == null)
+				{
+				AwayModeActionEnabled = false;
+				AwayModeIsEnabled = false;
+				AwayModeStateLabel = "^AwayUnavailableLabel";
+				AwayModeActionLabel = "^AwayUnavailableActionLabel";
+				}
+			else
+				{
+				bool isAwayEnabled = system.AwayModeEnabled;
+				AwayModeActionEnabled = OnlineIndicatorIsOnline && Interlocked.CompareExchange (ref _awayModeCommandInProgress, 0, 0) == 0;
+				AwayModeIsEnabled = isAwayEnabled;
+				AwayModeStateLabel = isAwayEnabled ? "^AwayEnabledLabel" : "^AwayDisabledLabel";
+				AwayModeActionLabel = isAwayEnabled ? "^AwayDisableActionLabel" : "^AwayEnableActionLabel";
+				}
+			}
+
+		if (!PlatformOptionsVisible)
+			{
+			PlatformTileIcon = "icClimateRegular";
+			PlatformTileStatus = string.Empty;
+			}
+		else if (HotWaterVisible)
+			{
+			PlatformTileIcon = HotWaterTileIcon;
+			PlatformTileStatus = HotWaterStateLabel;
+			}
+		else
+			{
+			PlatformTileIcon = AwayModeIsEnabled ? "icLeaveHome" : "icClimateRegular";
+			PlatformTileStatus = AwayModeStateLabel;
+			}
+		}
+
+	private async Task ToggleHotWaterAsync ()
+		{
+		if (!_enableWholeHouseHotWater)
+			return;
+
+		if (Interlocked.Exchange (ref _hotWaterCommandInProgress, 1) != 0)
+			return;
+
+		UpdatePlatformOptionsState ();
+
+		try
+			{
+			await _workQueue.EnqueueAsync (async api =>
+				{
+				WiserHotwater? hotwater = api.Hotwater;
+				if (hotwater == null)
+					return;
+
+				bool requestedOn = !HotWaterIsOn;
+				bool success = await hotwater.OverrideStateAsync (requestedOn ? "On" : "Off", CancellationToken.None).ConfigureAwait (false);
+				if (success)
+					await RefreshRoomsAsync ().ConfigureAwait (false);
+				}).ConfigureAwait (false);
+
+			UpdatePlatformOptionsState ();
+			}
+		catch (Exception ex)
+			{
+			LogError ("Toggle hot water failed: " + ex);
+			PlatformLastError = ex.Message;
+			UpdatePlatformOptionsState ();
+			}
+		finally
+			{
+			Interlocked.Exchange (ref _hotWaterCommandInProgress, 0);
+			UpdatePlatformOptionsState ();
+			}
+		}
+
+	private async Task ToggleAwayModeAsync ()
+		{
+		if (!_allowAwayMode)
+			return;
+
+		if (Interlocked.Exchange (ref _awayModeCommandInProgress, 1) != 0)
+			return;
+
+		UpdatePlatformOptionsState ();
+
+		try
+			{
+			await _workQueue.EnqueueAsync (async api =>
+				{
+				WiserSystem? system = api.System;
+				if (system == null)
+					return;
+
+				bool requestedOn = !system.AwayModeEnabled;
+				system.AwayModeEnabled = requestedOn;
+				await RefreshRoomsAsync ().ConfigureAwait (false);
+				}).ConfigureAwait (false);
+
+			UpdatePlatformOptionsState ();
+			}
+		catch (Exception ex)
+			{
+			LogError ("Toggle away mode failed: " + ex);
+			PlatformLastError = ex.Message;
+			UpdatePlatformOptionsState ();
+			}
+		finally
+			{
+			Interlocked.Exchange (ref _awayModeCommandInProgress, 0);
+			UpdatePlatformOptionsState ();
+			}
+		}
+
 	private async Task ConnectAndDiscoverAsync ()
 		{
 		WiserAPI? newApi = null;
@@ -360,6 +710,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			Log ("Connected to Wiser API");
 			_workQueue.SetClient (_api);
 			SetOnline (true);
+			UpdatePlatformOptionsState ();
 			UpdateStatus ("Connected", string.Empty);
 			await RefreshRoomsAsync ().ConfigureAwait (false);
 			}
@@ -371,6 +722,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			LogError ("Wiser connection failed: " + ex);
 			SetOnline (false);
 			SetReady (false);
+			UpdatePlatformOptionsState ();
 			UpdateStatus ("Offline", ex.Message);
 			}
 		}
@@ -442,6 +794,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			}
 
 		ManagedDevices = managed;
+		UpdatePlatformOptionsState ();
 		Log ("RefreshRoomsAsync - publishing platform:managedDevices count=" + ManagedDevices.Count);
 
 		if (ManagedDevices.Count == 0)

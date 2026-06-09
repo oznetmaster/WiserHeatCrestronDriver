@@ -16,8 +16,8 @@
       "Website": "",
       "PhoneNumber": ""
     },
-    "DriverVersion": "1.0.000.0233",
-    "VersionDate": "2026-06-09 14:17:24.968"
+    "DriverVersion": "1.0.001.0002",
+    "VersionDate": "2026-06-09 16:39:48.317"
   },
   "ConfigurationSteps": {
     "Items": [
@@ -73,6 +73,26 @@
         "DefaultValue": 60,
         "MinValue": 5,
         "MaxValue": 1440
+      },
+      {
+        "Id": "EnableWholeHouseHotWater",
+        "Title": "Enable Whole House Hot Water Control",
+        "Description": "Show an optional domestic hot water control on the platform homepage when the Wiser hub supports hot water.",
+        "UsageContext": "Generic.Prompt",
+        "Required": true,
+        "Persistent": true,
+        "ValueType": "Boolean",
+        "DefaultValue": false
+      },
+      {
+        "Id": "AllowAwayMode",
+        "Title": "Allow Away Mode",
+        "Description": "Show an optional Away mode control on the platform homepage.",
+        "UsageContext": "Generic.Prompt",
+        "Required": true,
+        "Persistent": true,
+        "ValueType": "Boolean",
+        "DefaultValue": false
       }
     ],
     "Steps": [
@@ -83,7 +103,7 @@
       },
       {
         "StepId": "HeatSettings",
-        "Items": [ "TemperatureUnits", "BoostDelta", "BoostDurationMinutes" ],
+        "Items": [ "TemperatureUnits", "BoostDelta", "BoostDurationMinutes", "EnableWholeHouseHotWater", "AllowAwayMode" ],
         "NextStep": null
       }
     ],

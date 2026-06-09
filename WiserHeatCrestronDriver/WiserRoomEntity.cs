@@ -43,6 +43,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	private IDictionary<string, object> _editScheduleData = new Dictionary<string, object> (StringComparer.OrdinalIgnoreCase);
 	private int _editScheduleId;
 	private string _editScheduleName = string.Empty;
+	private int _roomActionInProgress;
 
 	public WiserRoomEntity (
 		string controllerId,
@@ -153,8 +154,12 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		double value)
 		{
 		LogInfo ($"UI requested targetTemperature value={value}");
+		if (!TryBeginRoomAction ())
+			return;
+
 		if (TargetTemperature.Equals (value))
 			{
+			EndRoomAction ();
 			LogInfo ($"UI targetTemperature ignored because value is unchanged ({value})");
 			return;
 			}
@@ -708,6 +713,9 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	[EntityCommandMetadata (Programmable = true)]
 	public void Boost ()
 		{
+		if (!TryBeginRoomAction ())
+			return;
+
 		_ = FireAndForgetAsync (
 			() => _platform.TriggerRoomBoostAsync (_room.Id),
 			"boost");
@@ -725,6 +733,9 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	[EntityCommandMetadata (Programmable = true)]
 	public void EnableSchedule ()
 		{
+		if (!TryBeginRoomAction ())
+			return;
+
 		_ = FireAndForgetAsync (
 			() => _platform.SetRoomScheduleEnabledAsync (_room.Id, true),
 			"enable schedule");
@@ -734,6 +745,9 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	[EntityCommandMetadata (Programmable = true)]
 	public void DisableSchedule ()
 		{
+		if (!TryBeginRoomAction ())
+			return;
+
 		_ = FireAndForgetAsync (
 			() => _platform.SetRoomScheduleEnabledAsync (_room.Id, false),
 			"disable schedule");
@@ -750,14 +764,14 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	[EntityCommand (Id = "saveEditScheduleDay", FriendlyName = "Save Edit Schedule Day")]
 	[EntityCommandMetadata (Programmable = true)]
 	public void SaveEditScheduleDay () =>
-		_ = FireAndForgetAsync (
+		_ = TryFireAndForgetRoomAction (
 			() => SaveEditedScheduleAsync (applyToAllDays: false),
 			"save schedule day");
 
 	[EntityCommand (Id = "saveEditScheduleAllDays", FriendlyName = "Save Edit Schedule All Days")]
 	[EntityCommandMetadata (Programmable = true)]
 	public void SaveEditScheduleAllDays () =>
-		_ = FireAndForgetAsync (
+		_ = TryFireAndForgetRoomAction (
 			() => SaveEditedScheduleAsync (applyToAllDays: true),
 			"save schedule all days");
 
@@ -788,6 +802,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		ScheduleEnabled = IsScheduleEnabled (_room);
 		CanEnableSchedule = !ScheduleEnabled && isScheduleAvailable;
 		CanDisableSchedule = ScheduleEnabled;
+		NotifyRoomActionStateChanged ();
 		ScheduleStatusLabel = BuildScheduleStatusLabel (_room);
 		SelectedScheduleName = BuildSelectedScheduleName (_room);
 		RefreshScheduleValues (notify: true);
@@ -842,6 +857,53 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 				LogEntryLevel.Error,
 				$"Failed to {operation} for room '{DeviceLabel}': {ex}");
 			}
+		finally
+			{
+			EndRoomAction ();
+			}
+		}
+
+	private Task TryFireAndForgetRoomAction (Func<Task<bool>> action, string operation)
+		{
+		if (!TryBeginRoomAction ())
+			return Task.CompletedTask;
+
+		return FireAndForgetAsync (action, operation);
+		}
+
+	private bool TryBeginRoomAction ()
+		{
+		if (Interlocked.Exchange (ref _roomActionInProgress, 1) != 0)
+			return false;
+
+		NotifyRoomActionStateChanged ();
+		return true;
+		}
+
+	private void EndRoomAction ()
+		{
+		Interlocked.Exchange (ref _roomActionInProgress, 0);
+		NotifyRoomActionStateChanged ();
+		}
+
+	private void NotifyRoomActionStateChanged ()
+		{
+		bool isBusy = Interlocked.CompareExchange (ref _roomActionInProgress, 0, 0) != 0;
+		bool isScheduleAvailable = _platform.HasHeatingSchedules;
+		bool canEnableSchedule = !ScheduleEnabled && isScheduleAvailable && !isBusy;
+		bool canDisableSchedule = ScheduleEnabled && !isBusy;
+
+		if (CanEnableSchedule != canEnableSchedule)
+			CanEnableSchedule = canEnableSchedule;
+
+		if (CanDisableSchedule != canDisableSchedule)
+			CanDisableSchedule = canDisableSchedule;
+
+		if (ScheduleSelectorEnabled != (isScheduleAvailable && !isBusy))
+			ScheduleSelectorEnabled = isScheduleAvailable && !isBusy;
+
+		if (EditScheduleEnabled != (ResolveAssignedSchedule (_room) != null && !isBusy))
+			EditScheduleEnabled = ResolveAssignedSchedule (_room) != null && !isBusy;
 		}
 
 	private string BuildScheduleSummary (WiserRoom room)

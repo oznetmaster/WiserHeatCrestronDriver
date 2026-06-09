@@ -1,18 +1,38 @@
-# Copyright © 2026 Neil Colvin.
-# Licensed under the MIT License with Commons Clause. See LICENSE file in the project root for full license information.
-
-param (
-    [Parameter(Mandatory)]
-    [string]$ManifestPath,
-    [Parameter(Mandatory)]
-    [string]$Configuration
+param(
+	[Parameter(Mandatory)][string] $ManifestPath,
+	[string] $Configuration = 'Debug'
 )
 
-$content = Get-Content $ManifestPath -Raw
-$content = $content -replace '(?<="DriverVersion":\s*"\d+\.\d+\.\d+\.)(\d+)', {
-    ([int]$_.Value + 1).ToString('D4')
+
+if (-not (Test-Path $ManifestPath)) {
+	exit 0
 }
-$now = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss.fff')
-$content = $content -replace '(?<="VersionDate":\s*")[^"]+', $now
+
+
+$content = Get-Content $ManifestPath -Raw
+$match = [regex]::Match($content, '(?<="DriverVersion":\s*")(?<major>\d+)\.(?<minor>\d+)\.(?<release>\d+)\.(?<build>\d+)(?=")')
+if (-not $match.Success) {
+	Write-Warning 'DriverVersion must contain four numeric components.'
+	exit 0
+}
+
+$major = $match.Groups['major'].Value
+$minor = $match.Groups['minor'].Value
+$release = [int]$match.Groups['release'].Value
+$build = [int]$match.Groups['build'].Value
+
+switch ($Configuration) {
+	'Debug' {
+		$newVersion = '{0}.{1}.{2}.{3}' -f $major, $minor, $release.ToString('000'), ($build + 1).ToString('0000')
+	}
+	'Release' {
+		$newVersion = '{0}.{1}.{2}.0000' -f $major, $minor, ($release + 1).ToString('000')
+	}
+	default {
+		exit 0
+	}
+}
+
+$content = [regex]::Replace($content, '(?<="DriverVersion":\s*")[^"]+(?=")', $newVersion, 1)
+$content = [regex]::Replace($content, '(?<="VersionDate":\s*")[^"]+(?=")', (Get-Date).ToString('yyyy-MM-dd HH:mm:ss.fff'), 1)
 Set-Content -Path $ManifestPath -Value $content -NoNewline
-Write-Host "DriverVersion build revision bumped ($Configuration) and VersionDate set to $now in $ManifestPath"
