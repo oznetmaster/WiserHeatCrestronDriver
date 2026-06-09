@@ -5,7 +5,7 @@
   <layouts>
     <layout id="MainPage" title="{deviceLabel}" subtitle="{scheduleSummary}" isdefaultlayout="#true">
       <controls>
-        <thermostat id="RoomThermostat" toplefticon="{tileIcon}" title="^ThermostatTitle|{deviceLabel}" setpointauto="{targetTemperature}" heatmodeenabled="#false" coolmodeenabled="#false" automodeenabled="#true" modeicon="{tileIcon}" currenttemperature="{currentTemperature}" currenttemperaturelabel="{currentTemperatureLabel}" temperatureunits="{temperatureUnits}" />
+         <thermostat id="RoomThermostat" toplefticon="{tileIcon}" title="^ThermostatTitle|{deviceLabel}" setpointheat="{targetTemperature}" heatmodeenabled="#true" coolmodeenabled="#false" automodeenabled="#false" modeicon="{tileIcon}" currenttemperature="{currentTemperature}" currenttemperaturelabel="{currentTemperatureLabel}" temperatureunits="{temperatureUnits}" />
         <statusandbutton id="BoostButton" label="^BoostLabel" status="{boostStateLabel}" buttonlabel="{boostActionLabel}" buttonaction="command:boost" />
         <statusandbutton id="ScheduleButton" label="^ScheduleLabel" status="{scheduleSummary}" buttonlabel="^ScheduleActionLabel" buttonaction="command:openSchedule" navigation="show:SchedulePage" />
       </controls>
@@ -17,13 +17,59 @@
         <statusandbutton id="EnableScheduleButton" label="^ScheduleEnabledTitle" status="{scheduleStatusLabel}" buttonlabel="^ScheduleEnableActionLabel" buttonaction="command:enableSchedule" visible="{canEnableSchedule}" enabled="{canEnableSchedule}" />
         <statusandbutton id="DisableScheduleButton" label="^ScheduleEnabledTitle" status="{scheduleStatusLabel}" buttonlabel="^ScheduleDisableActionLabel" buttonaction="command:disableSchedule" visible="{canDisableSchedule}" enabled="{canDisableSchedule}" />
         <buttongroup>
-          <button id="EditScheduleBtn" label="^EditScheduleLabel" navigation="show:EditSchedulePage" enabled="{scheduleSelectorEnabled}" />
+          <button id="EditScheduleBtn" label="^EditScheduleLabel" action="command:openEditSchedule" navigation="show:EditSchedulePage" enabled="{scheduleSelectorEnabled}" />
         </buttongroup>
       </controls>
     </layout>
     <layout id="EditSchedulePage" title="^EditScheduleTitle" subtitle="{deviceLabel}">
       <controls>
-        <textdisplay id="EditScheduleText" title="^EditScheduleTitle" line1label="^EditScheduleHint1" line2label="^EditScheduleHint2" line3label="{selectedScheduleName}" />
+        <textdisplay id="EditScheduleSummary" title="^EditScheduleTitle" line1label="{editScheduleSummary}" line2label="{editScheduleImpact}" line3label="{editScheduleError}" />
+        <selectorbutton id="EditScheduleDaySelector" label="^EditScheduleDayLabel" value="{editSelectedDay}" visible="{editScheduleEnabled}" enabled="{editScheduleEnabled}" />
+        <controlgroup visible="{editSlot1Visible}">
+          <selectorbutton id="EditSlot1Time" label="^EditScheduleTime1Label" value="{editSlot1Time}" />
+          <raiselowerwithtext id="EditSlot1Temperature" label="^EditScheduleTemperature1Label" value="{editSlot1Temperature}" valueformat="^EditScheduleTemperatureFormat" />
+        </controlgroup>
+        <controlgroup visible="{editSlot2Visible}">
+          <selectorbutton id="EditSlot2Time" label="^EditScheduleTime2Label" value="{editSlot2Time}" />
+          <raiselowerwithtext id="EditSlot2Temperature" label="^EditScheduleTemperature2Label" value="{editSlot2Temperature}" valueformat="^EditScheduleTemperatureFormat" />
+        </controlgroup>
+        <controlgroup visible="{editSlot3Visible}">
+          <selectorbutton id="EditSlot3Time" label="^EditScheduleTime3Label" value="{editSlot3Time}" />
+          <raiselowerwithtext id="EditSlot3Temperature" label="^EditScheduleTemperature3Label" value="{editSlot3Temperature}" valueformat="^EditScheduleTemperatureFormat" />
+        </controlgroup>
+        <controlgroup visible="{editSlot4Visible}">
+          <selectorbutton id="EditSlot4Time" label="^EditScheduleTime4Label" value="{editSlot4Time}" />
+          <raiselowerwithtext id="EditSlot4Temperature" label="^EditScheduleTemperature4Label" value="{editSlot4Temperature}" valueformat="^EditScheduleTemperatureFormat" />
+        </controlgroup>
+        <controlgroup visible="{editSlot5Visible}">
+          <selectorbutton id="EditSlot5Time" label="^EditScheduleTime5Label" value="{editSlot5Time}" />
+          <raiselowerwithtext id="EditSlot5Temperature" label="^EditScheduleTemperature5Label" value="{editSlot5Temperature}" valueformat="^EditScheduleTemperatureFormat" />
+        </controlgroup>
+        <controlgroup visible="{editSlot6Visible}">
+          <selectorbutton id="EditSlot6Time" label="^EditScheduleTime6Label" value="{editSlot6Time}" />
+          <raiselowerwithtext id="EditSlot6Temperature" label="^EditScheduleTemperature6Label" value="{editSlot6Temperature}" valueformat="^EditScheduleTemperatureFormat" />
+        </controlgroup>
+        <controlgroup visible="{editSlot7Visible}">
+          <selectorbutton id="EditSlot7Time" label="^EditScheduleTime7Label" value="{editSlot7Time}" />
+          <raiselowerwithtext id="EditSlot7Temperature" label="^EditScheduleTemperature7Label" value="{editSlot7Temperature}" valueformat="^EditScheduleTemperatureFormat" />
+        </controlgroup>
+        <controlgroup visible="{editSlot8Visible}">
+          <selectorbutton id="EditSlot8Time" label="^EditScheduleTime8Label" value="{editSlot8Time}" />
+          <raiselowerwithtext id="EditSlot8Temperature" label="^EditScheduleTemperature8Label" value="{editSlot8Temperature}" valueformat="^EditScheduleTemperatureFormat" />
+        </controlgroup>
+        <controlgroup visible="{editSlot9Visible}">
+          <selectorbutton id="EditSlot9Time" label="^EditScheduleTime9Label" value="{editSlot9Time}" />
+          <raiselowerwithtext id="EditSlot9Temperature" label="^EditScheduleTemperature9Label" value="{editSlot9Temperature}" valueformat="^EditScheduleTemperatureFormat" />
+        </controlgroup>
+        <controlgroup visible="{editSlot10Visible}">
+          <selectorbutton id="EditSlot10Time" label="^EditScheduleTime10Label" value="{editSlot10Time}" />
+          <raiselowerwithtext id="EditSlot10Temperature" label="^EditScheduleTemperature10Label" value="{editSlot10Temperature}" valueformat="^EditScheduleTemperatureFormat" />
+        </controlgroup>
+        <buttongroup visible="{editScheduleEnabled}">
+          <button id="SaveEditScheduleDayBtn" label="^EditScheduleSaveDayLabel" action="command:saveEditScheduleDay" />
+          <button id="SaveEditScheduleAllDaysBtn" label="^EditScheduleSaveAllDaysLabel" action="command:saveEditScheduleAllDays" />
+          <button id="CancelEditScheduleBtn" label="^EditScheduleCancelLabel" action="command:cancelEditSchedule" navigation="back" />
+        </buttongroup>
       </controls>
     </layout>
   </layouts>

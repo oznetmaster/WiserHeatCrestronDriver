@@ -1,6 +1,8 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -22,9 +24,21 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	private readonly string _driverLogId;
 	private readonly WiserPlatformDriver _platform;
 	private readonly UiDefinitionProperty _uiDefinition;
-	private readonly Dictionary<string, DriverEntityValue> _propertyCache = [];
+	private string _selectedScheduleId = string.Empty;
 	private DriverEntityAvailableValue[] _scheduleValues = [];
 	private WiserRoom _room;
+	private const int MaxEditableScheduleSlots = 10;
+	private static readonly string[] EditableScheduleDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+	private static readonly DriverEntityAvailableValue[] EditTimeValues = BuildEditTimeAvailableValues ();
+	private readonly Dictionary<string, List<EditableScheduleSlot>> _editDaySlots = new (StringComparer.OrdinalIgnoreCase);
+	private string _editSelectedDay = string.Empty;
+	private readonly string[] _editSlotTimes = new string[MaxEditableScheduleSlots];
+	private readonly double[] _editSlotTemperatures = new double[MaxEditableScheduleSlots];
+	private readonly bool[] _editSlotVisible = new bool[MaxEditableScheduleSlots];
+	private readonly string[] _editSlotErrors = new string[MaxEditableScheduleSlots];
+	private IDictionary<string, object> _editScheduleData = new Dictionary<string, object> (StringComparer.OrdinalIgnoreCase);
+	private int _editScheduleId;
+	private string _editScheduleName = string.Empty;
 
 	public WiserRoomEntity (
 		string controllerId,
@@ -40,39 +54,42 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		_driverLogId = driverLogId;
 		_platform = platform;
 		_room = room;
-		DeviceLabel = room?.Name ?? controllerId;
-		CurrentTemperature = room?.CurrentTemperature ?? 0;
-		TargetTemperature = room?.CurrentTargetTemperature ?? 0;
-		DisplayedSetpoint = room?.DisplayedSetpoint ?? TargetTemperature;
+		DeviceLabel = room.Name ?? controllerId;
+		TargetTemperature = room.CurrentTargetTemperature;
+		CurrentTemperature = room.CurrentTemperature;
 		IsBoostActive = IsRoomBoostActive (room);
 		BoostStateLabel = IsBoostActive ? "^BoostOnLabel" : "^BoostOffLabel";
 		BoostActionLabel = IsBoostActive ? "^BoostOffActionLabel" : "^BoostOnActionLabel";
 		TemperatureUnits = "Celsius";
-		IsScheduleAvailable = platform?.HasHeatingSchedules == true;
+		bool isScheduleAvailable = platform.HasHeatingSchedules;
 		ScheduleSummary = BuildScheduleSummary (room);
 		ScheduleEnabled = IsScheduleEnabled (room);
-		CanEnableSchedule = !ScheduleEnabled && IsScheduleAvailable;
+		CanEnableSchedule = !ScheduleEnabled && isScheduleAvailable;
 		CanDisableSchedule = ScheduleEnabled;
 		ScheduleStatusLabel = BuildScheduleStatusLabel (room);
-		ScheduleToggleActionLabel = BuildScheduleToggleActionLabel (room);
 		SelectedScheduleName = BuildSelectedScheduleName (room);
 		SelectedScheduleId = BuildSelectedScheduleId (room);
-		ScheduleSelectorEnabled = platform?.HasHeatingSchedules == true;
+		ScheduleSelectorEnabled = platform.HasHeatingSchedules;
 		CurrentTemperatureLabel = $"{CurrentTemperature:0.0}°";
 		TileIcon = BuildTileIcon (room);
 		OnlineIndicatorIsOnline = true;
 		ReadyIndicatorIsReady = true;
-		RefreshPropertyCache ();
+		EditScheduleSummary = string.Empty;
+		EditScheduleImpact = string.Empty;
+		EditScheduleError = string.Empty;
+		EditSelectedDay = string.Empty;
+		LoadEditScheduleState (notify: false);
 
 		try
 			{
-			var baseDir = driverDataDirectoryPath ?? Path.GetTempPath ();
-			var roomRoot = Path.Combine (baseDir, "room");
-			_uiDefinition = UiDefinitionProperty.LoadFromDirectoryIfExists (roomRoot, resources.InitLogger, LogEntryLevel.Error);
+			var roomRoot = Path.Combine (driverDataDirectoryPath, "room");
+			_uiDefinition = UiDefinitionProperty.LoadFromDirectoryIfExists (roomRoot, resources.InitLogger, LogEntryLevel.Error)
+				?? throw new InvalidOperationException ($"UiDefinition is required but was not found at '{roomRoot}'.");
 			}
 		catch (Exception ex)
 			{
-			_logger?.Log (_driverLogId, LogEntryLevel.Error, "UiDefinition load failed: " + ex.Message);
+			_logger.Log (_driverLogId, LogEntryLevel.Error, "UiDefinition load failed: " + ex.Message);
+			throw;
 			}
 
 		AddProperty (this, UiDefinitionProperty.Name, _uiDefinition);
@@ -83,138 +100,174 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		var setPropertyValue = new ExtensionSetPropertyValueExecutor (GetCommand, resources.Logger);
 		AddCommand (this, ExtensionSetPropertyValueExecutor.CommandName, setPropertyValue);
 
-		RegisterExtensionSurface ();
+		NotifyEditStateChanged ();
 		}
 
 	public DeviceUxCategory UxCategory => DeviceUxCategory.Thermostat;
 
-	[EntityProperty (Id = "onlineIndicator:isOnline")]
+	[EntityProperty (Id = "onlineIndicator:isOnline", Type = DriverEntityValueType.Boolean)]
 	public bool OnlineIndicatorIsOnline
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("onlineIndicator:isOnline", value, ref field);
 		}
 
-	[EntityProperty (Id = "readyIndicator:isReady")]
+	[EntityProperty (Id = "readyIndicator:isReady", Type = DriverEntityValueType.Boolean)]
 	public bool ReadyIndicatorIsReady
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("readyIndicator:isReady", value, ref field);
 		}
 
-	[EntityProperty (Id = "deviceLabel", FriendlyName = "Room Label")]
+	[EntityProperty (Id = "deviceLabel", FriendlyName = "Room Label", Type = DriverEntityValueType.String)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public string DeviceLabel
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("deviceLabel", value, ref field);
 		}
 
-	[EntityProperty (Id = "currentTemperature", FriendlyName = "Current Temperature")]
+	[EntityProperty (Id = "currentTemperature", FriendlyName = "Current Temperature", Type = DriverEntityValueType.Number)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public double CurrentTemperature
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("currentTemperature", value, ref field);
 		}
 
-	[EntityProperty (Id = "targetTemperature", FriendlyName = "Target Temperature")]
+	[EntityProperty (Id = "targetTemperature", FriendlyName = "Target Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public double TargetTemperature
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("targetTemperature", value, ref field);
 		}
 
-	[EntityProperty (Id = "displayedSetpoint", FriendlyName = "Displayed Setpoint")]
-	[EntityPropertyMetadata (ExtensionUiProperty = true)]
-	public double DisplayedSetpoint
+	[EntityCommand (Id = "setTargetTemperature", FriendlyName = "Set Target Temperature")]
+	public void SetTargetTemperature (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.Number)]
+		double value)
 		{
-		get; private set;
+		LogInfo ($"UI requested targetTemperature value={value}");
+		if (TargetTemperature.Equals (value))
+			{
+			LogInfo ($"UI targetTemperature ignored because value is unchanged ({value})");
+			return;
+			}
+
+		TargetTemperature = value;
+		_ = FireAndForgetAsync (
+			() => _platform.SetRoomSetpointAsync (_room.Id, value),
+			"set target temperature");
 		}
 
-	[EntityProperty (Id = "isBoostActive", FriendlyName = "Boost Active")]
+	[EntityProperty (Id = "isBoostActive", FriendlyName = "Boost Active", Type = DriverEntityValueType.Boolean)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public bool IsBoostActive
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("isBoostActive", value, ref field);
 		}
 
-	[EntityProperty (Id = "boostStateLabel", FriendlyName = "Boost State Label")]
+	[EntityProperty (Id = "boostStateLabel", FriendlyName = "Boost State Label", Type = DriverEntityValueType.String)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public string BoostStateLabel
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("boostStateLabel", value, ref field);
 		}
 
-	[EntityProperty (Id = "boostActionLabel", FriendlyName = "Boost Action Label")]
+	[EntityProperty (Id = "boostActionLabel", FriendlyName = "Boost Action Label", Type = DriverEntityValueType.String)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public string BoostActionLabel
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("boostActionLabel", value, ref field);
 		}
 
-	[EntityProperty (Id = "temperatureUnits", FriendlyName = "Temperature Units")]
+	[EntityProperty (Id = "temperatureUnits", FriendlyName = "Temperature Units", Type = DriverEntityValueType.String)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public string TemperatureUnits
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("temperatureUnits", value, ref field);
 		}
 
-	[EntityProperty (Id = "isScheduleAvailable", FriendlyName = "Schedule Available")]
-	[EntityPropertyMetadata (ExtensionUiProperty = true)]
-	public bool IsScheduleAvailable
-		{
-		get; private set;
-		}
-
-	[EntityProperty (Id = "scheduleSummary", FriendlyName = "Schedule Summary")]
+	[EntityProperty (Id = "scheduleSummary", FriendlyName = "Schedule Summary", Type = DriverEntityValueType.String)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public string ScheduleSummary
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("scheduleSummary", value, ref field);
 		}
 
-	[EntityProperty (Id = "scheduleEnabled", FriendlyName = "Schedule Enabled")]
+	[EntityProperty (Id = "scheduleEnabled", FriendlyName = "Schedule Enabled", Type = DriverEntityValueType.Boolean)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public bool ScheduleEnabled
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("scheduleEnabled", value, ref field);
 		}
 
-	[EntityProperty (Id = "canEnableSchedule", FriendlyName = "Can Enable Schedule")]
+	[EntityProperty (Id = "canEnableSchedule", FriendlyName = "Can Enable Schedule", Type = DriverEntityValueType.Boolean)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public bool CanEnableSchedule
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("canEnableSchedule", value, ref field);
 		}
 
-	[EntityProperty (Id = "canDisableSchedule", FriendlyName = "Can Disable Schedule")]
+	[EntityProperty (Id = "canDisableSchedule", FriendlyName = "Can Disable Schedule", Type = DriverEntityValueType.Boolean)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public bool CanDisableSchedule
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("canDisableSchedule", value, ref field);
 		}
 
-	[EntityProperty (Id = "scheduleStatusLabel", FriendlyName = "Schedule Status")]
+	[EntityProperty (Id = "scheduleStatusLabel", FriendlyName = "Schedule Status", Type = DriverEntityValueType.String)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public string ScheduleStatusLabel
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("scheduleStatusLabel", value, ref field);
 		}
 
-	[EntityProperty (Id = "scheduleToggleActionLabel", FriendlyName = "Schedule Toggle Action Label")]
-	[EntityPropertyMetadata (ExtensionUiProperty = true)]
-	public string ScheduleToggleActionLabel
-		{
-		get; private set;
-		}
-
-	[EntityProperty (Id = "selectedScheduleName", FriendlyName = "Selected Schedule")]
+	[EntityProperty (Id = "selectedScheduleName", FriendlyName = "Selected Schedule", Type = DriverEntityValueType.String)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public string SelectedScheduleName
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("selectedScheduleName", value, ref field);
 		}
 
+	[EntityProperty (Id = "selectedScheduleOptions", FriendlyName = "Selected Schedule Options", Type = DriverEntityValueType.Array, ItemType = DriverEntityValueType.AvailableValue)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public DriverEntityAvailableValue[] SelectedScheduleOptions => ScheduleValues;
+
+	[EntityProperty (Id = "selectedScheduleId", FriendlyName = "Selected Schedule Id", Type = DriverEntityValueType.String, AvailableValuesProperty = "selectedScheduleOptions")]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public string SelectedScheduleId
 		{
-		get; private set;
+		get => _selectedScheduleId;
+		private set => SetAndNotify ("selectedScheduleId", value ?? string.Empty, ref _selectedScheduleId);
+		}
+
+	[EntityCommand (Id = "setSelectedScheduleId", FriendlyName = "Set Selected Schedule Id")]
+	public void SetSelectedScheduleId (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.String)]
+		string value)
+		{
+		string selectedScheduleId = value ?? string.Empty;
+		LogInfo ($"UI requested selectedScheduleId='{selectedScheduleId}'");
+		if (string.Equals (SelectedScheduleId, selectedScheduleId, StringComparison.Ordinal))
+			{
+			LogInfo ($"UI selectedScheduleId ignored because value is unchanged ('{selectedScheduleId}')");
+			return;
+			}
+
+		SelectedScheduleId = selectedScheduleId;
+		SelectSchedule (selectedScheduleId);
 		}
 
 	private DriverEntityAvailableValue[] ScheduleValues
@@ -223,59 +276,434 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		set => _scheduleValues = value ?? [];
 		}
 
-	[EntityProperty (Id = "scheduleSelectorEnabled", FriendlyName = "Schedule Selector Enabled")]
+	[EntityProperty (Id = "scheduleSelectorEnabled", FriendlyName = "Schedule Selector Enabled", Type = DriverEntityValueType.Boolean)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public bool ScheduleSelectorEnabled
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("scheduleSelectorEnabled", value, ref field);
 		}
 
-	[EntityProperty (Id = "currentTemperatureLabel", FriendlyName = "Current Temperature Label")]
+	[EntityProperty (Id = "currentTemperatureLabel", FriendlyName = "Current Temperature Label", Type = DriverEntityValueType.String)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public string CurrentTemperatureLabel
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("currentTemperatureLabel", value, ref field);
 		}
 
-	[EntityProperty (Id = "tileIcon", FriendlyName = "Tile Icon")]
+	[EntityProperty (Id = "tileIcon", FriendlyName = "Tile Icon", Type = DriverEntityValueType.String)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public string TileIcon
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("tileIcon", value, ref field);
 		}
 
-
-	[EntityCommand (Id = "increaseSetpoint", FriendlyName = "Increase Setpoint")]
-	[EntityCommandMetadata (Programmable = true)]
-	public void IncreaseSetpoint ()
+	[EntityProperty (Id = "editScheduleEnabled", FriendlyName = "Edit Schedule Enabled", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool EditScheduleEnabled
 		{
-		if (_room == null)
-			return;
-
-		_ = FireAndForgetAsync (
-			() => _platform.AdjustRoomSetpointAsync (_room.Id, 0.5),
-			"increase setpoint");
+		get;
+		private set => SetAndNotify ("editScheduleEnabled", value, ref field);
 		}
 
-	[EntityCommand (Id = "decreaseSetpoint", FriendlyName = "Decrease Setpoint")]
-	[EntityCommandMetadata (Programmable = true)]
-	public void DecreaseSetpoint ()
+	[EntityProperty (Id = "editScheduleSummary", FriendlyName = "Edit Schedule Summary", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditScheduleSummary
 		{
-		if (_room == null)
-			return;
-
-		_ = FireAndForgetAsync (
-			() => _platform.AdjustRoomSetpointAsync (_room.Id, -0.5),
-			"decrease setpoint");
+		get;
+		private set => SetAndNotify ("editScheduleSummary", value, ref field);
 		}
+
+	[EntityProperty (Id = "editScheduleImpact", FriendlyName = "Edit Schedule Impact", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditScheduleImpact
+		{
+		get;
+		private set => SetAndNotify ("editScheduleImpact", value, ref field);
+		}
+
+	[EntityProperty (Id = "editScheduleError", FriendlyName = "Edit Schedule Error", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditScheduleError
+		{
+		get;
+		private set => SetAndNotify ("editScheduleError", value, ref field);
+		}
+
+	[EntityProperty (
+		Id = "editSelectedDay",
+		FriendlyName = "Edit Selected Day",
+		Type = DriverEntityValueType.String,
+		AvailableValues = new[] { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" },
+		// Crestron selectorbutton uses the localization key for selector labels and caches the initial caption width; keep keys equal to labels and pad shorter day names to avoid truncation.
+		AvailableValuesLabels = new[] { "    Sunday    ", "    Monday    ", "   Tuesday    ", "Wednesday", "   Thursday   ", "    Friday    ", "   Saturday   " },
+		AvailableValuesLocalizationKeys = new[] { "    Sunday    ", "    Monday    ", "   Tuesday    ", "Wednesday", "   Thursday   ", "    Friday    ", "   Saturday   " })]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSelectedDay
+		{
+		get => _editSelectedDay;
+		private set => SetAndNotify ("editSelectedDay", value ?? string.Empty, ref _editSelectedDay);
+		}
+
+	[EntityCommand (Id = "setEditSelectedDay", FriendlyName = "Set Edit Selected Day")]
+	public void SetEditSelectedDay (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.String)]
+		string value) => SetEditSelectedDayFromUi (value ?? string.Empty);
+
+	[EntityProperty (
+		Id = "editSlot1Time",
+		FriendlyName = "Edit Slot 1 Time",
+		Type = DriverEntityValueType.String,
+		// Crestron selectorbutton renders selector labels from LocalizationKey instead of Text; keep time values, labels, and keys identical.
+		AvailableValues = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" },
+		AvailableValuesLabels = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" },
+		AvailableValuesLocalizationKeys = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" })]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot1Time
+		{
+		get => _editSlotTimes[0] ?? string.Empty;
+		private set => _editSlotTimes[0] = value ?? string.Empty;
+		}
+
+	[EntityProperty (Id = "editSlot2Time", FriendlyName = "Edit Slot 2 Time", Type = DriverEntityValueType.String, AvailableValues = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLabels = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLocalizationKeys = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" })]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot2Time
+		{
+		get => _editSlotTimes[1] ?? string.Empty;
+		private set => _editSlotTimes[1] = value ?? string.Empty;
+		}
+
+	[EntityProperty (Id = "editSlot3Time", FriendlyName = "Edit Slot 3 Time", Type = DriverEntityValueType.String, AvailableValues = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLabels = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLocalizationKeys = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" })]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot3Time
+		{
+		get => _editSlotTimes[2] ?? string.Empty;
+		private set => _editSlotTimes[2] = value ?? string.Empty;
+		}
+
+	[EntityProperty (Id = "editSlot4Time", FriendlyName = "Edit Slot 4 Time", Type = DriverEntityValueType.String, AvailableValues = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLabels = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLocalizationKeys = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" })]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot4Time
+		{
+		get => _editSlotTimes[3] ?? string.Empty;
+		private set => _editSlotTimes[3] = value ?? string.Empty;
+		}
+
+	[EntityProperty (Id = "editSlot5Time", FriendlyName = "Edit Slot 5 Time", Type = DriverEntityValueType.String, AvailableValues = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLabels = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLocalizationKeys = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" })]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot5Time
+		{
+		get => _editSlotTimes[4] ?? string.Empty;
+		private set => _editSlotTimes[4] = value ?? string.Empty;
+		}
+
+	[EntityProperty (Id = "editSlot6Time", FriendlyName = "Edit Slot 6 Time", Type = DriverEntityValueType.String, AvailableValues = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLabels = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLocalizationKeys = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" })]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot6Time
+		{
+		get => _editSlotTimes[5] ?? string.Empty;
+		private set => _editSlotTimes[5] = value ?? string.Empty;
+		}
+
+	[EntityProperty (Id = "editSlot7Time", FriendlyName = "Edit Slot 7 Time", Type = DriverEntityValueType.String, AvailableValues = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLabels = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLocalizationKeys = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" })]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot7Time
+		{
+		get => _editSlotTimes[6] ?? string.Empty;
+		private set => _editSlotTimes[6] = value ?? string.Empty;
+		}
+
+	[EntityProperty (Id = "editSlot8Time", FriendlyName = "Edit Slot 8 Time", Type = DriverEntityValueType.String, AvailableValues = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLabels = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLocalizationKeys = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" })]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot8Time
+		{
+		get => _editSlotTimes[7] ?? string.Empty;
+		private set => _editSlotTimes[7] = value ?? string.Empty;
+		}
+
+	[EntityProperty (Id = "editSlot9Time", FriendlyName = "Edit Slot 9 Time", Type = DriverEntityValueType.String, AvailableValues = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLabels = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLocalizationKeys = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" })]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot9Time
+		{
+		get => _editSlotTimes[8] ?? string.Empty;
+		private set => _editSlotTimes[8] = value ?? string.Empty;
+		}
+
+	[EntityProperty (Id = "editSlot10Time", FriendlyName = "Edit Slot 10 Time", Type = DriverEntityValueType.String, AvailableValues = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLabels = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLocalizationKeys = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" })]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot10Time
+		{
+		get => _editSlotTimes[9] ?? string.Empty;
+		private set => _editSlotTimes[9] = value ?? string.Empty;
+		}
+
+	[EntityProperty (Id = "editSlot1Temperature", FriendlyName = "Edit Slot 1 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public double EditSlot1Temperature
+		{
+		get => _editSlotTemperatures[0];
+		private set => _editSlotTemperatures[0] = value;
+		}
+
+	[EntityProperty (Id = "editSlot2Temperature", FriendlyName = "Edit Slot 2 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public double EditSlot2Temperature
+		{
+		get => _editSlotTemperatures[1];
+		private set => _editSlotTemperatures[1] = value;
+		}
+
+	[EntityProperty (Id = "editSlot3Temperature", FriendlyName = "Edit Slot 3 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public double EditSlot3Temperature
+		{
+		get => _editSlotTemperatures[2];
+		private set => _editSlotTemperatures[2] = value;
+		}
+
+	[EntityProperty (Id = "editSlot4Temperature", FriendlyName = "Edit Slot 4 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public double EditSlot4Temperature
+		{
+		get => _editSlotTemperatures[3];
+		private set => _editSlotTemperatures[3] = value;
+		}
+
+	[EntityProperty (Id = "editSlot5Temperature", FriendlyName = "Edit Slot 5 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public double EditSlot5Temperature
+		{
+		get => _editSlotTemperatures[4];
+		private set => _editSlotTemperatures[4] = value;
+		}
+
+	[EntityProperty (Id = "editSlot6Temperature", FriendlyName = "Edit Slot 6 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public double EditSlot6Temperature
+		{
+		get => _editSlotTemperatures[5];
+		private set => _editSlotTemperatures[5] = value;
+		}
+
+	[EntityProperty (Id = "editSlot7Temperature", FriendlyName = "Edit Slot 7 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public double EditSlot7Temperature
+		{
+		get => _editSlotTemperatures[6];
+		private set => _editSlotTemperatures[6] = value;
+		}
+
+	[EntityProperty (Id = "editSlot8Temperature", FriendlyName = "Edit Slot 8 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public double EditSlot8Temperature
+		{
+		get => _editSlotTemperatures[7];
+		private set => _editSlotTemperatures[7] = value;
+		}
+
+	[EntityProperty (Id = "editSlot9Temperature", FriendlyName = "Edit Slot 9 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public double EditSlot9Temperature
+		{
+		get => _editSlotTemperatures[8];
+		private set => _editSlotTemperatures[8] = value;
+		}
+
+	[EntityProperty (Id = "editSlot10Temperature", FriendlyName = "Edit Slot 10 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public double EditSlot10Temperature
+		{
+		get => _editSlotTemperatures[9];
+		private set => _editSlotTemperatures[9] = value;
+		}
+
+	[EntityCommand (Id = "setEditSlot1Time", FriendlyName = "Set Edit Slot 1 Time")]
+	public void SetEditSlot1Time (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.String)]
+		string value) => SetEditSlotTimeProperty (0, "editSlot1Time", value);
+
+	[EntityCommand (Id = "setEditSlot2Time", FriendlyName = "Set Edit Slot 2 Time")]
+	public void SetEditSlot2Time (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.String)]
+		string value) => SetEditSlotTimeProperty (1, "editSlot2Time", value);
+
+	[EntityCommand (Id = "setEditSlot3Time", FriendlyName = "Set Edit Slot 3 Time")]
+	public void SetEditSlot3Time (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.String)]
+		string value) => SetEditSlotTimeProperty (2, "editSlot3Time", value);
+
+	[EntityCommand (Id = "setEditSlot4Time", FriendlyName = "Set Edit Slot 4 Time")]
+	public void SetEditSlot4Time (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.String)]
+		string value) => SetEditSlotTimeProperty (3, "editSlot4Time", value);
+
+	[EntityCommand (Id = "setEditSlot5Time", FriendlyName = "Set Edit Slot 5 Time")]
+	public void SetEditSlot5Time (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.String)]
+		string value) => SetEditSlotTimeProperty (4, "editSlot5Time", value);
+
+	[EntityCommand (Id = "setEditSlot6Time", FriendlyName = "Set Edit Slot 6 Time")]
+	public void SetEditSlot6Time (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.String)]
+		string value) => SetEditSlotTimeProperty (5, "editSlot6Time", value);
+
+	[EntityCommand (Id = "setEditSlot7Time", FriendlyName = "Set Edit Slot 7 Time")]
+	public void SetEditSlot7Time (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.String)]
+		string value) => SetEditSlotTimeProperty (6, "editSlot7Time", value);
+
+	[EntityCommand (Id = "setEditSlot8Time", FriendlyName = "Set Edit Slot 8 Time")]
+	public void SetEditSlot8Time (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.String)]
+		string value) => SetEditSlotTimeProperty (7, "editSlot8Time", value);
+
+	[EntityCommand (Id = "setEditSlot9Time", FriendlyName = "Set Edit Slot 9 Time")]
+	public void SetEditSlot9Time (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.String)]
+		string value) => SetEditSlotTimeProperty (8, "editSlot9Time", value);
+
+	[EntityCommand (Id = "setEditSlot10Time", FriendlyName = "Set Edit Slot 10 Time")]
+	public void SetEditSlot10Time (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.String)]
+		string value) => SetEditSlotTimeProperty (9, "editSlot10Time", value);
+
+	[EntityCommand (Id = "setEditSlot1Temperature", FriendlyName = "Set Edit Slot 1 Temperature")]
+	public void SetEditSlot1Temperature (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.Number)]
+		double value) => SetEditSlotTemperatureProperty (0, "editSlot1Temperature", value);
+
+	[EntityCommand (Id = "setEditSlot2Temperature", FriendlyName = "Set Edit Slot 2 Temperature")]
+	public void SetEditSlot2Temperature (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.Number)]
+		double value) => SetEditSlotTemperatureProperty (1, "editSlot2Temperature", value);
+
+	[EntityCommand (Id = "setEditSlot3Temperature", FriendlyName = "Set Edit Slot 3 Temperature")]
+	public void SetEditSlot3Temperature (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.Number)]
+		double value) => SetEditSlotTemperatureProperty (2, "editSlot3Temperature", value);
+
+	[EntityCommand (Id = "setEditSlot4Temperature", FriendlyName = "Set Edit Slot 4 Temperature")]
+	public void SetEditSlot4Temperature (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.Number)]
+		double value) => SetEditSlotTemperatureProperty (3, "editSlot4Temperature", value);
+
+	[EntityCommand (Id = "setEditSlot5Temperature", FriendlyName = "Set Edit Slot 5 Temperature")]
+	public void SetEditSlot5Temperature (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.Number)]
+		double value) => SetEditSlotTemperatureProperty (4, "editSlot5Temperature", value);
+
+	[EntityCommand (Id = "setEditSlot6Temperature", FriendlyName = "Set Edit Slot 6 Temperature")]
+	public void SetEditSlot6Temperature (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.Number)]
+		double value) => SetEditSlotTemperatureProperty (5, "editSlot6Temperature", value);
+
+	[EntityCommand (Id = "setEditSlot7Temperature", FriendlyName = "Set Edit Slot 7 Temperature")]
+	public void SetEditSlot7Temperature (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.Number)]
+		double value) => SetEditSlotTemperatureProperty (6, "editSlot7Temperature", value);
+
+	[EntityCommand (Id = "setEditSlot8Temperature", FriendlyName = "Set Edit Slot 8 Temperature")]
+	public void SetEditSlot8Temperature (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.Number)]
+		double value) => SetEditSlotTemperatureProperty (7, "editSlot8Temperature", value);
+
+	[EntityCommand (Id = "setEditSlot9Temperature", FriendlyName = "Set Edit Slot 9 Temperature")]
+	public void SetEditSlot9Temperature (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.Number)]
+		double value) => SetEditSlotTemperatureProperty (8, "editSlot9Temperature", value);
+
+	[EntityCommand (Id = "setEditSlot10Temperature", FriendlyName = "Set Edit Slot 10 Temperature")]
+	public void SetEditSlot10Temperature (
+		[EntityParameter (Id = "value", Type = DriverEntityValueType.Number)]
+		double value) => SetEditSlotTemperatureProperty (9, "editSlot10Temperature", value);
+
+	[EntityProperty (Id = "editSlot1Visible", FriendlyName = "Edit Slot 1 Visible", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool EditSlot1Visible => _editSlotVisible[0];
+
+	[EntityProperty (Id = "editSlot2Visible", FriendlyName = "Edit Slot 2 Visible", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool EditSlot2Visible => _editSlotVisible[1];
+
+	[EntityProperty (Id = "editSlot3Visible", FriendlyName = "Edit Slot 3 Visible", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool EditSlot3Visible => _editSlotVisible[2];
+
+	[EntityProperty (Id = "editSlot4Visible", FriendlyName = "Edit Slot 4 Visible", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool EditSlot4Visible => _editSlotVisible[3];
+
+	[EntityProperty (Id = "editSlot5Visible", FriendlyName = "Edit Slot 5 Visible", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool EditSlot5Visible => _editSlotVisible[4];
+
+	[EntityProperty (Id = "editSlot6Visible", FriendlyName = "Edit Slot 6 Visible", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool EditSlot6Visible => _editSlotVisible[5];
+
+	[EntityProperty (Id = "editSlot7Visible", FriendlyName = "Edit Slot 7 Visible", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool EditSlot7Visible => _editSlotVisible[6];
+
+	[EntityProperty (Id = "editSlot8Visible", FriendlyName = "Edit Slot 8 Visible", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool EditSlot8Visible => _editSlotVisible[7];
+
+	[EntityProperty (Id = "editSlot9Visible", FriendlyName = "Edit Slot 9 Visible", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool EditSlot9Visible => _editSlotVisible[8];
+
+	[EntityProperty (Id = "editSlot10Visible", FriendlyName = "Edit Slot 10 Visible", Type = DriverEntityValueType.Boolean)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public bool EditSlot10Visible => _editSlotVisible[9];
+
+	[EntityProperty (Id = "editSlot1Error", FriendlyName = "Edit Slot 1 Error", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot1Error => _editSlotErrors[0] ?? string.Empty;
+
+	[EntityProperty (Id = "editSlot2Error", FriendlyName = "Edit Slot 2 Error", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot2Error => _editSlotErrors[1] ?? string.Empty;
+
+	[EntityProperty (Id = "editSlot3Error", FriendlyName = "Edit Slot 3 Error", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot3Error => _editSlotErrors[2] ?? string.Empty;
+
+	[EntityProperty (Id = "editSlot4Error", FriendlyName = "Edit Slot 4 Error", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot4Error => _editSlotErrors[3] ?? string.Empty;
+
+	[EntityProperty (Id = "editSlot5Error", FriendlyName = "Edit Slot 5 Error", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot5Error => _editSlotErrors[4] ?? string.Empty;
+
+	[EntityProperty (Id = "editSlot6Error", FriendlyName = "Edit Slot 6 Error", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot6Error => _editSlotErrors[5] ?? string.Empty;
+
+	[EntityProperty (Id = "editSlot7Error", FriendlyName = "Edit Slot 7 Error", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot7Error => _editSlotErrors[6] ?? string.Empty;
+
+	[EntityProperty (Id = "editSlot8Error", FriendlyName = "Edit Slot 8 Error", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot8Error => _editSlotErrors[7] ?? string.Empty;
+
+	[EntityProperty (Id = "editSlot9Error", FriendlyName = "Edit Slot 9 Error", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot9Error => _editSlotErrors[8] ?? string.Empty;
+
+	[EntityProperty (Id = "editSlot10Error", FriendlyName = "Edit Slot 10 Error", Type = DriverEntityValueType.String)]
+	[EntityPropertyMetadata (ExtensionUiProperty = true)]
+	public string EditSlot10Error => _editSlotErrors[9] ?? string.Empty;
+
 
 	[EntityCommand (Id = "boost", FriendlyName = "Boost")]
 	[EntityCommandMetadata (Programmable = true)]
 	public void Boost ()
 		{
-		if (_room == null)
-			return;
-
 		_ = FireAndForgetAsync (
 			() => _platform.TriggerRoomBoostAsync (_room.Id),
 			"boost");
@@ -293,9 +721,6 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	[EntityCommandMetadata (Programmable = true)]
 	public void EnableSchedule ()
 		{
-		if (_room == null)
-			return;
-
 		_ = FireAndForgetAsync (
 			() => _platform.SetRoomScheduleEnabledAsync (_room.Id, true),
 			"enable schedule");
@@ -305,65 +730,67 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	[EntityCommandMetadata (Programmable = true)]
 	public void DisableSchedule ()
 		{
-		if (_room == null)
-			return;
-
 		_ = FireAndForgetAsync (
 			() => _platform.SetRoomScheduleEnabledAsync (_room.Id, false),
 			"disable schedule");
 		}
 
-	public void UpdateFromRoom (WiserRoom room, string temperatureUnits)
+	[EntityCommand (Id = "openEditSchedule", FriendlyName = "Open Edit Schedule")]
+	[EntityCommandMetadata (Programmable = true)]
+	public void OpenEditSchedule ()
 		{
-		_room = room ?? _room;
-		if (_room == null)
-			return;
+		LogInfo ($"OpenEditSchedule invoked; selectedScheduleId='{SelectedScheduleId ?? string.Empty}'");
+		LoadEditScheduleState (notify: _frameworkReady != 0);
+		}
 
-		WiserHeatingSchedule assignedSchedule = ResolveAssignedSchedule (_room);
+	[EntityCommand (Id = "saveEditScheduleDay", FriendlyName = "Save Edit Schedule Day")]
+	[EntityCommandMetadata (Programmable = true)]
+	public void SaveEditScheduleDay () =>
+		_ = FireAndForgetAsync (
+			() => SaveEditedScheduleAsync (applyToAllDays: false),
+			"save schedule day");
+
+	[EntityCommand (Id = "saveEditScheduleAllDays", FriendlyName = "Save Edit Schedule All Days")]
+	[EntityCommandMetadata (Programmable = true)]
+	public void SaveEditScheduleAllDays () =>
+		_ = FireAndForgetAsync (
+			() => SaveEditedScheduleAsync (applyToAllDays: true),
+			"save schedule all days");
+
+	[EntityCommand (Id = "cancelEditSchedule", FriendlyName = "Cancel Edit Schedule")]
+	[EntityCommandMetadata (Programmable = true)]
+	public void CancelEditSchedule ()
+		{
+		LogInfo ("CancelEditSchedule invoked");
+		LoadEditScheduleState (notify: _frameworkReady != 0);
+		}
+
+	public void UpdateFromRoom (WiserRoom room, string? temperatureUnits)
+		{
+		_room = room;
+
+		WiserHeatingSchedule? assignedSchedule = ResolveAssignedSchedule (_room);
 		LogInfo ($"UpdateFromRoom start; roomId={_room.Id}, mode='{_room.Mode ?? string.Empty}', scheduleId={assignedSchedule?.Id ?? _room.ScheduleId}, scheduleName='{ResolveScheduleNameForLog (_room, assignedSchedule)}', temperatureUnits='{temperatureUnits ?? string.Empty}'");
 
 		DeviceLabel = _room.Name ?? DeviceLabel;
 		CurrentTemperature = _room.CurrentTemperature;
 		TargetTemperature = _room.CurrentTargetTemperature;
-		DisplayedSetpoint = _room.DisplayedSetpoint;
 		IsBoostActive = IsRoomBoostActive (_room);
 		BoostStateLabel = IsBoostActive ? "^BoostOnLabel" : "^BoostOffLabel";
 		BoostActionLabel = IsBoostActive ? "^BoostOffActionLabel" : "^BoostOnActionLabel";
-		TemperatureUnits = temperatureUnits;
-		IsScheduleAvailable = _platform?.HasHeatingSchedules == true;
+		TemperatureUnits = temperatureUnits ?? string.Empty;
+		bool isScheduleAvailable = _platform.HasHeatingSchedules;
 		ScheduleSummary = BuildScheduleSummary (_room);
 		ScheduleEnabled = IsScheduleEnabled (_room);
-		CanEnableSchedule = !ScheduleEnabled && IsScheduleAvailable;
+		CanEnableSchedule = !ScheduleEnabled && isScheduleAvailable;
 		CanDisableSchedule = ScheduleEnabled;
 		ScheduleStatusLabel = BuildScheduleStatusLabel (_room);
-		ScheduleToggleActionLabel = BuildScheduleToggleActionLabel (_room);
 		SelectedScheduleName = BuildSelectedScheduleName (_room);
 		RefreshScheduleValues (notify: true);
-		ScheduleSelectorEnabled = _platform?.HasHeatingSchedules == true;
+		ScheduleSelectorEnabled = _platform.HasHeatingSchedules;
 		CurrentTemperatureLabel = $"{CurrentTemperature:0.0}°";
 		TileIcon = BuildTileIcon (_room);
-		RefreshPropertyCache ();
-
-		NotifyPropertyChanged ("deviceLabel", new DriverEntityValue (DeviceLabel));
-		NotifyPropertyChanged ("currentTemperature", new DriverEntityValue (CurrentTemperature));
-		NotifyPropertyChanged ("targetTemperature", new DriverEntityValue (TargetTemperature));
-		NotifyPropertyChanged ("displayedSetpoint", new DriverEntityValue (DisplayedSetpoint));
-		NotifyPropertyChanged ("isBoostActive", new DriverEntityValue (IsBoostActive));
-		NotifyPropertyChanged ("boostStateLabel", new DriverEntityValue (BoostStateLabel));
-		NotifyPropertyChanged ("boostActionLabel", new DriverEntityValue (BoostActionLabel));
-		NotifyPropertyChanged ("temperatureUnits", new DriverEntityValue (TemperatureUnits));
-		NotifyPropertyChanged ("isScheduleAvailable", new DriverEntityValue (IsScheduleAvailable));
-		NotifyPropertyChanged ("scheduleSummary", new DriverEntityValue (ScheduleSummary));
-		NotifyPropertyChanged ("scheduleEnabled", new DriverEntityValue (ScheduleEnabled));
-		NotifyPropertyChanged ("canEnableSchedule", new DriverEntityValue (CanEnableSchedule));
-		NotifyPropertyChanged ("canDisableSchedule", new DriverEntityValue (CanDisableSchedule));
-		NotifyPropertyChanged ("scheduleStatusLabel", new DriverEntityValue (ScheduleStatusLabel));
-		NotifyPropertyChanged ("scheduleToggleActionLabel", new DriverEntityValue (ScheduleToggleActionLabel));
-		NotifyPropertyChanged ("selectedScheduleName", new DriverEntityValue (SelectedScheduleName));
-		NotifyPropertyChanged ("selectedScheduleId", new DriverEntityValue (SelectedScheduleId));
-		NotifyPropertyChanged ("scheduleSelectorEnabled", new DriverEntityValue (ScheduleSelectorEnabled));
-		NotifyPropertyChanged ("currentTemperatureLabel", new DriverEntityValue (CurrentTemperatureLabel));
-		NotifyPropertyChanged ("tileIcon", new DriverEntityValue (TileIcon));
+		LoadEditScheduleState (notify: _frameworkReady != 0);
 		}
 
 	public void SetOnline (bool online)
@@ -385,39 +812,14 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			}
 
 		LogInfo ("StartPolling initializing extension surface");
+		SetOnline (true);
 
-		if (_uiDefinition != null)
-			{
-			DriverEntityValue? uiValue = _uiDefinition.GetValue (null, null);
-			if (uiValue.HasValue)
-				NotifyPropertyChanged (UiDefinitionProperty.Name, uiValue.Value);
-			}
+		DriverEntityValue? uiValue = _uiDefinition.GetValue (null, null);
+		if (uiValue.HasValue)
+			NotifyPropertyChanged (UiDefinitionProperty.Name, uiValue.Value);
 
 		RefreshScheduleValues (notify: true);
-
-		NotifyPropertyChanged ("readyIndicator:isReady", new DriverEntityValue (ReadyIndicatorIsReady));
-		NotifyPropertyChanged ("deviceLabel", new DriverEntityValue (DeviceLabel));
-		NotifyPropertyChanged ("currentTemperature", new DriverEntityValue (CurrentTemperature));
-		NotifyPropertyChanged ("targetTemperature", new DriverEntityValue (TargetTemperature));
-		NotifyPropertyChanged ("displayedSetpoint", new DriverEntityValue (DisplayedSetpoint));
-		NotifyPropertyChanged ("isBoostActive", new DriverEntityValue (IsBoostActive));
-		NotifyPropertyChanged ("boostStateLabel", new DriverEntityValue (BoostStateLabel));
-		NotifyPropertyChanged ("boostActionLabel", new DriverEntityValue (BoostActionLabel));
-		NotifyPropertyChanged ("temperatureUnits", new DriverEntityValue (TemperatureUnits));
-		NotifyPropertyChanged ("isScheduleAvailable", new DriverEntityValue (IsScheduleAvailable));
-		NotifyPropertyChanged ("scheduleSummary", new DriverEntityValue (ScheduleSummary));
-		NotifyPropertyChanged ("scheduleEnabled", new DriverEntityValue (ScheduleEnabled));
-		NotifyPropertyChanged ("canEnableSchedule", new DriverEntityValue (CanEnableSchedule));
-		NotifyPropertyChanged ("canDisableSchedule", new DriverEntityValue (CanDisableSchedule));
-		NotifyPropertyChanged ("scheduleStatusLabel", new DriverEntityValue (ScheduleStatusLabel));
-		NotifyPropertyChanged ("scheduleToggleActionLabel", new DriverEntityValue (ScheduleToggleActionLabel));
-		NotifyPropertyChanged ("selectedScheduleName", new DriverEntityValue (SelectedScheduleName));
-		NotifyPropertyChanged ("selectedScheduleId", new DriverEntityValue (SelectedScheduleId));
-		NotifyPropertyChanged ("scheduleSelectorEnabled", new DriverEntityValue (ScheduleSelectorEnabled));
-		NotifyPropertyChanged ("currentTemperatureLabel", new DriverEntityValue (CurrentTemperatureLabel));
-		NotifyPropertyChanged ("tileIcon", new DriverEntityValue (TileIcon));
-
-		SetOnline (true);
+		LoadEditScheduleState (notify: true);
 		}
 
 	public void StopPolling () => SetOnline (false);
@@ -431,7 +833,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			}
 		catch (Exception ex)
 			{
-			_logger?.Log (
+			_logger.Log (
 				_driverLogId,
 				LogEntryLevel.Error,
 				$"Failed to {operation} for room '{DeviceLabel}': {ex}");
@@ -440,19 +842,16 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 	private string BuildScheduleSummary (WiserRoom room)
 		{
-		WiserHeatingSchedule assignedSchedule = ResolveAssignedSchedule (room);
+		WiserHeatingSchedule? assignedSchedule = ResolveAssignedSchedule (room);
 		if (assignedSchedule == null)
 			return IsScheduleEnabled (room) ? "Schedule available" : "No schedule assigned";
 
 		string name = ResolveScheduleName (room, assignedSchedule);
-		return $"{name} ({room.Mode})";
+		return $"{name} ({room.Mode ?? string.Empty})";
 		}
 
 	private bool IsScheduleEnabled (WiserRoom room)
 		{
-		if (room == null)
-			return false;
-
 		if (ResolveAssignedSchedule (room) == null)
 			return false;
 
@@ -465,9 +864,6 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	private string BuildScheduleStatusLabel (WiserRoom room) =>
 		IsScheduleEnabled (room) ? "^ScheduleEnabledLabel" : "^ScheduleDisabledLabel";
 
-	private string BuildScheduleToggleActionLabel (WiserRoom room) =>
-		IsScheduleEnabled (room) ? "^ScheduleDisableActionLabel" : "^ScheduleEnableActionLabel";
-
 	private string BuildSelectedScheduleName (WiserRoom room)
 		{
 		if (ResolveAssignedSchedule (room) == null)
@@ -476,49 +872,46 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		return ResolveScheduleName (room);
 		}
 
-	private string ResolveScheduleName (WiserRoom room, WiserHeatingSchedule assignedSchedule = null)
+	private string ResolveScheduleName (WiserRoom room, WiserHeatingSchedule? assignedSchedule = null)
 		{
 		assignedSchedule ??= ResolveAssignedSchedule (room);
 
 		if (!string.IsNullOrWhiteSpace (assignedSchedule?.Name))
-			return assignedSchedule.Name;
+			return assignedSchedule!.Name!;
 
-		return $"Schedule {assignedSchedule?.Id ?? room?.ScheduleId ?? 0}";
+		return $"Schedule {assignedSchedule?.Id ?? room.ScheduleId}";
 		}
 
 	private string BuildSelectedScheduleId (WiserRoom room)
 		{
-		WiserHeatingSchedule assignedSchedule = ResolveAssignedSchedule (room);
+		WiserHeatingSchedule? assignedSchedule = ResolveAssignedSchedule (room);
 		if (assignedSchedule == null)
 			return string.Empty;
 
 		return assignedSchedule.Id.ToString ();
 		}
 
-	private WiserHeatingSchedule ResolveAssignedSchedule (WiserRoom room)
+	private WiserHeatingSchedule? ResolveAssignedSchedule (WiserRoom room)
 		{
-		if (room == null)
-			return null;
-
-		return _platform?.GetAssignedScheduleForRoom (room.Id) ?? room.Schedule as WiserHeatingSchedule;
+		return _platform.GetAssignedScheduleForRoom (room.Id) ?? room.Schedule as WiserHeatingSchedule;
 		}
 
 	private void SelectSchedule (string scheduleIdText)
 		{
 		LogInfo ($"SelectSchedule requested with value='{scheduleIdText ?? string.Empty}'");
 
-		if (_room == null || string.IsNullOrWhiteSpace (scheduleIdText))
+		if (string.IsNullOrWhiteSpace (scheduleIdText))
 			{
-			LogInfo ("SelectSchedule ignored because room is null or value is empty");
+			LogInfo ("SelectSchedule ignored because value is empty");
 			return;
 			}
 
 		int scheduleId = 0;
-		foreach (WiserHeatingSchedule schedule in _platform?.HeatingSchedules ?? [])
+		foreach (WiserHeatingSchedule schedule in _platform.HeatingSchedules ?? [])
 			{
 			if (string.Equals ((schedule?.Id ?? 0).ToString (), scheduleIdText, StringComparison.OrdinalIgnoreCase))
 				{
-				scheduleId = schedule.Id;
+					scheduleId = schedule!.Id;
 				break;
 				}
 			}
@@ -531,26 +924,14 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 		LogInfo ($"SelectSchedule resolved value='{scheduleIdText}' to scheduleId={scheduleId}");
 
+		int roomId = _room.Id;
 		_ = FireAndForgetAsync (
-			() => _platform.SetRoomAssignedScheduleAsync (_room.Id, scheduleId),
+			() => AssignSelectedScheduleAsync (roomId, scheduleId),
 			"select schedule");
 		}
 
-	private DriverEntityCommandResult SetExtensionPropertyValue (IDictionary<string, DriverEntityValue> args)
-		{
-		if (args == null)
-			return new DriverEntityCommandResult (true, null);
-
-		string propertyId = TryReadStringValue (args, "propertyId") ?? TryReadStringValue (args, "propertyName");
-		string propertyValue = TryReadStringValue (args, "value") ?? TryReadStringValue (args, "propertyValue");
-
-		LogInfo ($"SetExtensionPropertyValue propertyId='{propertyId ?? string.Empty}', value='{propertyValue ?? string.Empty}'");
-
-		if (!string.IsNullOrWhiteSpace (propertyValue))
-			SelectSchedule (propertyValue);
-
-		return new DriverEntityCommandResult (false, null);
-		}
+	private Task<bool> AssignSelectedScheduleAsync (int roomId, int scheduleId) =>
+		_platform.SetRoomAssignedScheduleAsync (roomId, scheduleId);
 
 	private void RefreshScheduleValues (bool notify)
 		{
@@ -560,40 +941,470 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 		ScheduleValues = nextScheduleValues;
 		SelectedScheduleId = nextSelectedScheduleId;
-		_propertyCache["selectedScheduleId"] = new DriverEntityValue (SelectedScheduleId ?? string.Empty);
 		LogScheduleValues ($"RefreshScheduleValues(notify={notify})");
-		RebuildSelectedScheduleProperty ();
 
 		if (notify)
 			{
-			NotifyPropertyChanged (
-				"selectedScheduleId",
-				new DriverEntityValue (previousSelectedScheduleId),
-				new DriverEntityValue (SelectedScheduleId ?? string.Empty));
+			NotifyPropertyChanged ("selectedScheduleOptions", new DriverEntityValue (SelectedScheduleOptions));
 			LogInfo ($"Published schedule selector state; newCount={ScheduleValues?.Length ?? 0}, previousSelectedScheduleId='{previousSelectedScheduleId}', newSelectedScheduleId='{SelectedScheduleId ?? string.Empty}'");
 			}
 		}
 
-	private static string TryReadStringValue (IDictionary<string, DriverEntityValue> args, string key)
+	private void LoadEditScheduleState (bool notify)
 		{
-		if (args == null || !args.TryGetValue (key, out DriverEntityValue value))
-			return null;
+		WiserHeatingSchedule? assignedSchedule = ResolveAssignedSchedule (_room);
+		_editDaySlots.Clear ();
+		_editScheduleData = new Dictionary<string, object> (StringComparer.OrdinalIgnoreCase);
+		_editScheduleId = assignedSchedule?.Id ?? 0;
+		_editScheduleName = BuildScheduleOptionValue (assignedSchedule);
+		EditScheduleError = string.Empty;
+		EditScheduleEnabled = assignedSchedule != null;
 
-		try
+		if (assignedSchedule != null)
 			{
-			return value.GetValue<string> ();
+			_editScheduleData = CloneScheduleData (assignedSchedule.ScheduleData);
+			foreach (string day in EditableScheduleDays)
+				{
+				if (_editScheduleData.TryGetValue (day, out object daySchedule))
+					_editDaySlots[day] = BuildEditableSlots (daySchedule);
+				}
+			EditSelectedDay = ResolveInitialEditDay (EditSelectedDay);
+			LoadSelectedEditDay (EditSelectedDay);
+			EditScheduleImpact = BuildEditScheduleImpact (assignedSchedule);
 			}
-		catch
+		else
 			{
-			return null;
+			EditSelectedDay = string.Empty;
+			ResetEditSlotState ();
+			EditScheduleImpact = string.Empty;
+			}
+
+		EditScheduleSummary = BuildEditScheduleSummary ();
+
+		if (notify)
+			NotifyEditStateChanged ();
+		}
+
+	private void SetEditSlotTimeProperty (int slotIndex, string propertyId, string value)
+		{
+		string timeValue = value ?? string.Empty;
+		LogInfo ($"UI requested {propertyId}='{timeValue}'");
+		UpdateEditSlotTime (slotIndex, timeValue);
+		}
+
+	private async Task<bool> SaveEditedScheduleAsync (bool applyToAllDays)
+		{
+		if (_editScheduleId == 0)
+			{
+			SetEditError ("No schedule assigned", notify: true);
+			return false;
+			}
+
+		if (!TryBuildEditedDaySchedule (out Dictionary<string, object>? editedDaySchedule, out string errorMessage))
+			{
+			SetEditError (errorMessage, notify: true);
+			return false;
+			}
+
+		editedDaySchedule ??= new Dictionary<string, object> (StringComparer.OrdinalIgnoreCase);
+
+		LogInfo ($"SaveEditedScheduleAsync prepared selectedDay='{EditSelectedDay}', applyToAllDays={applyToAllDays}, editedDay={DescribeDaySchedule (editedDaySchedule)}");
+
+		IDictionary<string, object> scheduleData = CloneScheduleData (_editScheduleData);
+		if (applyToAllDays)
+			{
+			foreach (string day in EditableScheduleDays)
+				scheduleData[day] = CloneScheduleValue (editedDaySchedule);
+			}
+		else
+			{
+			scheduleData[EditSelectedDay] = editedDaySchedule;
+			}
+
+		SetEditError (string.Empty, notify: true);
+		bool saved = await _platform.SaveHeatingScheduleAsync (_editScheduleId, scheduleData).ConfigureAwait (false);
+		if (!saved)
+			{
+			SetEditError ("Unable to save schedule changes", notify: true);
+			return false;
+			}
+
+		LoadEditScheduleState (notify: _frameworkReady != 0);
+		return true;
+		}
+
+	private void SetEditSelectedDayFromUi (string day)
+		{
+		LogInfo ($"UI requested editSelectedDay='{day ?? string.Empty}'");
+		if (string.IsNullOrWhiteSpace (day))
+			{
+			LogInfo ("UI editSelectedDay ignored because value is empty");
+			return;
+			}
+
+		string normalizedDay = ResolveInitialEditDay (day ?? string.Empty);
+		if (string.IsNullOrWhiteSpace (normalizedDay))
+			{
+			LogInfo ($"UI editSelectedDay ignored because '{day}' could not be normalized");
+			return;
+			}
+
+		if (!SetValue (normalizedDay, ref _editSelectedDay))
+			{
+			LogInfo ($"UI editSelectedDay ignored because normalized value is unchanged ('{normalizedDay}')");
+			return;
+			}
+
+		EditScheduleError = string.Empty;
+		LoadSelectedEditDay (normalizedDay);
+		EditScheduleSummary = BuildEditScheduleSummary ();
+		LogInfo ($"UI editSelectedDay accepted; normalized='{normalizedDay}'");
+		}
+
+	private void SetEditSlotTemperatureProperty (int slotIndex, string propertyId, double value)
+		{
+		LogInfo ($"UI requested {propertyId}={value.ToString (CultureInfo.InvariantCulture)}");
+		UpdateEditSlotTemperature (slotIndex, value.ToString (CultureInfo.InvariantCulture));
+		}
+
+	private void LoadSelectedEditDay (string day)
+		{
+		ResetEditSlotState ();
+		if (string.IsNullOrWhiteSpace (day) || !_editDaySlots.TryGetValue (day, out List<EditableScheduleSlot> slots))
+			return;
+
+		for (int i = 0; i < slots.Count && i < MaxEditableScheduleSlots; i++)
+			{
+			_editSlotVisible[i] = true;
+			_editSlotTimes[i] = slots[i].Time;
+			_editSlotTemperatures[i] = slots[i].Temperature;
+			_editSlotErrors[i] = string.Empty;
 			}
 		}
+
+	private void UpdateEditSlotTime (int slotIndex, string timeText)
+		{
+		if (!TryGetEditableSlot (slotIndex, out EditableScheduleSlot? slot) || slot == null)
+			{
+			LogInfo ($"Ignored edit slot time update for slot={slotIndex + 1} because no editable slot is loaded for day '{EditSelectedDay}'");
+			return;
+			}
+
+		string normalizedTime = NormalizeTimeText (timeText);
+		if (!EditTimeValues.Any (value => string.Equals (value.Value, normalizedTime, StringComparison.OrdinalIgnoreCase)))
+			{
+			LogInfo ($"Ignored edit slot time update for slot={slotIndex + 1} because '{normalizedTime}' is not an allowed value");
+			return;
+			}
+
+		if (string.Equals (_editSlotTimes[slotIndex], normalizedTime, StringComparison.Ordinal))
+			{
+			LogInfo ($"Ignored edit slot time update for slot={slotIndex + 1} because value is unchanged ('{normalizedTime}')");
+			return;
+			}
+
+		slot.Time = normalizedTime;
+		_editSlotTimes[slotIndex] = slot.Time;
+		string slotErrorPropertyId = GetEditSlotErrorPropertyId (slotIndex);
+		string previousSlotError = _editSlotErrors[slotIndex] ?? string.Empty;
+		_editSlotErrors[slotIndex] = string.Empty;
+		LogInfo ($"Updated edit slot time slot={slotIndex + 1}, day='{EditSelectedDay}', value='{slot.Time}'");
+		EditScheduleError = string.Empty;
+		if (!string.IsNullOrEmpty (previousSlotError))
+			NotifyPropertyChanged (slotErrorPropertyId, new DriverEntityValue (string.Empty));
+		}
+
+	private void UpdateEditSlotTemperature (int slotIndex, string temperatureText)
+		{
+		if (!TryGetEditableSlot (slotIndex, out EditableScheduleSlot? slot) || slot == null)
+			{
+			LogInfo ($"Ignored edit slot temperature update for slot={slotIndex + 1} because no editable slot is loaded for day '{EditSelectedDay}'");
+			return;
+			}
+
+		if (!double.TryParse (temperatureText, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed))
+			{
+			LogInfo ($"Ignored edit slot temperature update for slot={slotIndex + 1} because '{temperatureText}' could not be parsed");
+			return;
+			}
+
+		parsed = Math.Round (parsed * 2.0, MidpointRounding.AwayFromZero) / 2.0;
+		if (_editSlotTemperatures[slotIndex].Equals (parsed))
+			{
+			LogInfo ($"Ignored edit slot temperature update for slot={slotIndex + 1} because value is unchanged ({parsed.ToString (CultureInfo.InvariantCulture)})");
+			return;
+			}
+
+		slot.Temperature = parsed;
+		_editSlotTemperatures[slotIndex] = parsed;
+		string slotErrorPropertyId = GetEditSlotErrorPropertyId (slotIndex);
+		string previousSlotError = _editSlotErrors[slotIndex] ?? string.Empty;
+		_editSlotErrors[slotIndex] = string.Empty;
+		LogInfo ($"Updated edit slot temperature slot={slotIndex + 1}, day='{EditSelectedDay}', value={parsed.ToString (CultureInfo.InvariantCulture)}");
+		EditScheduleError = string.Empty;
+		if (!string.IsNullOrEmpty (previousSlotError))
+			NotifyPropertyChanged (slotErrorPropertyId, new DriverEntityValue (string.Empty));
+		}
+
+	private bool TryBuildEditedDaySchedule (out Dictionary<string, object>? editedDaySchedule, out string errorMessage)
+		{
+		editedDaySchedule = null;
+		errorMessage = string.Empty;
+
+		for (int i = 0; i < MaxEditableScheduleSlots; i++)
+			_editSlotErrors[i] = string.Empty;
+
+		if (!TryGetEditableSlotsForSelectedDay (out List<EditableScheduleSlot>? slots) || slots == null)
+			{
+			errorMessage = "No editable schedule is loaded";
+			NotifyEditStateChanged ();
+			return false;
+			}
+
+		var normalizedSlots = new List<EditableScheduleSlot> (slots.Count);
+		for (int i = 0; i < slots.Count; i++)
+			{
+			EditableScheduleSlot slot = slots[i];
+			if (!TryParseTimeText (slot.Time, out string normalizedTime))
+				{
+				_editSlotErrors[i] = "Use HH:mm";
+				errorMessage = $"Invalid time in slot {i + 1}";
+				NotifyEditStateChanged ();
+				return false;
+				}
+
+			normalizedSlots.Add (new EditableScheduleSlot (normalizedTime, Math.Round (slot.Temperature * 2.0, MidpointRounding.AwayFromZero) / 2.0));
+			}
+
+		editedDaySchedule = BuildRawDaySchedule (normalizedSlots);
+		NotifyEditStateChanged ();
+		return true;
+		}
+
+	private bool TryGetEditableSlotsForSelectedDay (out List<EditableScheduleSlot>? slots) =>
+		_editDaySlots.TryGetValue (EditSelectedDay ?? string.Empty, out slots);
+
+	private bool TryGetEditableSlot (int slotIndex, out EditableScheduleSlot? slot)
+		{
+		slot = null;
+		if (!TryGetEditableSlotsForSelectedDay (out List<EditableScheduleSlot>? slots) || slots == null)
+			return false;
+
+		if (slotIndex < 0 || slotIndex >= slots.Count || slotIndex >= MaxEditableScheduleSlots)
+			return false;
+
+		slot = slots[slotIndex];
+		return true;
+		}
+
+	private void SetEditError (string errorText, bool notify)
+		{
+		EditScheduleError = errorText ?? string.Empty;
+		if (notify)
+			NotifyEditSlotStateChanged ();
+		}
+
+	private string BuildEditScheduleSummary ()
+		{
+		if (!EditScheduleEnabled)
+			return "No schedule assigned";
+
+		if (string.IsNullOrWhiteSpace (EditSelectedDay))
+			return _editScheduleName;
+
+		return $"{_editScheduleName} - {EditSelectedDay}";
+		}
+
+	private static string BuildEditScheduleImpact (WiserHeatingSchedule schedule)
+		{
+		if (schedule == null)
+			return string.Empty;
+
+		List<string> names = schedule.AssignmentNames ?? [];
+		return names.Count == 0
+			? "Updates the shared schedule"
+			: $"Updates all assigned rooms: {string.Join (", ", names)}";
+		}
+
+	private string ResolveInitialEditDay (string preferredDay)
+		{
+		if (!string.IsNullOrWhiteSpace (preferredDay))
+			{
+			string matchingPreferredDay = EditableScheduleDays.FirstOrDefault (day => string.Equals (day, preferredDay, StringComparison.OrdinalIgnoreCase));
+			if (!string.IsNullOrWhiteSpace (matchingPreferredDay))
+				return matchingPreferredDay;
+			}
+
+		return EditableScheduleDays[(int) DateTime.Today.DayOfWeek];
+		}
+
+	private void ResetEditSlotState ()
+		{
+		for (int i = 0; i < MaxEditableScheduleSlots; i++)
+			{
+			_editSlotTimes[i] = string.Empty;
+			_editSlotTemperatures[i] = 0;
+			_editSlotVisible[i] = false;
+			_editSlotErrors[i] = string.Empty;
+			}
+		}
+
+	private void NotifyEditStateChanged ()
+		{
+		NotifyPropertyChanged ("editScheduleEnabled", new DriverEntityValue (EditScheduleEnabled));
+		NotifyPropertyChanged ("editScheduleSummary", new DriverEntityValue (EditScheduleSummary ?? string.Empty));
+		NotifyPropertyChanged ("editScheduleImpact", new DriverEntityValue (EditScheduleImpact ?? string.Empty));
+		NotifyPropertyChanged ("editScheduleError", new DriverEntityValue (EditScheduleError ?? string.Empty));
+		NotifyPropertyChanged ("editSelectedDay", new DriverEntityValue (EditSelectedDay));
+		NotifyEditSlotStateChanged ();
+		}
+
+	private void NotifyEditSlotStateChanged ()
+		{
+		for (int i = 0; i < MaxEditableScheduleSlots; i++)
+			{
+			NotifyPropertyChanged (GetEditSlotVisiblePropertyId (i), new DriverEntityValue (_editSlotVisible[i]));
+			NotifyPropertyChanged (GetEditSlotTimePropertyId (i), new DriverEntityValue (_editSlotTimes[i] ?? string.Empty));
+			NotifyPropertyChanged (GetEditSlotErrorPropertyId (i), new DriverEntityValue (_editSlotErrors[i] ?? string.Empty));
+			NotifyPropertyChanged (GetEditSlotTemperaturePropertyId (i), new DriverEntityValue (_editSlotTemperatures[i]));
+			}
+		}
+
+	private static List<EditableScheduleSlot> BuildEditableSlots (object daySchedule)
+		{
+		var slots = new List<EditableScheduleSlot> ();
+		if (daySchedule is not IDictionary<string, object> dayDict)
+			return slots;
+
+		if (!TryGetScheduleValueList (dayDict, "Time", out List<object> times) ||
+			!TryGetScheduleValueList (dayDict, "DegreesC", out List<object> temperatures))
+			return slots;
+
+		for (int i = 0; i < times.Count && i < temperatures.Count && i < MaxEditableScheduleSlots; i++)
+			{
+			string timeValue = Convert.ToInt32 (times[i], CultureInfo.InvariantCulture).ToString ("D4", CultureInfo.InvariantCulture);
+			string formattedTime = DateTime.ParseExact (timeValue, "HHmm", CultureInfo.InvariantCulture).ToString ("HH:mm", CultureInfo.InvariantCulture);
+			double temp = WiserTemperatureFunctions.FromWiserTemp (temperatures[i]);
+			slots.Add (new EditableScheduleSlot (formattedTime, temp));
+			}
+
+		return slots;
+		}
+
+	private static bool TryGetScheduleValueList (IDictionary<string, object> dayDict, string key, out List<object> values)
+		{
+		values = [];
+		if (!dayDict.TryGetValue (key, out object value) || value == null)
+			return false;
+
+		if (value is List<object> objectList)
+			{
+			values = objectList;
+			return true;
+			}
+
+		if (value is IEnumerable<object> enumerable)
+			{
+			values = enumerable.ToList ();
+			return true;
+			}
+
+		return false;
+		}
+
+	private static Dictionary<string, object> BuildRawDaySchedule (IEnumerable<EditableScheduleSlot> slots)
+		{
+		List<EditableScheduleSlot> orderedSlots = [.. slots.OrderBy (slot => slot.Time, StringComparer.OrdinalIgnoreCase)];
+		return new Dictionary<string, object>
+			{
+				["Time"] = orderedSlots
+					.Select (slot => int.Parse (slot.Time.Replace (":", string.Empty), CultureInfo.InvariantCulture))
+					.ToList (),
+				["DegreesC"] = orderedSlots.Select (slot => WiserTemperatureFunctions.ToWiserTemp (slot.Temperature)).ToList ()
+			};
+		}
+
+	private static string DescribeDaySchedule (IDictionary<string, object>? daySchedule)
+		{
+		if (daySchedule == null)
+			return "<null>";
+
+		IEnumerable<object>? times = null;
+		if (daySchedule.TryGetValue ("Time", out object timesObj) && timesObj is IEnumerable<object> timeValues)
+			times = timeValues;
+
+		IEnumerable<object>? temps = null;
+		if (daySchedule.TryGetValue ("DegreesC", out object tempsObj) && tempsObj is IEnumerable<object> tempValues)
+			temps = tempValues;
+
+		string timesText = times != null ? string.Join (",", times) : "<missing>";
+		string tempsText = temps != null ? string.Join (",", temps) : "<missing>";
+		return $"Time=[{timesText}] DegreesC=[{tempsText}]";
+		}
+
+	private static IDictionary<string, object> CloneScheduleData (IDictionary<string, object> source) =>
+		source?.ToDictionary (kvp => kvp.Key, kvp => CloneScheduleValue (kvp.Value), StringComparer.OrdinalIgnoreCase)
+		?? new Dictionary<string, object> (StringComparer.OrdinalIgnoreCase);
+
+	private static object CloneScheduleValue (object value)
+		{
+		if (value is IDictionary<string, object> dictionary)
+			return CloneScheduleData (dictionary);
+
+		if (value is IEnumerable<object> enumerable && value is not string)
+			return enumerable.Select (CloneScheduleValue).ToList ();
+
+		return value;
+		}
+
+	private static string NormalizeTimeText (string timeText) =>
+		string.IsNullOrWhiteSpace (timeText) ? string.Empty : timeText.Trim ();
+
+	private static DriverEntityAvailableValue[] BuildEditTimeAvailableValues ()
+		{
+		var values = new List<DriverEntityAvailableValue> (48);
+		for (int hour = 0; hour < 24; hour++)
+			{
+				for (int minute = 0; minute < 60; minute += 30)
+					{
+						string timeText = new DateTime (1, 1, 1, hour, minute, 0).ToString ("HH:mm", CultureInfo.InvariantCulture);
+						// Crestron selectorbutton renders selector labels from LocalizationKey instead of Text; keep both equal to the displayed time text.
+						values.Add (new DriverEntityAvailableValue (
+							timeText,
+							new DriverEntityLocalizedString (timeText, timeText),
+							false));
+					}
+			}
+
+		return [.. values];
+		}
+
+	private static bool TryParseTimeText (string timeText, out string normalizedTime)
+		{
+		string candidate = NormalizeTimeText (timeText);
+		foreach (string format in new[] { "HH:mm", "H:mm", "HHmm", "Hmm" })
+			{
+				if (DateTime.TryParseExact (candidate, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsed))
+					{
+					normalizedTime = parsed.ToString ("HH:mm", CultureInfo.InvariantCulture);
+					return true;
+					}
+			}
+
+		normalizedTime = string.Empty;
+		return false;
+		}
+
+	private static string GetEditSlotVisiblePropertyId (int slotIndex) => $"editSlot{slotIndex + 1}Visible";
+	private static string GetEditSlotTimePropertyId (int slotIndex) => $"editSlot{slotIndex + 1}Time";
+	private static string GetEditSlotErrorPropertyId (int slotIndex) => $"editSlot{slotIndex + 1}Error";
+	private static string GetEditSlotTemperaturePropertyId (int slotIndex) => $"editSlot{slotIndex + 1}Temperature";
 
 	private DriverEntityAvailableValue[] BuildScheduleAvailableValues ()
 		{
 		var values = new List<DriverEntityAvailableValue> ();
 		var diagnostics = new List<string> ();
-		foreach (WiserHeatingSchedule schedule in _platform?.HeatingSchedules ?? [])
+		foreach (WiserHeatingSchedule? schedule in _platform.HeatingSchedules ?? [])
 			{
 			string labelText = BuildScheduleOptionValue (schedule);
 			string value = (schedule?.Id ?? 0).ToString ();
@@ -617,230 +1428,100 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	private void LogScheduleValues (string context)
 		{
 		var diagnostics = new List<string> ();
-		foreach (WiserHeatingSchedule schedule in _platform?.HeatingSchedules ?? [])
+		foreach (WiserHeatingSchedule? schedule in _platform.HeatingSchedules ?? [])
 			diagnostics.Add ($"{schedule?.Id ?? 0}:{BuildScheduleOptionValue (schedule)}");
 
-		WiserHeatingSchedule assignedSchedule = ResolveAssignedSchedule (_room);
-		LogInfo ($"{context}; availableCount={_scheduleValues?.Length ?? 0}, selectedScheduleId='{SelectedScheduleId ?? string.Empty}', roomScheduleId={assignedSchedule?.Id ?? _room?.ScheduleId ?? 0}, roomScheduleName='{ResolveScheduleNameForLog (_room, assignedSchedule)}', platformSchedules={(diagnostics.Count == 0 ? "<none>" : string.Join (", ", diagnostics))}");
+		WiserHeatingSchedule? assignedSchedule = ResolveAssignedSchedule (_room);
+		LogInfo ($"{context}; availableCount={_scheduleValues?.Length ?? 0}, selectedScheduleId='{SelectedScheduleId ?? string.Empty}', roomScheduleId={assignedSchedule?.Id ?? _room.ScheduleId}, roomScheduleName='{ResolveScheduleNameForLog (_room, assignedSchedule)}', platformSchedules={(diagnostics.Count == 0 ? "<none>" : string.Join (", ", diagnostics))}");
 		}
 
 	private void LogInfo (string message) =>
-		_logger?.Log (_driverLogId, LogEntryLevel.Info, $"Room '{DeviceLabel ?? ControllerId}': {message}");
+		_logger.Log (_driverLogId, LogEntryLevel.Info, $"Room '{DeviceLabel ?? ControllerId}': {message}");
 
-	private static string ResolveScheduleNameForLog (WiserRoom room, WiserHeatingSchedule assignedSchedule)
+	private static string ResolveScheduleNameForLog (WiserRoom room, WiserHeatingSchedule? assignedSchedule)
 		{
 		if (assignedSchedule == null)
 			return string.Empty;
 
 		if (!string.IsNullOrWhiteSpace (assignedSchedule.Name))
-			return assignedSchedule.Name;
+			return assignedSchedule.Name!;
 
 		return $"Schedule {assignedSchedule.Id}";
 		}
 
-	private static string BuildScheduleOptionValue (WiserHeatingSchedule schedule) =>
+	private static string BuildScheduleOptionValue (WiserHeatingSchedule? schedule) =>
 		string.IsNullOrWhiteSpace (schedule?.Name)
 			? $"Schedule {schedule?.Id ?? 0}"
-			: schedule.Name;
+			: schedule!.Name!;
+
+	private static bool SetValue (string value, ref string field)
+		{
+		if (string.Equals (field, value, StringComparison.Ordinal))
+			return false;
+
+		field = value;
+		return true;
+		}
+
+	private bool SetAndNotify (string propertyId, string value, ref string field)
+		{
+		if (string.Equals (field, value, StringComparison.Ordinal))
+			return false;
+
+		field = value;
+		NotifyPropertyChanged (propertyId, new DriverEntityValue (value));
+		return true;
+		}
+
+	private bool SetAndNotify (string propertyId, bool value, ref bool field)
+		{
+		if (field == value)
+			return false;
+
+		field = value;
+		NotifyPropertyChanged (propertyId, new DriverEntityValue (value));
+		return true;
+		}
+
+	private bool SetAndNotify (string propertyId, double value, ref double field)
+		{
+		LogInfo ($"Set property '{propertyId}' value={value} (current={field})");
+
+		if (field.Equals (value))
+			return false;
+
+		field = value;
+		NotifyPropertyChanged (propertyId, new DriverEntityValue (value));
+		return true;
+		}
+
+	private bool SetAndNotify (string propertyId, int value, ref int field)
+		{
+		if (field == value)
+			return false;
+
+		field = value;
+		NotifyPropertyChanged (propertyId, new DriverEntityValue (value));
+		return true;
+		}
 
 	private static bool IsRoomBoostActive (WiserRoom room)
 		{
-		if (room == null)
-			return false;
-
 		return room.BoostTimeRemaining > 0;
 		}
 
-	private void RebuildSelectedScheduleProperty ()
+	private sealed class EditableScheduleSlot (string time, double temperature)
 		{
-		RemoveProperty ("selectedScheduleId");
-
-		var noName = new DriverEntityLocalizedString (null, null);
-		var writableMeta = new DriverEntityPropertyMetadata (true, true, false);
-		var scheduleIdType = new DriverEntityTypeDefinition (
-			DriverEntityValueType.String,
-			DriverEntityValueType.Uninitialized,
-			null,
-			null,
-			null,
-			_scheduleValues,
-			null);
-		var selectedScheduleDefinition = new DriverEntityPropertyDefinition (
-			noName,
-			null,
-			scheduleIdType,
-			null,
-			null,
-			null,
-			null);
-		AddProperty (this, "selectedScheduleId", new DelegatePropertyInstance (
-			selectedScheduleDefinition,
-			writableMeta,
-			(inst, lookup) =>
-				{
-				_ = _propertyCache.TryGetValue ("selectedScheduleId", out DriverEntityValue value);
-				return value;
-				}));
-		RaiseDefinitionChangedEvent ();
-		LogInfo ($"Rebuilt selectedScheduleId property definition with available value count={_scheduleValues?.Length ?? 0}");
+		public string Time { get; set; } = time ?? string.Empty;
+		public double Temperature { get; set; } = temperature;
 		}
 
-	private void RegisterExtensionSurface ()
+	private string BuildTileIcon (WiserRoom room)
 		{
-		var noName = new DriverEntityLocalizedString (null, null);
-		var boolType = new DriverEntityTypeDefinition (DriverEntityValueType.Boolean, DriverEntityValueType.Uninitialized, null, null, null, null, null);
-		var stringType = new DriverEntityTypeDefinition (DriverEntityValueType.String, DriverEntityValueType.Uninitialized, null, null, null, null, null);
-		var tempRange = new DriverEntityValueRange (5.0, 35.0, 0.5);
-		var tempType = new DriverEntityTypeDefinition (DriverEntityValueType.Number, DriverEntityValueType.Uninitialized, null, tempRange, null, null, null);
-		var readableMeta = new DriverEntityPropertyMetadata (false, true, false);
-		var writableMeta = new DriverEntityPropertyMetadata (true, true, false);
-
-		RegisterCachedProperty ("currentTemperature", tempType, readableMeta, noName);
-		RegisterCachedProperty ("targetTemperature", tempType, writableMeta, noName);
-		RegisterCachedProperty ("displayedSetpoint", tempType, readableMeta, noName);
-		RegisterCachedProperty ("deviceLabel", stringType, readableMeta, noName);
-		RegisterCachedProperty ("boostStateLabel", stringType, readableMeta, noName);
-		RegisterCachedProperty ("boostActionLabel", stringType, readableMeta, noName);
-		RegisterCachedProperty ("temperatureUnits", stringType, readableMeta, noName);
-		RegisterCachedProperty ("scheduleSummary", stringType, readableMeta, noName);
-		RegisterCachedProperty ("scheduleToggleActionLabel", stringType, readableMeta, noName);
-		RegisterCachedProperty ("scheduleStatusLabel", stringType, readableMeta, noName);
-		RegisterCachedProperty ("selectedScheduleName", stringType, readableMeta, noName);
-		RegisterCachedProperty ("currentTemperatureLabel", stringType, readableMeta, noName);
-		RegisterCachedProperty ("tileIcon", stringType, readableMeta, noName);
-		RegisterCachedProperty ("isBoostActive", boolType, readableMeta, noName);
-		RegisterCachedProperty ("isScheduleAvailable", boolType, readableMeta, noName);
-		RegisterCachedProperty ("scheduleEnabled", boolType, readableMeta, noName);
-		RegisterCachedProperty ("canEnableSchedule", boolType, readableMeta, noName);
-		RegisterCachedProperty ("canDisableSchedule", boolType, readableMeta, noName);
-		RegisterCachedProperty ("scheduleSelectorEnabled", boolType, readableMeta, noName);
-		RebuildSelectedScheduleProperty ();
-
-		var noResult = new DriverEntityCommandResult (false, null);
-		var commandMeta = new DriverEntityCommandMetadata (true, false);
-		var emptyDef = new DriverEntityCommandDefinition (null, null, null, noName);
-
-		AddCommand (this, "increaseSetpoint", new DelegateCommandInstance (
-			"increaseSetpoint",
-			emptyDef,
-			commandMeta,
-			(id, inst, args, lookup, cb) =>
-				{
-				IncreaseSetpoint ();
-				cb?.Invoke (noResult);
-				},
-			null));
-
-		AddCommand (this, "decreaseSetpoint", new DelegateCommandInstance (
-			"decreaseSetpoint",
-			emptyDef,
-			commandMeta,
-			(id, inst, args, lookup, cb) =>
-				{
-				DecreaseSetpoint ();
-				cb?.Invoke (noResult);
-				},
-			null));
-
-		AddCommand (this, "boost", new DelegateCommandInstance (
-			"boost",
-			emptyDef,
-			commandMeta,
-			(id, inst, args, lookup, cb) =>
-				{
-				Boost ();
-				cb?.Invoke (noResult);
-				},
-			null));
-
-		AddCommand (this, "openSchedule", new DelegateCommandInstance (
-			"openSchedule",
-			emptyDef,
-			commandMeta,
-			(id, inst, args, lookup, cb) =>
-				{
-				OpenSchedule ();
-				cb?.Invoke (noResult);
-				},
-			null));
-
-		AddCommand (this, "enableSchedule", new DelegateCommandInstance (
-			"enableSchedule",
-			emptyDef,
-			commandMeta,
-			(id, inst, args, lookup, cb) =>
-				{
-				EnableSchedule ();
-				cb?.Invoke (noResult);
-				},
-			null));
-
-		AddCommand (this, "disableSchedule", new DelegateCommandInstance (
-			"disableSchedule",
-			emptyDef,
-			commandMeta,
-			(id, inst, args, lookup, cb) =>
-				{
-				DisableSchedule ();
-				cb?.Invoke (noResult);
-				},
-			null));
-
-		AddCommand (this, ExtensionSetPropertyValueExecutor.CommandName, new DelegateCommandInstance (
-			ExtensionSetPropertyValueExecutor.CommandName,
-			ExtensionSetPropertyValueExecutor.CommandDefinition,
-			commandMeta,
-			(id, inst, args, lookup, cb) => cb?.Invoke (SetExtensionPropertyValue (args)),
-			null));
-		}
-
-	private void RegisterCachedProperty (
-		string propertyId,
-		DriverEntityTypeDefinition typeDefinition,
-		DriverEntityPropertyMetadata metadata,
-		DriverEntityLocalizedString name)
-		{
-		var propertyDefinition = new DriverEntityPropertyDefinition (name, null, typeDefinition, null, null, null, null);
-		AddProperty (this, propertyId, new DelegatePropertyInstance (
-			propertyDefinition,
-			metadata,
-			(inst, lookup) =>
-				{
-				_ = _propertyCache.TryGetValue (propertyId, out DriverEntityValue value);
-				return value;
-				}));
-		}
-
-	private void RefreshPropertyCache ()
-		{
-		_propertyCache["currentTemperature"] = new DriverEntityValue (CurrentTemperature);
-		_propertyCache["targetTemperature"] = new DriverEntityValue (TargetTemperature);
-		_propertyCache["displayedSetpoint"] = new DriverEntityValue (DisplayedSetpoint);
-		_propertyCache["deviceLabel"] = new DriverEntityValue (DeviceLabel ?? string.Empty);
-		_propertyCache["boostStateLabel"] = new DriverEntityValue (BoostStateLabel ?? string.Empty);
-		_propertyCache["boostActionLabel"] = new DriverEntityValue (BoostActionLabel ?? string.Empty);
-		_propertyCache["temperatureUnits"] = new DriverEntityValue (TemperatureUnits ?? string.Empty);
-		_propertyCache["scheduleSummary"] = new DriverEntityValue (ScheduleSummary ?? string.Empty);
-		_propertyCache["scheduleToggleActionLabel"] = new DriverEntityValue (BuildScheduleToggleActionLabel (_room) ?? string.Empty);
-		_propertyCache["scheduleStatusLabel"] = new DriverEntityValue (ScheduleStatusLabel ?? string.Empty);
-		_propertyCache["selectedScheduleName"] = new DriverEntityValue (SelectedScheduleName ?? string.Empty);
-		_propertyCache["selectedScheduleId"] = new DriverEntityValue (SelectedScheduleId ?? string.Empty);
-		_propertyCache["currentTemperatureLabel"] = new DriverEntityValue (CurrentTemperatureLabel ?? string.Empty);
-		_propertyCache["tileIcon"] = new DriverEntityValue (TileIcon ?? string.Empty);
-		_propertyCache["isBoostActive"] = new DriverEntityValue (IsBoostActive);
-		_propertyCache["isScheduleAvailable"] = new DriverEntityValue (IsScheduleAvailable);
-		_propertyCache["scheduleEnabled"] = new DriverEntityValue (ScheduleEnabled);
-		_propertyCache["canEnableSchedule"] = new DriverEntityValue (CanEnableSchedule);
-		_propertyCache["canDisableSchedule"] = new DriverEntityValue (CanDisableSchedule);
-		_propertyCache["scheduleSelectorEnabled"] = new DriverEntityValue (ScheduleSelectorEnabled);
-		}
-
-	private static string BuildTileIcon (WiserRoom room)
-		{
-		if (room?.IsHeating == true)
+		if (room.IsHeating)
 			return "icHeatingRegular";
 
-		if (string.Equals (room?.TargetTemperatureOrigin, "FromSchedule", StringComparison.OrdinalIgnoreCase))
+		if (IsScheduleEnabled (room))
 			return "icClimateSchedule";
 
 		return "icClimateRegular";

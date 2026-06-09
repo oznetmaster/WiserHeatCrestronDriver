@@ -27,7 +27,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	private readonly Dictionary<string, ConfigurableDriverEntity> _roomControllers = new (StringComparer.OrdinalIgnoreCase);
 	private readonly object _entitiesLock = new ();
 
-	private WiserAPI _api;
+	private WiserAPI _api = null!;
 	private string _hubIpAddress = string.Empty;
 	private string _hubSecret = string.Empty;
 	private string _temperatureUnits = "Celsius";
@@ -42,27 +42,48 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	internal string TemperatureUnits => _temperatureUnits;
 	internal double BoostDelta => _boostDelta;
 	internal int BoostDurationMinutes => _boostDurationMinutes;
-	internal bool HasHeatingSchedules => _api?.Schedules?.HeatingSchedules?.Count > 0;
-	internal IReadOnlyList<WiserHeatingSchedule> HeatingSchedules => _api?.Schedules?.HeatingSchedules?
+	internal bool HasHeatingSchedules => _api.Schedules?.HeatingSchedules?.Count > 0;
+	internal IReadOnlyList<WiserHeatingSchedule> HeatingSchedules => _api.Schedules?.HeatingSchedules?
 		.OrderBy (schedule => schedule.Name ?? string.Empty)
 		.ThenBy (schedule => schedule.Id)
 		.ToList () ?? [];
 
-	internal WiserHeatingSchedule GetAssignedScheduleForRoom (int roomId) =>
-		_api?.Schedules?.GetByRoomId (roomId);
+	internal WiserHeatingSchedule? GetAssignedScheduleForRoom (int roomId) =>
+		_api.Schedules?.GetByRoomId (roomId);
 
-	[EntityProperty (Id = "platformStatus", FriendlyName = "Platform Status")]
+	internal async Task<bool> SaveHeatingScheduleAsync (int scheduleId, IDictionary<string, object> scheduleData)
+		{
+		if (scheduleData == null)
+			return false;
+
+		WiserHeatingSchedule? schedule = _api.Schedules?.GetById (WiserScheduleType.Heating, scheduleId) as WiserHeatingSchedule;
+		if (schedule == null)
+			return false;
+
+		Log ($"SaveHeatingScheduleAsync saving scheduleId={scheduleId} name='{schedule.Name ?? string.Empty}'");
+		bool succeeded = await schedule.SetScheduleAsync (scheduleData, CancellationToken.None).ConfigureAwait (false);
+		if (!succeeded)
+			return false;
+
+		await RefreshRoomsAsync ().ConfigureAwait (false);
+		Log ($"SaveHeatingScheduleAsync completed scheduleId={scheduleId}");
+		return true;
+		}
+
+	[EntityProperty (Id = "platformStatus", FriendlyName = "Platform Status", Type = DriverEntityValueType.String)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public string PlatformStatus
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("platformStatus", value, ref field);
 		} = "Not configured";
 
-	[EntityProperty (Id = "platformLastError", FriendlyName = "Platform Last Error")]
+	[EntityProperty (Id = "platformLastError", FriendlyName = "Platform Last Error", Type = DriverEntityValueType.String)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public string PlatformLastError
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("platformLastError", value, ref field);
 		} = string.Empty;
 
 	[EntityProperty (
@@ -72,19 +93,22 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		FriendlyName = "Managed Rooms")]
 	public IDictionary<string, PlatformManagedDevice> ManagedDevices
 		{
-		get; private set;
-		}
+		get;
+		private set => SetAndNotifyManagedDevices (value, ref field);
+		} = new Dictionary<string, PlatformManagedDevice> (StringComparer.OrdinalIgnoreCase);
 
-	[EntityProperty (Id = "onlineIndicator:isOnline")]
+	[EntityProperty (Id = "onlineIndicator:isOnline", Type = DriverEntityValueType.Boolean)]
 	public bool OnlineIndicatorIsOnline
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("onlineIndicator:isOnline", value, ref field);
 		}
 
-	[EntityProperty (Id = "readyIndicator:isReady")]
+	[EntityProperty (Id = "readyIndicator:isReady", Type = DriverEntityValueType.Boolean)]
 	public bool ReadyIndicatorIsReady
 		{
-		get; private set;
+		get;
+		private set => SetAndNotify ("readyIndicator:isReady", value, ref field);
 		}
 
 	public WiserPlatformDriver (
@@ -96,7 +120,6 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		_resources = resources;
 		_logger = args.Logger;
 		_driverLogId = args.DriverId;
-		ManagedDevices = new Dictionary<string, PlatformManagedDevice> ();
 
 		var cfgArgs = DataDrivenConfigurationControllerArgs.FromResources (args, resources, ControllerId);
 		ConfigurationController = new DelegateDataDrivenConfigurationController (
@@ -109,7 +132,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	public override void Dispose ()
 		{
 		_workQueue.Stop ();
-		_api?.Dispose ();
+		DisposeApi ();
 		base.Dispose ();
 		}
 
@@ -119,35 +142,58 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	private void LogError (string message) =>
 		_logger?.Log (_driverLogId, LogEntryLevel.Error, message);
 
-	private void UpdateStatus (string status, string error = null)
+	private void SetAndNotify (string propertyId, string value, ref string field)
+		{
+		if (string.Equals (field, value, StringComparison.Ordinal))
+			return;
+
+		field = value;
+		NotifyPropertyChanged (propertyId, new DriverEntityValue (value));
+		}
+
+	private void SetAndNotify (string propertyId, bool value, ref bool field)
+		{
+		if (field == value)
+			return;
+
+		field = value;
+		NotifyPropertyChanged (propertyId, new DriverEntityValue (value));
+		}
+
+	private void SetAndNotifyManagedDevices (
+		IDictionary<string, PlatformManagedDevice> value,
+		ref IDictionary<string, PlatformManagedDevice> field)
+		{
+		value ??= new Dictionary<string, PlatformManagedDevice> (StringComparer.OrdinalIgnoreCase);
+
+		if (ReferenceEquals (field, value))
+			return;
+
+		field = value;
+		NotifyPropertyChanged ("platform:managedDevices", CreateValueForEntries (field));
+		}
+
+	private void DisposeApi ()
+		{
+		if (_api == null)
+			return;
+
+		_api.Dispose ();
+		_api = null!;
+		}
+
+	private void UpdateStatus (string status, string? error = null)
 		{
 		PlatformStatus = status ?? string.Empty;
 		if (error != null)
 			PlatformLastError = error;
-
-		NotifyPropertyChanged ("platformStatus", new DriverEntityValue (PlatformStatus));
-		NotifyPropertyChanged ("platformLastError", new DriverEntityValue (PlatformLastError));
 		}
 
-	private void SetOnline (bool online)
-		{
-		if (OnlineIndicatorIsOnline == online)
-			return;
+	private void SetOnline (bool online) => OnlineIndicatorIsOnline = online;
 
-		OnlineIndicatorIsOnline = online;
-		NotifyPropertyChanged ("onlineIndicator:isOnline", new DriverEntityValue (online));
-		}
+	private void SetReady (bool ready) => ReadyIndicatorIsReady = ready;
 
-	private void SetReady (bool ready)
-		{
-		if (ReadyIndicatorIsReady == ready)
-			return;
-
-		ReadyIndicatorIsReady = ready;
-		NotifyPropertyChanged ("readyIndicator:isReady", new DriverEntityValue (ready));
-		}
-
-	private ConfigurationItemErrors ApplyConfigurationItems (
+	private ConfigurationItemErrors? ApplyConfigurationItems (
 		DataDrivenConfigurationController.ApplyConfigurationAction action,
 		string stepId,
 		IDictionary<string, DriverEntityValue?> values)
@@ -170,7 +216,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				_boostDurationMinutes = ReadIntValue (boostMinutes.Value, _boostDurationMinutes);
 			}
 
-		ConfigurationItemErrors ValidateConnectionItems ()
+		ConfigurationItemErrors? ValidateConnectionItems ()
 			{
 			if (!string.IsNullOrWhiteSpace (_hubIpAddress) && !string.IsNullOrWhiteSpace (_hubSecret))
 				return null;
@@ -192,7 +238,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			case DataDrivenConfigurationController.ApplyConfigurationAction.ApplyAll:
 				Log ("ApplyConfigurationItems: action=ApplyAll stepId=" + (stepId ?? "(none)"));
 				ApplyValues ();
-				ConfigurationItemErrors allErrors = ValidateConnectionItems ();
+				ConfigurationItemErrors? allErrors = ValidateConnectionItems ();
 				if (allErrors != null)
 					return allErrors;
 
@@ -213,9 +259,8 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 			case DataDrivenConfigurationController.ApplyConfigurationAction.ClearValues:
 				Log ("ApplyConfigurationItems: action=ClearValues");
-				_api?.Dispose ();
-				_api = null;
-				_workQueue.SetClient (null);
+				DisposeApi ();
+				_workQueue.ClearClient ();
 				SetReady (false);
 				SetOnline (false);
 				UpdateStatus ("Configuration cleared", string.Empty);
@@ -286,6 +331,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 	private async Task ConnectAndDiscoverAsync ()
 		{
+		WiserAPI? newApi = null;
 		try
 			{
 			Log (
@@ -299,10 +345,13 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				? WiserUnits.Imperial
 				: WiserUnits.Metric;
 
-			_api?.Dispose ();
-			_api = new WiserAPI (_hubIpAddress, _hubSecret, units);
+			newApi = new WiserAPI (_hubIpAddress, _hubSecret, units)
+				?? throw new InvalidOperationException ("Wiser API client creation returned null.");
 			Log ("Wiser API client created; initializing against host=" + _hubIpAddress);
-			await _api.InitializeAsync (CancellationToken.None).ConfigureAwait (false);
+			await newApi.InitializeAsync (CancellationToken.None).ConfigureAwait (false);
+			DisposeApi ();
+			_api = newApi;
+			newApi = null;
 			Log ("Connected to Wiser API");
 			_workQueue.SetClient (_api);
 			SetOnline (true);
@@ -311,6 +360,9 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			}
 		catch (Exception ex)
 			{
+			newApi?.Dispose ();
+			DisposeApi ();
+			_workQueue.ClearClient ();
 			LogError ("Wiser connection failed: " + ex);
 			SetOnline (false);
 			SetReady (false);
@@ -320,12 +372,6 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 	internal async Task RefreshRoomsAsync ()
 		{
-		if (_api == null)
-			{
-			Log ("RefreshRoomsAsync skipped: API client is null");
-			return;
-			}
-
 		Log ("RefreshRoomsAsync: reading hub data");
 		await _api.ReadHubDataAsync (CancellationToken.None).ConfigureAwait (false);
 		List<WiserRoom> rooms = _api.Rooms?.All ?? [];
@@ -392,7 +438,6 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 		ManagedDevices = managed;
 		Log ("RefreshRoomsAsync - publishing platform:managedDevices count=" + ManagedDevices.Count);
-		NotifyPropertyChanged ("platform:managedDevices", CreateValueForEntries (ManagedDevices));
 
 		if (ManagedDevices.Count == 0)
 			UpdateStatus ("Connected - no rooms discovered", string.Empty);
@@ -404,10 +449,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 	internal async Task<bool> AdjustRoomSetpointAsync (int roomId, double delta)
 		{
-		if (_api == null)
-			return false;
-
-		WiserRoom room = _api.Rooms?.GetById (roomId);
+		WiserRoom? room = _api.Rooms?.GetById (roomId);
 		if (room == null)
 			return false;
 
@@ -417,12 +459,20 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		return true;
 		}
 
-	internal async Task<bool> TriggerRoomBoostAsync (int roomId)
+	internal async Task<bool> SetRoomSetpointAsync (int roomId, double setpoint)
 		{
-		if (_api == null)
+		WiserRoom? room = _api.Rooms?.GetById (roomId);
+		if (room == null)
 			return false;
 
-		WiserRoom room = _api.Rooms?.GetById (roomId);
+		await room.SetTargetTemperatureAsync (setpoint, CancellationToken.None).ConfigureAwait (false);
+		await RefreshRoomsAsync ().ConfigureAwait (false);
+		return true;
+		}
+
+	internal async Task<bool> TriggerRoomBoostAsync (int roomId)
+		{
+		WiserRoom? room = _api.Rooms?.GetById (roomId);
 		if (room == null)
 			return false;
 
@@ -437,10 +487,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 	internal async Task<bool> AdvanceRoomScheduleAsync (int roomId)
 		{
-		if (_api == null)
-			return false;
-
-		WiserRoom room = _api.Rooms?.GetById (roomId);
+		WiserRoom? room = _api.Rooms?.GetById (roomId);
 		if (room == null)
 			return false;
 
@@ -451,17 +498,14 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 	internal async Task<bool> SetRoomAssignedScheduleAsync (int roomId, int scheduleId)
 		{
-		if (_api == null)
-			return false;
-
-		WiserRoom room = _api.Rooms?.GetById (roomId);
+		WiserRoom? room = _api.Rooms?.GetById (roomId);
 		List<WiserHeatingSchedule> schedules = HeatingSchedules.ToList ();
 		Log ($"SetRoomAssignedScheduleAsync requested roomId={roomId}, scheduleId={scheduleId}, roomFound={room != null}, scheduleCount={schedules.Count}");
 
 		if (room == null || schedules.Count == 0)
 			return false;
 
-		WiserHeatingSchedule targetSchedule = schedules.FirstOrDefault (schedule => schedule.Id == scheduleId);
+		WiserHeatingSchedule? targetSchedule = schedules.FirstOrDefault (schedule => schedule.Id == scheduleId);
 		if (targetSchedule == null)
 			{
 			Log ($"SetRoomAssignedScheduleAsync could not find scheduleId={scheduleId} for roomId={roomId}");
@@ -478,10 +522,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 	internal async Task<bool> SetRoomScheduleEnabledAsync (int roomId, bool enabled)
 		{
-		if (_api == null)
-			return false;
-
-		WiserRoom room = _api.Rooms?.GetById (roomId);
+		WiserRoom? room = _api.Rooms?.GetById (roomId);
 		if (room == null)
 			return false;
 
@@ -497,15 +538,15 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				await schedules[0].AssignScheduleAsync ([roomId], true, CancellationToken.None).ConfigureAwait (false);
 				}
 
-			string autoMode = FindPreferredRoomMode (room, "Auto", "Scheduled", "Schedule");
+			string? autoMode = FindPreferredRoomMode (room, "Auto", "Scheduled", "Schedule");
 			if (!string.IsNullOrWhiteSpace (autoMode))
-				await room.SetModeAsync (autoMode, CancellationToken.None).ConfigureAwait (false);
+				await room.SetModeAsync (autoMode!, CancellationToken.None).ConfigureAwait (false);
 			}
 		else
 			{
-			string manualMode = FindPreferredRoomMode (room, "Manual", "Fixed");
+			string? manualMode = FindPreferredRoomMode (room, "Manual", "Fixed");
 			if (!string.IsNullOrWhiteSpace (manualMode))
-				await room.SetModeAsync (manualMode, CancellationToken.None).ConfigureAwait (false);
+				await room.SetModeAsync (manualMode!, CancellationToken.None).ConfigureAwait (false);
 			else
 				await room.SetManualTemperatureAsync (room.CurrentTargetTemperature, CancellationToken.None).ConfigureAwait (false);
 			}
@@ -514,7 +555,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		return true;
 		}
 
-	private static string FindPreferredRoomMode (WiserRoom room, params string[] preferredModes)
+	private static string? FindPreferredRoomMode (WiserRoom room, params string[] preferredModes)
 		{
 		List<string> availableModes = WiserRoom.AvailableModes;
 		if (availableModes == null || availableModes.Count == 0)
