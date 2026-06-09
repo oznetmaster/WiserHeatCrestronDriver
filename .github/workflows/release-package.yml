@@ -5,9 +5,6 @@ on:
   release:
     types:
       - published
-  push:
-    tags:
-      - 'v*'
 
 permissions:
   contents: write
@@ -37,7 +34,7 @@ jobs:
         shell: pwsh
         run: |
           dotnet tool install --global dotnet-ilrepack
-          "$env:USERPROFILE\.dotenv\tools" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
       - name: Install ManifestUtil package
         shell: pwsh
