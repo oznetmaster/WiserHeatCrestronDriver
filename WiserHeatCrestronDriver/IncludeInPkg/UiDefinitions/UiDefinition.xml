@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
+<!-- Copyright © 2026 Neil Colvin. -->
+<!-- Licensed under the MIT License with Commons Clause. See LICENSE file in the project root for full license information. -->
 <uidefinition xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://prd-use-rad-assets.azurewebsites.net/ExtensionsSchemaDefinition.xsd">
   <version ver="2.0" />
   <tile icon="#icClimateRegular" navigation="show:MainPage" showinhomepage="#false" showinroompage="#true" />

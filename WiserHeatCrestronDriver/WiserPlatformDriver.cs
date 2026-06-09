@@ -1,5 +1,9 @@
+// Copyright © 2026 Neil Colvin.
+// Licensed under the MIT License with Commons Clause. See LICENSE file in the project root for full license information.
+
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
@@ -136,6 +140,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		base.Dispose ();
 		}
 
+	[Conditional ("DEBUG")]
 	private void Log (string message) =>
 		_logger?.Log (_driverLogId, LogEntryLevel.Info, message);
 
@@ -465,7 +470,14 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		if (room == null)
 			return false;
 
-		await room.SetTargetTemperatureAsync (setpoint, CancellationToken.None).ConfigureAwait (false);
+		if (room.IsBoost)
+			await room.CancelBoostAsync (CancellationToken.None).ConfigureAwait (false);
+
+		if (_api.Schedules?.GetByRoomId (roomId) != null && !string.Equals (room.Mode, "Manual", StringComparison.OrdinalIgnoreCase))
+			await room.SetTargetTemperatureForDurationOfScheduleAsync (setpoint, CancellationToken.None).ConfigureAwait (false);
+		else
+			await room.SetManualTemperatureAsync (setpoint, CancellationToken.None).ConfigureAwait (false);
+
 		await RefreshRoomsAsync ().ConfigureAwait (false);
 		return true;
 		}

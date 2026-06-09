@@ -1,3 +1,6 @@
+# Copyright © 2026 Neil Colvin.
+# Licensed under the MIT License with Commons Clause. See LICENSE file in the project root for full license information.
+
 param(
 	[string] $LogDirectory = "C:\Temp",
 	[string] $TimeWindowRegex = 'L:01 \[[0-9]{2}:[0-9]{2}:[0-9]{2}\]:',

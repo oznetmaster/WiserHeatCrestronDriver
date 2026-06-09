@@ -1,5 +1,9 @@
+// Copyright © 2026 Neil Colvin.
+// Licensed under the MIT License with Commons Clause. See LICENSE file in the project root for full license information.
+
 using System;
 using System.Globalization;
+using System.Diagnostics;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
@@ -1435,6 +1439,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		LogInfo ($"{context}; availableCount={_scheduleValues?.Length ?? 0}, selectedScheduleId='{SelectedScheduleId ?? string.Empty}', roomScheduleId={assignedSchedule?.Id ?? _room.ScheduleId}, roomScheduleName='{ResolveScheduleNameForLog (_room, assignedSchedule)}', platformSchedules={(diagnostics.Count == 0 ? "<none>" : string.Join (", ", diagnostics))}");
 		}
 
+	[Conditional ("DEBUG")]
 	private void LogInfo (string message) =>
 		_logger.Log (_driverLogId, LogEntryLevel.Info, $"Room '{DeviceLabel ?? ControllerId}': {message}");
 

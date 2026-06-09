@@ -1,3 +1,6 @@
+# Copyright © 2026 Neil Colvin.
+# Licensed under the MIT License with Commons Clause. See LICENSE file in the project root for full license information.
+
 param(
 	[string] $ProjectUserFile = "$PSScriptRoot\WiserHeatCrestronDriver.csproj.user",
 	[string] $OutputDirectory = "C:\Temp"
