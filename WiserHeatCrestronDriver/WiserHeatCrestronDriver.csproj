@@ -16,8 +16,8 @@
     <IsPackable>true</IsPackable>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
-    <PackageType>CrestronDriver</PackageType>
-    <PackageId>WiserHeatCrestronDriver</PackageId>
+    <PackageType>CrestronHomeDriver</PackageType>
+    <PackageId>CrestronHomeDriver.Wiser.WiserHeat</PackageId>
     <Authors>Neil Colvin</Authors>
     <Company>Neil Colvin</Company>
     <Description>Crestron Home platform driver for Drayton Wiser Heating hubs with managed child thermostat devices and optional platform-level hot water and away mode controls.</Description>

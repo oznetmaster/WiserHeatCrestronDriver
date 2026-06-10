@@ -144,12 +144,12 @@ jobs:
 
           $manifest = @{
             standardVersion = '1.0'
-            packageType = 'CrestronDriver'
+            packageType = 'CrestronHomeDriver'
             driverPlatform = 'Crestron Home'
             payloadType = 'pkg'
             payloadFile = [System.IO.Path]::GetFileName("${{ steps.package.outputs.pkg_path }}")
             containsManagedDllPayload = $false
-            packageId = 'WiserHeatCrestronDriver'
+            packageId = 'CrestronHomeDriver.Wiser.WiserHeat'
             packageVersion = "${{ steps.package_version.outputs.value }}"
             displayName = 'Wiser Heat Driver'
             vendor = 'Drayton Wiser'
