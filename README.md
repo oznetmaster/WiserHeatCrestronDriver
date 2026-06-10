@@ -46,6 +46,8 @@ The driver is implemented using the **Crestron Home SDK V2 Entity Model**. It de
 
 Preferred download source: use the attached `Thermostat_WiserHeat_IP_V2.pkg` asset from the relevant GitHub Release. The automatic GitHub `Source code (zip)` and `Source code (tar.gz)` assets are repository snapshots, not installable Crestron driver packages.
 
+NuGet package availability: this driver is also published as the `WiserHeatCrestronDriver` NuGet package. That NuGet package contains the same final `Thermostat_WiserHeat_IP_V2.pkg` artifact for scripted retrieval or package-feed distribution; it is not intended as a direct DLL reference package.
+
 1. Download `Thermostat_WiserHeat_IP_V2.pkg` from the GitHub Release assets, or build it yourself using the instructions in [Building from Source](#building-from-source).
 2. Upload the `.pkg` to your Crestron Home processor manually, for example via SFTP to `/user/ThirdPartyDrivers/Import`.
 3. In the Crestron Home setup workflow, add the Wiser platform driver.
@@ -109,6 +111,8 @@ The build pipeline:
 ### GitHub Release Asset
 
 This repository includes a GitHub Actions workflow that builds and attaches the `.pkg` when a GitHub Release is published.
+
+The same release workflow also publishes the `WiserHeatCrestronDriver` NuGet package, which wraps the final `Thermostat_WiserHeat_IP_V2.pkg` artifact.
 
 For end users, GitHub Releases are the preferred download point: download the attached `Thermostat_WiserHeat_IP_V2.pkg` asset, not the automatic source archive assets.
 

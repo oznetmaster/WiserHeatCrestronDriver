@@ -8,13 +8,26 @@
     <Nullable>enable</Nullable>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <NoWarn>$(NoWarn);ILLink1005</NoWarn>
-    <Description></Description>
-    <Company></Company>
     <Product>WiserHeatCrestronDriver</Product>
     <Copyright>Copyright © 2026 Neil Colvin</Copyright>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
     <Version>1.0.0</Version>
+    <IsPackable>true</IsPackable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <PackageId>WiserHeatCrestronDriver</PackageId>
+    <Authors>Neil Colvin</Authors>
+    <Company>Neil Colvin</Company>
+    <Description>Crestron Home platform driver for Drayton Wiser Heating hubs with managed child thermostat devices and optional platform-level hot water and away mode controls.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <RepositoryUrl>https://github.com/oznetmaster/WiserHeatCrestronDriver</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageProjectUrl>https://github.com/oznetmaster/WiserHeatCrestronDriver</PackageProjectUrl>
+    <PackageTags>crestron;crestron-home;driver;wiser;heating;thermostat;smarthome</PackageTags>
+    <PackageDriverPkgPath Condition="'$(PackageDriverPkgPath)' == ''"></PackageDriverPkgPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -33,6 +46,9 @@
     <EmbeddedResource Include="Thermostat_WiserHeat_IP_V2.json" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="..\LICENSE" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="$(PackageDriverPkgPath)" Pack="true" PackagePath="\" Visible="false" Condition="'$(PackageDriverPkgPath)' != ''" />
     <None Include="IncludeInPkg\UiDefinitions\UiDefinition.xml" />
     <None Include="IncludeInPkg\room\uidefinitions\UiDefinition.xml" />
     <None Include="IncludeInPkg\Translations\en-US.json" />
@@ -92,6 +108,11 @@
     </ItemGroup>
     <Copy SourceFiles="@(IncludeInPkgFiles)" DestinationFiles="@(IncludeInPkgFiles->'$(TargetDir)patched\IncludeInPkg\%(RecursiveDir)%(Filename)%(Extension)')" />
     <Exec Command="&quot;$(ManifestUtilExe)&quot; --file &quot;$(TargetDir)patched\$(AssemblyName).dll&quot; --lib &quot;$(TargetDir.TrimEnd('\'))&quot; --output &quot;$(TargetDir.TrimEnd('\'))&quot;" ContinueOnError="$(PackageDriverContinueOnError)" IgnoreExitCode="$(PackageDriverIgnoreExitCode)" />
+  </Target>
+
+  <Target Name="ValidateNuGetPkgInput" BeforeTargets="GenerateNuspec" Condition="'$(IsPacking)' == 'true'">
+    <Error Condition="'$(PackageDriverPkgPath)' == ''" Text="PackageDriverPkgPath must be set when packing the NuGet package." />
+    <Error Condition="!Exists('$(PackageDriverPkgPath)')" Text="PackageDriverPkgPath '$(PackageDriverPkgPath)' does not exist." />
   </Target>
 
   <Import Project="WiserHeatCrestronDriver.Local.targets" Condition="Exists('WiserHeatCrestronDriver.Local.targets')" />
