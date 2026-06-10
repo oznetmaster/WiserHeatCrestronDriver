@@ -16,6 +16,7 @@
     <IsPackable>true</IsPackable>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <PackageType>CrestronDriver</PackageType>
     <PackageId>WiserHeatCrestronDriver</PackageId>
     <Authors>Neil Colvin</Authors>
     <Company>Neil Colvin</Company>
@@ -26,8 +27,9 @@
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <PackageProjectUrl>https://github.com/oznetmaster/WiserHeatCrestronDriver</PackageProjectUrl>
-    <PackageTags>crestron;crestron-home;driver;wiser;heating;thermostat;smarthome</PackageTags>
+    <PackageTags>crestron;crestron-home;driver;pkg;wiser;heating;thermostat;smarthome</PackageTags>
     <PackageDriverPkgPath Condition="'$(PackageDriverPkgPath)' == ''"></PackageDriverPkgPath>
+    <PackageDriverManifestPath Condition="'$(PackageDriverManifestPath)' == ''"></PackageDriverManifestPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -49,6 +51,7 @@
     <None Include="..\README.md" Pack="true" PackagePath="\" Visible="false" />
     <None Include="..\LICENSE" Pack="true" PackagePath="\" Visible="false" />
     <None Include="$(PackageDriverPkgPath)" Pack="true" PackagePath="\" Visible="false" Condition="'$(PackageDriverPkgPath)' != ''" />
+    <None Include="$(PackageDriverManifestPath)" Pack="true" PackagePath="\" Visible="false" Condition="'$(PackageDriverManifestPath)' != ''" />
     <None Include="IncludeInPkg\UiDefinitions\UiDefinition.xml" />
     <None Include="IncludeInPkg\room\uidefinitions\UiDefinition.xml" />
     <None Include="IncludeInPkg\Translations\en-US.json" />
@@ -113,6 +116,8 @@
   <Target Name="ValidateNuGetPkgInput" BeforeTargets="GenerateNuspec" Condition="'$(IsPacking)' == 'true'">
     <Error Condition="'$(PackageDriverPkgPath)' == ''" Text="PackageDriverPkgPath must be set when packing the NuGet package." />
     <Error Condition="!Exists('$(PackageDriverPkgPath)')" Text="PackageDriverPkgPath '$(PackageDriverPkgPath)' does not exist." />
+    <Error Condition="'$(PackageDriverManifestPath)' == ''" Text="PackageDriverManifestPath must be set when packing the NuGet package." />
+    <Error Condition="!Exists('$(PackageDriverManifestPath)')" Text="PackageDriverManifestPath '$(PackageDriverManifestPath)' does not exist." />
   </Target>
 
   <Import Project="WiserHeatCrestronDriver.Local.targets" Condition="Exists('WiserHeatCrestronDriver.Local.targets')" />

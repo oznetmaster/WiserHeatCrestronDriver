@@ -1,0 +1,13 @@
+{
+  "standardVersion": "1.0",
+  "packageType": "CrestronDriver",
+  "driverPlatform": "Crestron Home",
+  "payloadType": "pkg",
+  "payloadFile": "Thermostat_WiserHeat_IP_V2.pkg",
+  "containsManagedDllPayload": false,
+  "packageId": "WiserHeatCrestronDriver",
+  "packageVersion": "$packageVersion$",
+  "displayName": "Wiser Heat Driver",
+  "vendor": "Drayton Wiser",
+  "driverCategory": "Thermostat"
+}
