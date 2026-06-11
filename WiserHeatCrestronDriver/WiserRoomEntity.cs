@@ -2,10 +2,10 @@
 // Licensed under the MIT License with Commons Clause. See LICENSE file in the project root for full license information.
 
 using System;
-using System.Globalization;
-using System.Diagnostics;
-using System.IO;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -977,7 +977,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			{
 			if (string.Equals ((schedule?.Id ?? 0).ToString (), scheduleIdText, StringComparison.OrdinalIgnoreCase))
 				{
-					scheduleId = schedule!.Id;
+				scheduleId = schedule!.Id;
 				break;
 				}
 			}
@@ -1301,7 +1301,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 				return matchingPreferredDay;
 			}
 
-		return EditableScheduleDays[(int) DateTime.Today.DayOfWeek];
+		return EditableScheduleDays[(int)DateTime.Today.DayOfWeek];
 		}
 
 	private void ResetEditSlotState ()
@@ -1383,10 +1383,10 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		List<EditableScheduleSlot> orderedSlots = [.. slots.OrderBy (slot => slot.Time, StringComparer.OrdinalIgnoreCase)];
 		return new Dictionary<string, object>
 			{
-				["Time"] = orderedSlots
+			["Time"] = orderedSlots
 					.Select (slot => int.Parse (slot.Time.Replace (":", string.Empty), CultureInfo.InvariantCulture))
 					.ToList (),
-				["DegreesC"] = orderedSlots.Select (slot => WiserTemperatureFunctions.ToWiserTemp (slot.Temperature)).ToList ()
+			["DegreesC"] = orderedSlots.Select (slot => WiserTemperatureFunctions.ToWiserTemp (slot.Temperature)).ToList ()
 			};
 		}
 
@@ -1431,15 +1431,15 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		var values = new List<DriverEntityAvailableValue> (48);
 		for (int hour = 0; hour < 24; hour++)
 			{
-				for (int minute = 0; minute < 60; minute += 30)
-					{
-						string timeText = new DateTime (1, 1, 1, hour, minute, 0).ToString ("HH:mm", CultureInfo.InvariantCulture);
-						// Crestron selectorbutton renders selector labels from LocalizationKey instead of Text; keep both equal to the displayed time text.
-						values.Add (new DriverEntityAvailableValue (
-							timeText,
-							new DriverEntityLocalizedString (timeText, timeText),
-							false));
-					}
+			for (int minute = 0; minute < 60; minute += 30)
+				{
+				string timeText = new DateTime (1, 1, 1, hour, minute, 0).ToString ("HH:mm", CultureInfo.InvariantCulture);
+				// Crestron selectorbutton renders selector labels from LocalizationKey instead of Text; keep both equal to the displayed time text.
+				values.Add (new DriverEntityAvailableValue (
+					timeText,
+					new DriverEntityLocalizedString (timeText, timeText),
+					false));
+				}
 			}
 
 		return [.. values];
@@ -1450,11 +1450,11 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		string candidate = NormalizeTimeText (timeText);
 		foreach (string format in new[] { "HH:mm", "H:mm", "HHmm", "Hmm" })
 			{
-				if (DateTime.TryParseExact (candidate, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsed))
-					{
-					normalizedTime = parsed.ToString ("HH:mm", CultureInfo.InvariantCulture);
-					return true;
-					}
+			if (DateTime.TryParseExact (candidate, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsed))
+				{
+				normalizedTime = parsed.ToString ("HH:mm", CultureInfo.InvariantCulture);
+				return true;
+				}
 			}
 
 		normalizedTime = string.Empty;

@@ -554,7 +554,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				}
 			else
 				{
-				bool isOn = hotwater.IsHeating || string.Equals (hotwater.CurrentState, "On", StringComparison.OrdinalIgnoreCase);
+				bool isOn = hotwater.IsHeating;
 				HotWaterActionEnabled = OnlineIndicatorIsOnline && Interlocked.CompareExchange (ref _hotWaterCommandInProgress, 0, 0) == 0;
 				HotWaterIsOn = isOn;
 				HotWaterStateLabel = isOn ? "^HotWaterOnLabel" : "^HotWaterOffLabel";
@@ -621,14 +621,14 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			{
 			await _workQueue.EnqueueAsync (async api =>
 				{
-				WiserHotwater? hotwater = api.Hotwater;
-				if (hotwater == null)
-					return;
+					WiserHotwater? hotwater = api.Hotwater;
+					if (hotwater == null)
+						return;
 
-				bool requestedOn = !HotWaterIsOn;
-				bool success = await hotwater.OverrideStateAsync (requestedOn ? "On" : "Off", CancellationToken.None).ConfigureAwait (false);
-				if (success)
-					await RefreshRoomsAsync ().ConfigureAwait (false);
+					bool requestedOn = !HotWaterIsOn;
+					bool success = await hotwater.OverrideStateAsync (requestedOn ? "On" : "Off", CancellationToken.None).ConfigureAwait (false);
+					if (success)
+						await RefreshRoomsAsync ().ConfigureAwait (false);
 				}).ConfigureAwait (false);
 
 			UpdatePlatformOptionsState ();
@@ -660,13 +660,13 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			{
 			await _workQueue.EnqueueAsync (async api =>
 				{
-				WiserSystem? system = api.System;
-				if (system == null)
-					return;
+					WiserSystem? system = api.System;
+					if (system == null)
+						return;
 
-				bool requestedOn = !system.AwayModeEnabled;
-				system.AwayModeEnabled = requestedOn;
-				await RefreshRoomsAsync ().ConfigureAwait (false);
+					bool requestedOn = !system.AwayModeEnabled;
+					system.AwayModeEnabled = requestedOn;
+					await RefreshRoomsAsync ().ConfigureAwait (false);
 				}).ConfigureAwait (false);
 
 			UpdatePlatformOptionsState ();
