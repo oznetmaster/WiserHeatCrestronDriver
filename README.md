@@ -44,7 +44,9 @@ The driver is implemented using the **Crestron Home SDK V2 Entity Model**. It de
 
 ## Installation
 
-Preferred download source: use the attached `Thermostat_WiserHeat_IP_V2.pkg` asset from the relevant GitHub Release. The automatic GitHub `Source code (zip)` and `Source code (tar.gz)` assets are repository snapshots, not installable Crestron driver packages.
+The best way to download and install this driver on a Crestron Home system is to use the [Crestron Home Driver Feed Installer](https://github.com/oznetmaster/Crestron-Home-Driver-Feed-Installer) repository and application.
+
+If you prefer to install manually, use the attached `Thermostat_WiserHeat_IP_V2.pkg` asset from the relevant GitHub Release. The automatic GitHub `Source code (zip)` and `Source code (tar.gz)` assets are repository snapshots, not installable Crestron driver packages.
 
 NuGet package availability: this driver is also published as the `CrestronHomeDriver.Wiser.WiserHeat` NuGet package. This NuGet package conforms to the **Crestron Home Driver NuGet Publishing Standard v1**. It is a distribution wrapper for the final `Thermostat_WiserHeat_IP_V2.pkg` artifact, includes the required `crestron-driver-package.json` manifest, and is not intended as a direct DLL reference package.
 
@@ -116,8 +118,6 @@ This repository includes a GitHub Actions workflow that builds and attaches the 
 
 The same release workflow also publishes the `WiserHeatCrestronDriver` NuGet package, which wraps the final `Thermostat_WiserHeat_IP_V2.pkg` artifact.
 
-For end users, GitHub Releases are the preferred download point: download the attached `Thermostat_WiserHeat_IP_V2.pkg` asset, not the automatic source archive assets.
-
 Typical release flow:
 
 1. Push the release commit and tag.
@@ -141,3 +141,4 @@ MIT + Commons Clause © 2026 Neil Colvin — see [LICENSE](LICENSE).
 Free to use and modify. You may not sell the Software as a standalone product or sublicense it. Commercial system integration and commissioning work is permitted, provided the Software itself is not sold as a standalone product.
 
 > **Note:** This project references [Crestron.DeviceDrivers.DevKit](https://www.nuget.org/packages/Crestron.DeviceDrivers.DevKit), which is subject to Crestron's SDK license agreement. That license governs the SDK libraries only; the source code in this repository is licensed independently under the terms above.
+
