@@ -4,6 +4,8 @@ A **Crestron Home** platform driver that integrates a **Drayton Wiser Heating** 
 
 Drayton, Wiser, and Schneider Electric are trademarks of Schneider Electric SE, its subsidiaries, or affiliated companies. This project is an independent, unofficial Crestron Home driver and is not affiliated with or endorsed by Schneider Electric or Crestron.
 
+Crestron and Crestron Home are trademarks or registered trademarks of Crestron Electronics, Inc. This project is not affiliated with, endorsed by, or sponsored by Crestron Electronics, Inc.
+
 [![License: MIT + Commons Clause](https://img.shields.io/badge/License-MIT%20%2B%20Commons%20Clause-blue.svg)](LICENSE)
 
 ---
