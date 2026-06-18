@@ -31,19 +31,21 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	private string _selectedScheduleId = string.Empty;
 	private DriverEntityAvailableValue[] _scheduleValues = [];
 	private WiserRoom _room;
-	private const int MaxEditableScheduleSlots = 10;
-	private static readonly string[] EditableScheduleDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+	private const int MAX_EDITABLE_SCHEDULE_SLOTS = 10;
+	private static readonly string[] _editableScheduleDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 	private static readonly DriverEntityAvailableValue[] EditTimeValues = BuildEditTimeAvailableValues ();
 	private readonly Dictionary<string, List<EditableScheduleSlot>> _editDaySlots = new (StringComparer.OrdinalIgnoreCase);
 	private string _editSelectedDay = string.Empty;
-	private readonly string[] _editSlotTimes = new string[MaxEditableScheduleSlots];
-	private readonly double[] _editSlotTemperatures = new double[MaxEditableScheduleSlots];
-	private readonly bool[] _editSlotVisible = new bool[MaxEditableScheduleSlots];
-	private readonly string[] _editSlotErrors = new string[MaxEditableScheduleSlots];
+	private readonly string[] _editSlotTimes = new string[MAX_EDITABLE_SCHEDULE_SLOTS];
+	private readonly double[] _editSlotTemperatures = new double[MAX_EDITABLE_SCHEDULE_SLOTS];
+	private readonly bool[] _editSlotVisible = new bool[MAX_EDITABLE_SCHEDULE_SLOTS];
+	private readonly string[] _editSlotErrors = new string[MAX_EDITABLE_SCHEDULE_SLOTS];
 	private IDictionary<string, object> _editScheduleData = new Dictionary<string, object> (StringComparer.OrdinalIgnoreCase);
 	private int _editScheduleId;
 	private string _editScheduleName = string.Empty;
 	private int _roomActionInProgress;
+	private int _debugLoggingEnabled;
+	private bool _suppressPropertyNotifications = true;
 
 	public WiserRoomEntity (
 		string controllerId,
@@ -74,9 +76,15 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		ScheduleStatusLabel = BuildScheduleStatusLabel (room);
 		SelectedScheduleName = BuildSelectedScheduleName (room);
 		SelectedScheduleId = BuildSelectedScheduleId (room);
+		ScheduleValues = BuildScheduleAvailableValues ();
 		ScheduleSelectorEnabled = platform.HasHeatingSchedules;
 		CurrentTemperatureLabel = $"{CurrentTemperature:0.0}°";
 		TileIcon = BuildTileIcon (room);
+		// The room is online/ready the moment it is discovered from the hub.
+		// Seed the indicators here (notifications are still suppressed) so the
+		// initial GetState snapshot reports online without waiting for lazy
+		// activation. Entity polling and data response remain deferred until
+		// the room is first activated via GetState.
 		OnlineIndicatorIsOnline = true;
 		ReadyIndicatorIsReady = true;
 		EditScheduleSummary = string.Empty;
@@ -105,6 +113,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		var setPropertyValue = new ExtensionSetPropertyValueExecutor (GetCommand, resources.Logger);
 		AddCommand (this, ExtensionSetPropertyValueExecutor.CommandName, setPropertyValue);
 
+		_suppressPropertyNotifications = false;
 		NotifyEditStateChanged ();
 		}
 
@@ -725,8 +734,10 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	[EntityCommandMetadata (Programmable = true)]
 	public void OpenSchedule ()
 		{
+		LogBreadcrumb ($"OpenSchedule entered; frameworkReady={_frameworkReady}, selectorEnabled={ScheduleSelectorEnabled}, selectedScheduleId='{SelectedScheduleId ?? string.Empty}', platformScheduleCount={_platform.HeatingSchedules.Count}");
 		LogInfo ($"OpenSchedule invoked; frameworkReady={_frameworkReady}, selectorEnabled={ScheduleSelectorEnabled}, selectedScheduleId='{SelectedScheduleId ?? string.Empty}'");
-		RefreshScheduleValues (notify: _frameworkReady != 0);
+		LogInfo ($"OpenSchedule before refresh; platformScheduleCount={_platform.HeatingSchedules.Count}");
+		RefreshScheduleValues (notify: true);
 		}
 
 	[EntityCommand (Id = "enableSchedule", FriendlyName = "Enable Schedule")]
@@ -758,7 +769,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	public void OpenEditSchedule ()
 		{
 		LogInfo ($"OpenEditSchedule invoked; selectedScheduleId='{SelectedScheduleId ?? string.Empty}'");
-		LoadEditScheduleState (notify: _frameworkReady != 0);
+		LoadEditScheduleState (notify: true);
 		}
 
 	[EntityCommand (Id = "saveEditScheduleDay", FriendlyName = "Save Edit Schedule Day")]
@@ -780,15 +791,12 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	public void CancelEditSchedule ()
 		{
 		LogInfo ("CancelEditSchedule invoked");
-		LoadEditScheduleState (notify: _frameworkReady != 0);
+		LoadEditScheduleState (notify: true);
 		}
 
 	public void UpdateFromRoom (WiserRoom room, string? temperatureUnits)
 		{
 		_room = room;
-
-		WiserHeatingSchedule? assignedSchedule = ResolveAssignedSchedule (_room);
-		LogInfo ($"UpdateFromRoom start; roomId={_room.Id}, mode='{_room.Mode ?? string.Empty}', scheduleId={assignedSchedule?.Id ?? _room.ScheduleId}, scheduleName='{ResolveScheduleNameForLog (_room, assignedSchedule)}', temperatureUnits='{temperatureUnits ?? string.Empty}'");
 
 		DeviceLabel = _room.Name ?? DeviceLabel;
 		CurrentTemperature = _room.CurrentTemperature;
@@ -805,7 +813,6 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		NotifyRoomActionStateChanged ();
 		ScheduleStatusLabel = BuildScheduleStatusLabel (_room);
 		SelectedScheduleName = BuildSelectedScheduleName (_room);
-		RefreshScheduleValues (notify: true);
 		ScheduleSelectorEnabled = _platform.HasHeatingSchedules;
 		CurrentTemperatureLabel = $"{CurrentTemperature:0.0}°";
 		TileIcon = BuildTileIcon (_room);
@@ -823,6 +830,9 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 	public void StartPolling ()
 		{
+		LogBreadcrumb ($"StartPolling entered; roomId={_room.Id}, frameworkReady={_frameworkReady}, online={OnlineIndicatorIsOnline}");
+		Interlocked.Exchange (ref _debugLoggingEnabled, 1);
+
 		if (Interlocked.CompareExchange (ref _frameworkReady, 1, 0) != 0)
 			{
 			LogInfo ("StartPolling ignored because framework is already ready");
@@ -841,7 +851,14 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		LoadEditScheduleState (notify: true);
 		}
 
-	public void StopPolling () => SetOnline (false);
+	public void StopPolling ()
+		{
+		Interlocked.Exchange (ref _debugLoggingEnabled, 0);
+		ReadyIndicatorIsReady = false;
+		SetOnline (false);
+		}
+
+	internal bool IsDebugLoggingEnabled => Volatile.Read (ref _debugLoggingEnabled) != 0;
 
 	private async Task FireAndForgetAsync (Func<Task<bool>> action, string operation)
 		{
@@ -1004,6 +1021,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		string previousSelectedScheduleId = SelectedScheduleId ?? string.Empty;
 		DriverEntityAvailableValue[] nextScheduleValues = BuildScheduleAvailableValues ();
 		string nextSelectedScheduleId = BuildSelectedScheduleId (_room);
+		LogBreadcrumb ($"RefreshScheduleValues entered; notify={notify}, builtCount={nextScheduleValues.Length}, previousSelectedScheduleId='{previousSelectedScheduleId}', nextSelectedScheduleId='{nextSelectedScheduleId}', platformScheduleCount={_platform.HeatingSchedules.Count}");
 
 		ScheduleValues = nextScheduleValues;
 		SelectedScheduleId = nextSelectedScheduleId;
@@ -1011,7 +1029,9 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 		if (notify)
 			{
+			LogBreadcrumb ($"RefreshScheduleValues publishing selectedScheduleOptions; count={SelectedScheduleOptions.Length}, selectedScheduleId='{SelectedScheduleId ?? string.Empty}'");
 			NotifyPropertyChanged ("selectedScheduleOptions", new DriverEntityValue (SelectedScheduleOptions));
+			NotifyPropertyChanged ("selectedScheduleId", new DriverEntityValue (SelectedScheduleId ?? string.Empty));
 			LogInfo ($"Published schedule selector state; newCount={ScheduleValues?.Length ?? 0}, previousSelectedScheduleId='{previousSelectedScheduleId}', newSelectedScheduleId='{SelectedScheduleId ?? string.Empty}'");
 			}
 		}
@@ -1029,7 +1049,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		if (assignedSchedule != null)
 			{
 			_editScheduleData = CloneScheduleData (assignedSchedule.ScheduleData);
-			foreach (string day in EditableScheduleDays)
+			foreach (string day in _editableScheduleDays)
 				{
 				if (_editScheduleData.TryGetValue (day, out object daySchedule))
 					_editDaySlots[day] = BuildEditableSlots (daySchedule);
@@ -1079,7 +1099,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		IDictionary<string, object> scheduleData = CloneScheduleData (_editScheduleData);
 		if (applyToAllDays)
 			{
-			foreach (string day in EditableScheduleDays)
+			foreach (string day in _editableScheduleDays)
 				scheduleData[day] = CloneScheduleValue (editedDaySchedule);
 			}
 		else
@@ -1139,7 +1159,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		if (string.IsNullOrWhiteSpace (day) || !_editDaySlots.TryGetValue (day, out List<EditableScheduleSlot> slots))
 			return;
 
-		for (int i = 0; i < slots.Count && i < MaxEditableScheduleSlots; i++)
+		for (int i = 0; i < slots.Count && i < MAX_EDITABLE_SCHEDULE_SLOTS; i++)
 			{
 			_editSlotVisible[i] = true;
 			_editSlotTimes[i] = slots[i].Time;
@@ -1217,7 +1237,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		editedDaySchedule = null;
 		errorMessage = string.Empty;
 
-		for (int i = 0; i < MaxEditableScheduleSlots; i++)
+		for (int i = 0; i < MAX_EDITABLE_SCHEDULE_SLOTS; i++)
 			_editSlotErrors[i] = string.Empty;
 
 		if (!TryGetEditableSlotsForSelectedDay (out List<EditableScheduleSlot>? slots) || slots == null)
@@ -1256,7 +1276,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		if (!TryGetEditableSlotsForSelectedDay (out List<EditableScheduleSlot>? slots) || slots == null)
 			return false;
 
-		if (slotIndex < 0 || slotIndex >= slots.Count || slotIndex >= MaxEditableScheduleSlots)
+		if (slotIndex < 0 || slotIndex >= slots.Count || slotIndex >= MAX_EDITABLE_SCHEDULE_SLOTS)
 			return false;
 
 		slot = slots[slotIndex];
@@ -1296,17 +1316,17 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		{
 		if (!string.IsNullOrWhiteSpace (preferredDay))
 			{
-			string matchingPreferredDay = EditableScheduleDays.FirstOrDefault (day => string.Equals (day, preferredDay, StringComparison.OrdinalIgnoreCase));
+			string matchingPreferredDay = _editableScheduleDays.FirstOrDefault (day => string.Equals (day, preferredDay, StringComparison.OrdinalIgnoreCase));
 			if (!string.IsNullOrWhiteSpace (matchingPreferredDay))
 				return matchingPreferredDay;
 			}
 
-		return EditableScheduleDays[(int)DateTime.Today.DayOfWeek];
+		return _editableScheduleDays[(int)DateTime.Today.DayOfWeek];
 		}
 
 	private void ResetEditSlotState ()
 		{
-		for (int i = 0; i < MaxEditableScheduleSlots; i++)
+		for (int i = 0; i < MAX_EDITABLE_SCHEDULE_SLOTS; i++)
 			{
 			_editSlotTimes[i] = string.Empty;
 			_editSlotTemperatures[i] = 0;
@@ -1327,7 +1347,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 	private void NotifyEditSlotStateChanged ()
 		{
-		for (int i = 0; i < MaxEditableScheduleSlots; i++)
+		for (int i = 0; i < MAX_EDITABLE_SCHEDULE_SLOTS; i++)
 			{
 			NotifyPropertyChanged (GetEditSlotVisiblePropertyId (i), new DriverEntityValue (_editSlotVisible[i]));
 			NotifyPropertyChanged (GetEditSlotTimePropertyId (i), new DriverEntityValue (_editSlotTimes[i] ?? string.Empty));
@@ -1346,7 +1366,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			!TryGetScheduleValueList (dayDict, "DegreesC", out List<object> temperatures))
 			return slots;
 
-		for (int i = 0; i < times.Count && i < temperatures.Count && i < MaxEditableScheduleSlots; i++)
+		for (int i = 0; i < times.Count && i < temperatures.Count && i < MAX_EDITABLE_SCHEDULE_SLOTS; i++)
 			{
 			string timeValue = Convert.ToInt32 (times[i], CultureInfo.InvariantCulture).ToString ("D4", CultureInfo.InvariantCulture);
 			string formattedTime = DateTime.ParseExact (timeValue, "HHmm", CultureInfo.InvariantCulture).ToString ("HH:mm", CultureInfo.InvariantCulture);
@@ -1502,8 +1522,16 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		}
 
 	[Conditional ("DEBUG")]
-	private void LogInfo (string message) =>
-		_logger.Log (_driverLogId, LogEntryLevel.Info, $"Room '{DeviceLabel ?? ControllerId}': {message}");
+	private void LogInfo (string message)
+		{
+		if (!IsDebugLoggingEnabled)
+			return;
+
+		_logger.Log (_driverLogId, LogEntryLevel.Info, $"Room '{ControllerId}': {message}");
+		}
+
+	private void LogBreadcrumb (string message) =>
+		_logger.Log (_driverLogId, LogEntryLevel.Info, $"Room '{ControllerId}': {message}");
 
 	private static string ResolveScheduleNameForLog (WiserRoom room, WiserHeatingSchedule? assignedSchedule)
 		{
@@ -1530,46 +1558,55 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		return true;
 		}
 
-	private bool SetAndNotify (string propertyId, string value, ref string field)
+	private void SetAndNotify (string propertyId, string? value, ref string field)
 		{
+		value ??= string.Empty;
+
 		if (string.Equals (field, value, StringComparison.Ordinal))
-			return false;
+			return;
 
 		field = value;
+		if (_suppressPropertyNotifications)
+			return;
+
 		NotifyPropertyChanged (propertyId, new DriverEntityValue (value));
-		return true;
 		}
 
-	private bool SetAndNotify (string propertyId, bool value, ref bool field)
+	private void SetAndNotify (string propertyId, bool value, ref bool field)
 		{
 		if (field == value)
-			return false;
+			return;
 
 		field = value;
+		if (_suppressPropertyNotifications)
+			return;
+
 		NotifyPropertyChanged (propertyId, new DriverEntityValue (value));
-		return true;
 		}
 
-	private bool SetAndNotify (string propertyId, double value, ref double field)
+	private void SetAndNotify (string propertyId, double value, ref double field)
 		{
-		LogInfo ($"Set property '{propertyId}' value={value} (current={field})");
-
 		if (field.Equals (value))
-			return false;
+			return;
 
+		LogInfo ($"Set property '{propertyId}' value={value} (current={field})");
 		field = value;
+		if (_suppressPropertyNotifications)
+			return;
+
 		NotifyPropertyChanged (propertyId, new DriverEntityValue (value));
-		return true;
 		}
 
-	private bool SetAndNotify (string propertyId, int value, ref int field)
+	private void SetAndNotify (string propertyId, int value, ref int field)
 		{
 		if (field == value)
-			return false;
+			return;
 
 		field = value;
+		if (_suppressPropertyNotifications)
+			return;
+
 		NotifyPropertyChanged (propertyId, new DriverEntityValue (value));
-		return true;
 		}
 
 	private static bool IsRoomBoostActive (WiserRoom room)

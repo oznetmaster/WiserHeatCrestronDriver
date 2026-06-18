@@ -22,7 +22,8 @@ namespace WiserHeat.CrestronDriver;
 
 public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	{
-	private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds (15);
+	private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds (10);
+	private static readonly TimeSpan ScheduleRefreshInterval = TimeSpan.FromSeconds (30);
 
 	private readonly DriverControllerCreationArgs _args;
 	private readonly DriverImplementationResources _resources;
@@ -32,6 +33,8 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	private readonly UiDefinitionProperty _uiDefinition;
 	private readonly Dictionary<string, WiserRoomEntity> _roomEntities = new (StringComparer.OrdinalIgnoreCase);
 	private readonly Dictionary<string, ConfigurableDriverEntity> _roomControllers = new (StringComparer.OrdinalIgnoreCase);
+	private readonly HashSet<string> _roomsAwaitingRebind = new (StringComparer.OrdinalIgnoreCase);
+	private readonly HashSet<string> _roomsReboundThisSession = new (StringComparer.OrdinalIgnoreCase);
 	private readonly object _entitiesLock = new ();
 
 	private WiserAPI _api = null!;
@@ -44,8 +47,11 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	private bool _allowAwayMode;
 	private int _hotWaterCommandInProgress;
 	private int _awayModeCommandInProgress;
+	private int _lastLoggedDiscoveredRoomCount = -1;
+	private DateTimeOffset _lastScheduleRefreshUtc = DateTimeOffset.MinValue;
 	private CancellationTokenSource? _refreshLoopCancellationTokenSource;
 	private Task? _refreshLoopTask;
+	private bool _suppressPropertyNotifications = true;
 
 	internal DataDrivenConfigurationController ConfigurationController
 		{
@@ -78,7 +84,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		if (!succeeded)
 			return false;
 
-		await RefreshSystemStateAsync ().ConfigureAwait (false);
+		await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
 		Log ($"SaveHeatingScheduleAsync completed scheduleId={scheduleId}");
 		return true;
 		}
@@ -271,6 +277,8 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			ApplyConfigurationItems,
 			null,
 			null);
+
+		_suppressPropertyNotifications = false;
 		}
 
 	public override void Dispose ()
@@ -285,6 +293,114 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	private void Log (string message) =>
 		_logger?.Log (_driverLogId, LogEntryLevel.Info, message);
 
+	[Conditional ("DEBUG")]
+	internal void LogDispatchCallback (string message) =>
+		Log (message);
+
+	// The room rebind workaround is intentionally one-time per controller per live
+	// session. Reset it when reconnecting or when a controller disappears.
+	private void ResetRoomRebindState (string? controllerId = null)
+		{
+		lock (_entitiesLock)
+			{
+			if (string.IsNullOrWhiteSpace (controllerId))
+				{
+				_roomsAwaitingRebind.Clear ();
+				_roomsReboundThisSession.Clear ();
+				return;
+				}
+
+			string roomControllerId = controllerId!;
+			_ = _roomsAwaitingRebind.Remove (roomControllerId);
+			_ = _roomsReboundThisSession.Remove (roomControllerId);
+			}
+		}
+
+	// A freshly commissioned room can report online/ready but still miss the final
+	// wrapper promotion in Crestron Home. Queue a one-time child rebind the first
+	// time CH meaningfully interacts with that room controller.
+	internal void OnRoomControllerCallback (string controllerId)
+		{
+		if (string.IsNullOrWhiteSpace (controllerId) ||
+			!controllerId.StartsWith ("room_", StringComparison.OrdinalIgnoreCase))
+			return;
+
+		bool shouldQueue;
+		lock (_entitiesLock)
+			{
+			if (!_roomControllers.ContainsKey (controllerId) ||
+				_roomsReboundThisSession.Contains (controllerId))
+				{
+				Log ($"Skipping room rebind callback for {controllerId}; controller missing or already rebound this session");
+				return;
+				}
+
+			shouldQueue = _roomsAwaitingRebind.Add (controllerId);
+			}
+
+		if (!shouldQueue)
+			{
+			Log ($"Ignoring duplicate room rebind callback for {controllerId}");
+			return;
+			}
+
+		Log ($"Queueing one-time room rebind for {controllerId}");
+		_ = Task.Run (() => RebindRoomControllerAsync (controllerId));
+		}
+
+	// Re-register only the commissioned room child to reproduce the promotion path
+	// that a full gateway restart would otherwise provide.
+	private async Task RebindRoomControllerAsync (string controllerId)
+		{
+		try
+			{
+				await Task.Yield ();
+
+				ConfigurableDriverEntity? currentController;
+				WiserRoomEntity? currentEntity;
+				Dictionary<string, PlatformManagedDevice> managedDevicesCopy;
+				lock (_entitiesLock)
+					{
+					if (!_roomControllers.TryGetValue (controllerId, out currentController) ||
+						!_roomEntities.TryGetValue (controllerId, out currentEntity))
+						return;
+
+					managedDevicesCopy = new Dictionary<string, PlatformManagedDevice> (ManagedDevices, StringComparer.OrdinalIgnoreCase);
+					_roomControllers[controllerId] = new ConfigurableDriverEntity (controllerId, currentEntity, null);
+					currentController = _roomControllers[controllerId];
+					}
+
+				Log ($"Starting one-time room rebind for {controllerId}");
+				UpdateSubControllers (null, [controllerId]);
+				UpdateSubControllers ([currentController], null);
+				ManagedDevices = managedDevicesCopy;
+				currentEntity.StartPolling ();
+				Log ($"Completed one-time room rebind for {controllerId}");
+			}
+		catch (Exception ex)
+			{
+				LogError ($"Failed one-time room rebind for {controllerId}: {ex}");
+				throw;
+			}
+		finally
+			{
+				lock (_entitiesLock)
+					{
+					_ = _roomsAwaitingRebind.Remove (controllerId);
+					_ = _roomsReboundThisSession.Add (controllerId);
+					}
+			}
+		}
+
+	[Conditional ("DEBUG")]
+	private void LogDiscoveryCountChanged (int roomCount)
+		{
+		if (roomCount == Interlocked.Exchange (ref _lastLoggedDiscoveredRoomCount, roomCount))
+			return;
+
+		Log ("Discovered room count changed to " + roomCount);
+		}
+
 	private void LogError (string message) =>
 		_logger?.Log (_driverLogId, LogEntryLevel.Error, message);
 
@@ -294,6 +410,9 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			return;
 
 		field = value;
+		if (_suppressPropertyNotifications)
+			return;
+
 		NotifyPropertyChanged (propertyId, new DriverEntityValue (value));
 		}
 
@@ -303,6 +422,9 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			return;
 
 		field = value;
+		if (_suppressPropertyNotifications)
+			return;
+
 		NotifyPropertyChanged (propertyId, new DriverEntityValue (value));
 		}
 
@@ -316,6 +438,9 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			return;
 
 		field = value;
+		if (_suppressPropertyNotifications)
+			return;
+
 		NotifyPropertyChanged ("platform:managedDevices", CreateValueForEntries (field));
 		}
 
@@ -766,8 +891,9 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				" units=" + _temperatureUnits +
 				" boostDelta=" + _boostDelta.ToString (CultureInfo.InvariantCulture) +
 				" boostDurationMinutes=" + _boostDurationMinutes);
+			ResetRoomRebindState ();
 			UpdateStatus ("Connecting", string.Empty);
-			SetReady (true);
+			SetReady (false);
 			WiserUnits units = string.Equals (_temperatureUnits, "Fahrenheit", StringComparison.OrdinalIgnoreCase)
 				? WiserUnits.Imperial
 				: WiserUnits.Metric;
@@ -781,10 +907,10 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			newApi = null;
 			Log ("Connected to Wiser API");
 			_workQueue.SetClient (_api);
-			SetOnline (true);
-			UpdatePlatformOptionsState ();
-			UpdateStatus ("Connected", string.Empty);
 			await RefreshSystemStateAsync ().ConfigureAwait (false);
+			SetOnline (true);
+			SetReady (true);
+			UpdatePlatformOptionsState ();
 			StartRefreshLoop ();
 			}
 		catch (Exception ex)
@@ -801,26 +927,27 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			}
 		}
 
-	internal async Task RefreshSystemStateAsync ()
+	internal async Task RefreshSystemStateAsync (bool refreshSchedules = false)
 		{
-		Log ("RefreshSystemStateAsync: reading hub data");
-		await _api.ReadHubDataAsync (CancellationToken.None).ConfigureAwait (false);
+		if (refreshSchedules || ShouldRefreshSchedules ())
+			{
+			await _api.ReadHubDataAsync (CancellationToken.None).ConfigureAwait (false);
+			_lastScheduleRefreshUtc = DateTimeOffset.UtcNow;
+			}
 		List<WiserRoom> rooms = _api.Rooms?.All ?? [];
-		Log ("Discovered " + rooms.Count + " total rooms");
+		LogDiscoveryCountChanged (rooms.Count);
 
 		var managed = new Dictionary<string, PlatformManagedDevice> (StringComparer.OrdinalIgnoreCase);
 		var controllersToAdd = new List<ConfigurableDriverEntity> ();
+		var addedControllerIds = new List<string> ();
+		var controllersToRemove = new List<string> ();
+		var activeControllerIds = new HashSet<string> (StringComparer.OrdinalIgnoreCase);
 		lock (_entitiesLock)
 			{
 			foreach (WiserRoom room in rooms)
 				{
-				Log (
-					"Evaluating room: " + (room.Name ?? "(unnamed)") +
-					" | Id=" + room.Id +
-					" | CurrentTemp=" + room.CurrentTemperature.ToString (CultureInfo.InvariantCulture) +
-					" | TargetTemp=" + room.CurrentTargetTemperature.ToString (CultureInfo.InvariantCulture) +
-					" | Mode=" + (room.Mode ?? "(none)"));
 				string controllerId = $"room_{room.Id}";
+				_ = activeControllerIds.Add (controllerId);
 				if (!_roomEntities.TryGetValue (controllerId, out WiserRoomEntity entity))
 					{
 					entity = new WiserRoomEntity (
@@ -832,15 +959,18 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 						_args.DriverDataDirectoryPath,
 						_driverLogId);
 					_roomEntities[controllerId] = entity;
-					var controller = new ConfigurableDriverEntity (controllerId, entity, null);
+					var controller = new ConfigurableDriverEntity (
+						controllerId,
+						entity,
+						null);
 					_roomControllers[controllerId] = controller;
 					controllersToAdd.Add (controller);
-					Log ("Queued room: " + room.Name + " (id=" + controllerId + ")");
+					addedControllerIds.Add (controllerId);
+					entity.UpdateFromRoom (room, _temperatureUnits);
 					}
 				else
 					{
 					entity.UpdateFromRoom (room, _temperatureUnits);
-					Log ("Updated room: " + room.Name + " (id=" + controllerId + ")");
 					}
 
 				managed[controllerId] = new PlatformManagedDevice (
@@ -850,34 +980,59 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 					"Room Thermostat",
 					room.Id.ToString ());
 				}
+
+			foreach (KeyValuePair<string, ConfigurableDriverEntity> controllerEntry in _roomControllers)
+				{
+				string controllerId = controllerEntry.Key;
+				if (activeControllerIds.Contains (controllerId))
+					continue;
+
+				if (_roomEntities.TryGetValue (controllerId, out WiserRoomEntity? removedEntity))
+					removedEntity.StopPolling ();
+
+				controllersToRemove.Add (controllerId);
+				}
+
+			foreach (string controllerId in controllersToRemove)
+				{
+				ResetRoomRebindState (controllerId);
+				_ = _roomControllers.Remove (controllerId);
+				_ = _roomEntities.Remove (controllerId);
+				}
 			}
 
-		if (controllersToAdd.Count > 0)
+		if (controllersToAdd.Count > 0 || controllersToRemove.Count > 0)
 			{
-			Log ("RefreshSystemStateAsync - UpdateSubControllers start count=" + controllersToAdd.Count);
-			UpdateSubControllers (controllersToAdd, null);
-			Log ("RefreshSystemStateAsync - UpdateSubControllers complete count=" + controllersToAdd.Count);
-			lock (_entitiesLock)
+			Log ("RefreshSystemStateAsync - UpdateSubControllers addCount=" + controllersToAdd.Count + ", removeCount=" + controllersToRemove.Count);
+			UpdateSubControllers (
+				controllersToAdd.Count == 0 ? null : controllersToAdd,
+				controllersToRemove.Count == 0 ? null : controllersToRemove);
+			Log ("RefreshSystemStateAsync - UpdateSubControllers complete addCount=" + controllersToAdd.Count + ", removeCount=" + controllersToRemove.Count);
+
+			if (addedControllerIds.Count > 0)
 				{
-				foreach (ConfigurableDriverEntity controller in controllersToAdd)
+				lock (_entitiesLock)
 					{
-					if (_roomEntities.TryGetValue (controller.ControllerId, out WiserRoomEntity roomEntity))
-						roomEntity.StartPolling ();
+					foreach (string addedControllerId in addedControllerIds)
+						{
+						if (_roomEntities.TryGetValue (addedControllerId, out WiserRoomEntity? addedEntity))
+							addedEntity.StartPolling ();
+						}
 					}
 				}
 			}
 
 		ManagedDevices = managed;
 		UpdatePlatformOptionsState ();
-		Log ("RefreshSystemStateAsync - publishing platform:managedDevices count=" + ManagedDevices.Count);
 
 		if (ManagedDevices.Count == 0)
 			UpdateStatus ("Connected - no rooms discovered", string.Empty);
 		else
 			UpdateStatus ("Connected - rooms discovered: " + ManagedDevices.Count, string.Empty);
-
-		Log ("Discovery complete");
 		}
+
+	private bool ShouldRefreshSchedules () =>
+		(DateTimeOffset.UtcNow - _lastScheduleRefreshUtc) >= ScheduleRefreshInterval;
 
 	internal async Task<bool> AdjustRoomSetpointAsync (int roomId, double delta)
 		{
@@ -887,7 +1042,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 		double newSetpoint = Math.Round (room.CurrentTargetTemperature + delta, 1, MidpointRounding.AwayFromZero);
 		await room.SetTargetTemperatureAsync (newSetpoint, CancellationToken.None).ConfigureAwait (false);
-		await RefreshSystemStateAsync ().ConfigureAwait (false);
+		await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
 		return true;
 		}
 
@@ -905,7 +1060,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		else
 			await room.SetManualTemperatureAsync (setpoint, CancellationToken.None).ConfigureAwait (false);
 
-		await RefreshSystemStateAsync ().ConfigureAwait (false);
+		await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
 		return true;
 		}
 
@@ -954,7 +1109,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		Log ($"SetRoomAssignedScheduleAsync assigning roomId={roomId} to scheduleId={scheduleId} name='{targetSchedule.Name ?? string.Empty}'");
 
 		await targetSchedule.AssignScheduleAsync ([roomId], true, CancellationToken.None).ConfigureAwait (false);
-		await RefreshSystemStateAsync ().ConfigureAwait (false);
+		await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
 		Log ($"SetRoomAssignedScheduleAsync completed roomId={roomId}, scheduleId={scheduleId}");
 		return true;
 		}
