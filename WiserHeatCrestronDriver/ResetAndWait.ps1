@@ -7,7 +7,7 @@
 	fully initialised (i.e. "Discovery complete" appears in the day log).
 
 .USAGE
-	.\ResetAndWait.ps1 -ProcessorIP 192.168.8.241 -User admin -Password secret
+	.\ResetAndWait.ps1 -ProcessorIP 192.0.2.10 -User admin -Password secret
 #>
 param(
 	[Parameter(Mandatory)][string] $ProcessorIP,

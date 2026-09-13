@@ -242,6 +242,10 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		private set => SetAndNotify ("awayModeActionLabel", value, ref field);
 		} = string.Empty;
 
+	private bool _disposed;
+	private long _connectionGeneration;
+	internal Func<string, string, WiserUnits, WiserAPI> ApiFactory { get; set; } = (host, secret, units) => new WiserAPI (host, secret, units);
+
 	public WiserPlatformDriver (
 		DriverControllerCreationArgs args,
 		DriverImplementationResources resources)
@@ -283,10 +287,18 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 	public override void Dispose ()
 		{
-		StopRefreshLoop ();
-		_workQueue.Stop ();
-		DisposeApi ();
-		base.Dispose ();
+		lock (_entitiesLock)
+			{
+			if (_disposed)
+				return;
+			_disposed = true;
+			_connectionGeneration++;
+			StopRefreshLoop ();
+			_workQueue.Stop ();
+			DisposeApi ();
+			RemoveRooms ();
+			base.Dispose ();
+			}
 		}
 
 	[Conditional ("DEBUG")]
@@ -616,15 +628,22 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				return null;
 
 			case DataDrivenConfigurationController.ApplyConfigurationAction.ClearValues:
-				Log ("ApplyConfigurationItems: action=ClearValues");
-				DisposeApi ();
-				_workQueue.ClearClient ();
-				_enableWholeHouseHotWater = false;
-				_allowAwayMode = false;
-				SetReady (false);
-				SetOnline (false);
-				UpdatePlatformOptionsState ();
-				UpdateStatus ("Configuration cleared", string.Empty);
+				lock (_entitiesLock)
+					{
+					_connectionGeneration++;
+					StopRefreshLoop ();
+					DisposeApi ();
+					_workQueue.ClearClient ();
+					RemoveRooms ();
+					_hubIpAddress = string.Empty;
+					_hubSecret = string.Empty;
+					_enableWholeHouseHotWater = false;
+					_allowAwayMode = false;
+					SetReady (false);
+					SetOnline (false);
+					UpdatePlatformOptionsState ();
+					UpdateStatus ("Configuration cleared", string.Empty);
+					}
 				return null;
 
 			default:
@@ -880,155 +899,211 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			}
 		}
 
+	// Called while holding _entitiesLock so clear/dispose cannot race publication.
+	private void RemoveRooms ()
+		{
+		var ids = new List<string> (_roomControllers.Keys);
+		foreach (WiserRoomEntity entity in _roomEntities.Values)
+			entity.StopPolling ();
+		_roomControllers.Clear ();
+		_roomEntities.Clear ();
+		ResetRoomRebindState ();
+		if (ids.Count != 0)
+			UpdateSubControllers (null, ids);
+		ManagedDevices = new Dictionary<string, PlatformManagedDevice> (StringComparer.OrdinalIgnoreCase);
+		}
+
 	private async Task ConnectAndDiscoverAsync ()
 		{
+		long generation;
 		WiserAPI? newApi = null;
-		try
+		lock (_entitiesLock)
 			{
+			if (_disposed)
+				return;
+			generation = ++_connectionGeneration;
 			StopRefreshLoop ();
-			Log (
-				"Connect task started; host=" + _hubIpAddress +
-				" units=" + _temperatureUnits +
-				" boostDelta=" + _boostDelta.ToString (CultureInfo.InvariantCulture) +
-				" boostDurationMinutes=" + _boostDurationMinutes);
 			ResetRoomRebindState ();
 			UpdateStatus ("Connecting", string.Empty);
 			SetReady (false);
+			}
+		try
+			{
 			WiserUnits units = string.Equals (_temperatureUnits, "Fahrenheit", StringComparison.OrdinalIgnoreCase)
-				? WiserUnits.Imperial
-				: WiserUnits.Metric;
-
-			newApi = new WiserAPI (_hubIpAddress, _hubSecret, units)
+				? WiserUnits.Imperial : WiserUnits.Metric;
+			newApi = ApiFactory (_hubIpAddress, _hubSecret, units)
 				?? throw new InvalidOperationException ("Wiser API client creation returned null.");
-			Log ("Wiser API client created; initializing against host=" + _hubIpAddress);
 			await newApi.InitializeAsync (CancellationToken.None).ConfigureAwait (false);
-			DisposeApi ();
-			_api = newApi;
-			newApi = null;
-			Log ("Connected to Wiser API");
-			_workQueue.SetClient (_api);
+			lock (_entitiesLock)
+				{
+				if (_disposed || generation != _connectionGeneration)
+					return;
+				DisposeApi ();
+				_api = newApi;
+				newApi = null;
+				_workQueue.SetClient (_api);
+				}
 			await RefreshSystemStateAsync ().ConfigureAwait (false);
-			SetOnline (true);
-			SetReady (true);
-			UpdatePlatformOptionsState ();
-			StartRefreshLoop ();
+			lock (_entitiesLock)
+				{
+				if (_disposed || generation != _connectionGeneration)
+					return;
+				SetOnline (true);
+				SetReady (true);
+				UpdatePlatformOptionsState ();
+				StartRefreshLoop ();
+				}
 			}
 		catch (Exception ex)
 			{
-			StopRefreshLoop ();
+			lock (_entitiesLock)
+				{
+				if (_disposed || generation != _connectionGeneration)
+					return;
+				StopRefreshLoop ();
+				DisposeApi ();
+				_workQueue.ClearClient ();
+				foreach (WiserRoomEntity entity in _roomEntities.Values)
+					entity.StopPolling ();
+				LogError ("Wiser connection failed: " + ex);
+				SetOnline (false);
+				SetReady (false);
+				UpdatePlatformOptionsState ();
+				UpdateStatus ("Offline", ex.Message);
+				}
+			}
+		finally
+			{
 			newApi?.Dispose ();
-			DisposeApi ();
-			_workQueue.ClearClient ();
-			LogError ("Wiser connection failed: " + ex);
-			SetOnline (false);
-			SetReady (false);
-			UpdatePlatformOptionsState ();
-			UpdateStatus ("Offline", ex.Message);
 			}
 		}
 
 	internal async Task RefreshSystemStateAsync (bool refreshSchedules = false)
 		{
-		if (refreshSchedules || ShouldRefreshSchedules ())
-			{
-			await _api.ReadHubDataAsync (CancellationToken.None).ConfigureAwait (false);
-			_lastScheduleRefreshUtc = DateTimeOffset.UtcNow;
-			}
-		List<WiserRoom> rooms = _api.Rooms?.All ?? [];
-		LogDiscoveryCountChanged (rooms.Count);
-
-		var managed = new Dictionary<string, PlatformManagedDevice> (StringComparer.OrdinalIgnoreCase);
-		var controllersToAdd = new List<ConfigurableDriverEntity> ();
-		var addedControllerIds = new List<string> ();
-		var controllersToRemove = new List<string> ();
-		var activeControllerIds = new HashSet<string> (StringComparer.OrdinalIgnoreCase);
+		WiserAPI api;
+		long generation;
 		lock (_entitiesLock)
 			{
-			foreach (WiserRoom room in rooms)
+			if (_disposed || _api == null)
+				return;
+			api = _api;
+			generation = _connectionGeneration;
+			}
+		bool readHub = refreshSchedules || ShouldRefreshSchedules ();
+		if (readHub)
+			{
+			try
 				{
-				string controllerId = $"room_{room.Id}";
-				_ = activeControllerIds.Add (controllerId);
-				if (!_roomEntities.TryGetValue (controllerId, out WiserRoomEntity entity))
-					{
-					entity = new WiserRoomEntity (
-						controllerId,
-						room,
-						this,
-						_logger,
-						_resources,
-						_args.DriverDataDirectoryPath,
-						_driverLogId);
-					_roomEntities[controllerId] = entity;
-					var controller = new ConfigurableDriverEntity (
-						controllerId,
-						entity,
-						null);
-					_roomControllers[controllerId] = controller;
-					controllersToAdd.Add (controller);
-					addedControllerIds.Add (controllerId);
-					entity.UpdateFromRoom (room, _temperatureUnits);
-					}
-				else
-					{
-					entity.UpdateFromRoom (room, _temperatureUnits);
-					}
-
-				managed[controllerId] = new PlatformManagedDevice (
-					DeviceUxCategory.Thermostat,
-					room.Name ?? $"Room {room.Id}",
-					"Drayton Wiser",
-					"Room Thermostat",
-					room.Id.ToString ());
+				if (!await api.ReadHubDataAsync (CancellationToken.None).ConfigureAwait (false))
+					return;
 				}
-
-			foreach (KeyValuePair<string, ConfigurableDriverEntity> controllerEntry in _roomControllers)
+			catch when (_disposed || generation != _connectionGeneration || !ReferenceEquals (api, _api))
 				{
-				string controllerId = controllerEntry.Key;
-				if (activeControllerIds.Contains (controllerId))
-					continue;
-
-				if (_roomEntities.TryGetValue (controllerId, out WiserRoomEntity? removedEntity))
-					removedEntity.StopPolling ();
-
-				controllersToRemove.Add (controllerId);
-				}
-
-			foreach (string controllerId in controllersToRemove)
-				{
-				ResetRoomRebindState (controllerId);
-				_ = _roomControllers.Remove (controllerId);
-				_ = _roomEntities.Remove (controllerId);
+				return;
 				}
 			}
-
-		if (controllersToAdd.Count > 0 || controllersToRemove.Count > 0)
+		lock (_entitiesLock)
 			{
-			Log ("RefreshSystemStateAsync - UpdateSubControllers addCount=" + controllersToAdd.Count + ", removeCount=" + controllersToRemove.Count);
-			UpdateSubControllers (
-				controllersToAdd.Count == 0 ? null : controllersToAdd,
-				controllersToRemove.Count == 0 ? null : controllersToRemove);
-			Log ("RefreshSystemStateAsync - UpdateSubControllers complete addCount=" + controllersToAdd.Count + ", removeCount=" + controllersToRemove.Count);
+			if (_disposed || generation != _connectionGeneration || !ReferenceEquals (api, _api))
+				return;
+			if (readHub)
+				_lastScheduleRefreshUtc = DateTimeOffset.UtcNow;
+			List<WiserRoom> rooms = api.Rooms?.All ?? [];
+			LogDiscoveryCountChanged (rooms.Count);
 
-			if (addedControllerIds.Count > 0)
+			var managed = new Dictionary<string, PlatformManagedDevice> (StringComparer.OrdinalIgnoreCase);
+			var controllersToAdd = new List<ConfigurableDriverEntity> ();
+			var addedControllerIds = new List<string> ();
+			var controllersToRemove = new List<string> ();
+			var activeControllerIds = new HashSet<string> (StringComparer.OrdinalIgnoreCase);
+			lock (_entitiesLock)
 				{
-				lock (_entitiesLock)
+				foreach (WiserRoom room in rooms)
 					{
-					foreach (string addedControllerId in addedControllerIds)
+					string controllerId = $"room_{room.Id}";
+					_ = activeControllerIds.Add (controllerId);
+					if (!_roomEntities.TryGetValue (controllerId, out WiserRoomEntity entity))
 						{
-						if (_roomEntities.TryGetValue (addedControllerId, out WiserRoomEntity? addedEntity))
-							addedEntity.StartPolling ();
+						entity = new WiserRoomEntity (
+							controllerId,
+							room,
+							this,
+							_logger,
+							_resources,
+							_args.DriverDataDirectoryPath,
+							_driverLogId);
+						_roomEntities[controllerId] = entity;
+						var controller = new ConfigurableDriverEntity (
+							controllerId,
+							entity,
+							null);
+						_roomControllers[controllerId] = controller;
+						controllersToAdd.Add (controller);
+						addedControllerIds.Add (controllerId);
+						entity.UpdateFromRoom (room, _temperatureUnits);
+						}
+					else
+						{
+						entity.UpdateFromRoom (room, _temperatureUnits);
+						}
+
+					managed[controllerId] = new PlatformManagedDevice (
+						DeviceUxCategory.Thermostat,
+						string.IsNullOrWhiteSpace (room.Name) ? $"Room {room.Id}" : room.Name,
+						"Drayton Wiser",
+						"Room Thermostat",
+						room.Id.ToString ());
+					}
+
+				foreach (KeyValuePair<string, ConfigurableDriverEntity> controllerEntry in _roomControllers)
+					{
+					string controllerId = controllerEntry.Key;
+					if (activeControllerIds.Contains (controllerId))
+						continue;
+
+					if (_roomEntities.TryGetValue (controllerId, out WiserRoomEntity? removedEntity))
+						removedEntity.StopPolling ();
+
+					controllersToRemove.Add (controllerId);
+					}
+
+				foreach (string controllerId in controllersToRemove)
+					{
+					ResetRoomRebindState (controllerId);
+					_ = _roomControllers.Remove (controllerId);
+					_ = _roomEntities.Remove (controllerId);
+					}
+				}
+
+			if (controllersToAdd.Count > 0 || controllersToRemove.Count > 0)
+				{
+				Log ("RefreshSystemStateAsync - UpdateSubControllers addCount=" + controllersToAdd.Count + ", removeCount=" + controllersToRemove.Count);
+				UpdateSubControllers (
+					controllersToAdd.Count == 0 ? null : controllersToAdd,
+					controllersToRemove.Count == 0 ? null : controllersToRemove);
+				Log ("RefreshSystemStateAsync - UpdateSubControllers complete addCount=" + controllersToAdd.Count + ", removeCount=" + controllersToRemove.Count);
+
+				if (addedControllerIds.Count > 0)
+					{
+					lock (_entitiesLock)
+						{
+						foreach (string addedControllerId in addedControllerIds)
+							{
+							if (_roomEntities.TryGetValue (addedControllerId, out WiserRoomEntity? addedEntity))
+								addedEntity.StartPolling ();
+							}
 						}
 					}
 				}
+
+			ManagedDevices = managed;
+			UpdatePlatformOptionsState ();
+
+			if (ManagedDevices.Count == 0)
+				UpdateStatus ("Connected - no rooms discovered", string.Empty);
+			else
+				UpdateStatus ("Connected - rooms discovered: " + ManagedDevices.Count, string.Empty);
 			}
-
-		ManagedDevices = managed;
-		UpdatePlatformOptionsState ();
-
-		if (ManagedDevices.Count == 0)
-			UpdateStatus ("Connected - no rooms discovered", string.Empty);
-		else
-			UpdateStatus ("Connected - rooms discovered: " + ManagedDevices.Count, string.Empty);
 		}
 
 	private bool ShouldRefreshSchedules () =>

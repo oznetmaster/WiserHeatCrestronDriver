@@ -16,8 +16,8 @@
       "Website": "",
       "PhoneNumber": ""
     },
-    "DriverVersion": "1.0.008.0102",
-    "VersionDate": "2026-06-18 17:08:52.434"
+    "DriverVersion": "1.3.005.0000",
+    "VersionDate": "2026-09-13 10:52:59.292"
   },
   "ConfigurationSteps": {
     "Items": [
@@ -110,4 +110,3 @@
     "FirstStep": "Connection"
   }
 }
-

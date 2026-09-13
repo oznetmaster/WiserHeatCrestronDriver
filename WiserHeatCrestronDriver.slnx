@@ -1,3 +1,6 @@
 <Solution>
   <Project Path="WiserHeatCrestronDriver/WiserHeatCrestronDriver.csproj" />
+  <Project Path="WiserHeatCrestronDriver.Tests/WiserHeatCrestronDriver.Tests.csproj" />
+  <Project Path="WiserHeatCrestronDriver.ProcessorTests/WiserHeatCrestronDriver.ProcessorTests.csproj" />
+  <Project Path="WiserHeatCrestronDriver.Lifecycle.Tests/WiserHeatCrestronDriver.Lifecycle.Tests.csproj" />
 </Solution>

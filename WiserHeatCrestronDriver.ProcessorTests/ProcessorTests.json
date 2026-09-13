@@ -1,0 +1,20 @@
+{
+  "Name": "WiserHeatCrestronDriver Tests",
+  "Port": 0,
+  "Suites": [
+    {
+      "Id": "unit",
+      "Name": "WiserHeatCrestronDriver Tests  -  Unit Tests",
+      "FilterXml": "<filter><and><namespace re='1'>^WiserHeatCrestronDriver[.]Tests($|[.])</namespace><not><cat>Processor</cat></not></and></filter>",
+      "ManualOnly": false,
+      "ExpectedCount": 29
+    },
+    {
+      "Id": "lifecycle",
+      "Name": "WiserHeatCrestronDriver Tests  -  Processor Lifecycle",
+      "FilterXml": "<filter><cat>Processor</cat></filter>",
+      "ManualOnly": true,
+      "ExpectedCount": 10
+    }
+  ]
+}

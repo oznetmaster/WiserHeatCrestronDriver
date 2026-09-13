@@ -1389,9 +1389,9 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			return true;
 			}
 
-		if (value is IEnumerable<object> enumerable)
+		if (value is System.Collections.IEnumerable enumerable && value is not string)
 			{
-			values = enumerable.ToList ();
+			values = enumerable.Cast<object> ().ToList ();
 			return true;
 			}
 
@@ -1415,13 +1415,8 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		if (daySchedule == null)
 			return "<null>";
 
-		IEnumerable<object>? times = null;
-		if (daySchedule.TryGetValue ("Time", out object timesObj) && timesObj is IEnumerable<object> timeValues)
-			times = timeValues;
-
-		IEnumerable<object>? temps = null;
-		if (daySchedule.TryGetValue ("DegreesC", out object tempsObj) && tempsObj is IEnumerable<object> tempValues)
-			temps = tempValues;
+		TryGetScheduleValueList (daySchedule, "Time", out List<object> times);
+		TryGetScheduleValueList (daySchedule, "DegreesC", out List<object> temps);
 
 		string timesText = times != null ? string.Join (",", times) : "<missing>";
 		string tempsText = temps != null ? string.Join (",", temps) : "<missing>";
@@ -1437,8 +1432,8 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		if (value is IDictionary<string, object> dictionary)
 			return CloneScheduleData (dictionary);
 
-		if (value is IEnumerable<object> enumerable && value is not string)
-			return enumerable.Select (CloneScheduleValue).ToList ();
+		if (value is System.Collections.IEnumerable enumerable && value is not string)
+			return enumerable.Cast<object> ().Select (CloneScheduleValue).ToList ();
 
 		return value;
 		}
@@ -1468,6 +1463,9 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	private static bool TryParseTimeText (string timeText, out string normalizedTime)
 		{
 		string candidate = NormalizeTimeText (timeText);
+		// ParseExact greedily consumes adjacent numeric fields in the three-digit form.
+		if (candidate.Length == 3 && candidate.All (char.IsDigit))
+			candidate = "0" + candidate;
 		foreach (string format in new[] { "HH:mm", "H:mm", "HHmm", "Hmm" })
 			{
 			if (DateTime.TryParseExact (candidate, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsed))

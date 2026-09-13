@@ -1,9 +1,10 @@
+<!-- Copyright (c) 2026 Neil Colvin. MIT with Commons Clause; see LICENSE. -->
 <Project>
   <PropertyGroup>
-	<ManifestUtilExe>C:\Applications (x86)\Crestron\Driver SDK\ManifestUtil\ManifestUtil.exe</ManifestUtilExe>
-	<LocalCrestronSdkLibDir>C:\Applications (x86)\Crestron\Driver SDK\Libraries</LocalCrestronSdkLibDir>
-	<LocalNet472ReferenceAssemblies>C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.7.2</LocalNet472ReferenceAssemblies>
-	<LocalNetFxRuntimeDir>C:\Windows\Microsoft.NET\Framework64\v4.0.30319</LocalNetFxRuntimeDir>
+	<ManifestUtilExe></ManifestUtilExe>
+	<LocalCrestronSdkLibDir></LocalCrestronSdkLibDir>
+	<LocalNet472ReferenceAssemblies></LocalNet472ReferenceAssemblies>
+	<LocalNetFxRuntimeDir></LocalNetFxRuntimeDir>
   </PropertyGroup>
 
   <Target Name="DeployDriver" AfterTargets="PackageDriver" Condition="'$(DeployAfterBuild)' == 'true' And '$(Configuration)' == 'Debug'" Inputs="$(TargetDir)$(AssemblyName).pkg" Outputs="$(TargetDir)$(AssemblyName).deployed.stamp">
