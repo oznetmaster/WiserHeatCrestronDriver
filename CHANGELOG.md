@@ -2,7 +2,7 @@
 
 ## 1.3.5 — 2026-09-14
 
-[Draft driver release notes](RELEASE-NOTES.md). Test-only changes do not require a driver release.
+[Driver release notes](RELEASE-NOTES.md). Test-only changes do not require a driver release.
 
 - Cover room discovery, stable child identity, renamed/removed rooms, cleared settings, overlapping connections and late refresh/login completion. Clearing or disposing the platform now removes its children and prevents old work from restoring them. Update WiserHeatAPIv2 to 1.1.0.6.
 
