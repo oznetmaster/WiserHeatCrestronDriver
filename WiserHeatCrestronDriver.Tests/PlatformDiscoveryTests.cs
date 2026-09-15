@@ -64,6 +64,64 @@ public sealed class PlatformDiscoveryTests
 		_transport.Rooms = rooms;
 		await TestSupport.Complete (_driver.RefreshSystemStateAsync (true));
 		}
+	[TestCase (false)]
+	[TestCase (true)]
+	public async Task HotWaterCommand_RefreshesObservedStateBeforeReenablingButton (bool initiallyOn)
+		{
+		_transport.HotWaterState = initiallyOn ? "On" : "Off";
+		Set ("_enableWholeHouseHotWater", true);
+		Field<WiserWorkQueue> ("_workQueue").SetClient (_api);
+		await TestSupport.Complete (_driver.RefreshSystemStateAsync (true));
+		Assert.That (_driver.HotWaterIsOn, Is.EqualTo (initiallyOn));
+		Set ("_lastScheduleRefreshUtc", DateTimeOffset.UtcNow);
+		int readsBeforeCommand = _transport.DomainReads;
+		var command = (Task)typeof (WiserPlatformDriver).GetMethod ("ToggleHotWaterAsync", Private).Invoke (_driver, null);
+		await TestSupport.Complete (command);
+		Assert.That (_transport.HotWaterCommands, Is.EqualTo (1), "One press must send one requested override.");
+		Assert.That (_transport.DomainReads, Is.GreaterThan (readsBeforeCommand), "A successful command must bypass the periodic snapshot throttle.");
+		Assert.That (_driver.HotWaterIsOn, Is.EqualTo (!initiallyOn), "The UI must reflect the hub's observed state when the command completes.");
+		Assert.That (Field<int> ("_hotWaterCommandInProgress"), Is.Zero);
+		}
+	[TestCase ("boost")]
+	[TestCase ("cancel boost")]
+	[TestCase ("advance schedule")]
+	[TestCase ("disable schedule")]
+	public async Task RoomCommands_RefreshObservedStateInsidePollingInterval (string command)
+		{
+		_transport.AllowRoomCommands = true;
+		string origin = command == "cancel boost" ? "FromBoost" : "FromSchedule";
+		await Refresh ("[{\"id\":4,\"Name\":\"Before command\",\"ScheduleId\":7,\"Mode\":\"Auto\",\"CurrentSetPoint\":205,\"SetPointOrigin\":\"" + origin + "\"}]");
+		Set ("_lastScheduleRefreshUtc", DateTimeOffset.UtcNow);
+		int readsBeforeCommand = _transport.DomainReads;
+		bool accepted;
+		switch (command)
+			{
+			case "boost":
+			case "cancel boost": accepted = await _driver.TriggerRoomBoostAsync (4); break;
+			case "advance schedule": accepted = await _driver.AdvanceRoomScheduleAsync (4); break;
+			default: accepted = await _driver.SetRoomScheduleEnabledAsync (4, false); break;
+			}
+		Assert.That (accepted, Is.True);
+		Assert.That (_transport.RoomCommands, Is.GreaterThan (0));
+		Assert.That (_transport.DomainReads, Is.GreaterThan (readsBeforeCommand));
+		Assert.That (_driver.ManagedDevices["room_4"].Name, Is.EqualTo ("Hub confirmed"), "Command completion must publish the returned hub snapshot.");
+		}
+	[TestCase (false)]
+	[TestCase (true)]
+	public async Task AwayCommand_RefreshesObservedStateInsidePollingInterval (bool initiallyAway)
+		{
+		_transport.AllowAwayCommands = true;
+		_transport.Away = initiallyAway;
+		Set ("_allowAwayMode", true);
+		Field<WiserWorkQueue> ("_workQueue").SetClient (_api);
+		await TestSupport.Complete (_driver.RefreshSystemStateAsync (true));
+		Set ("_lastScheduleRefreshUtc", DateTimeOffset.UtcNow);
+		int readsBeforeCommand = _transport.DomainReads;
+		await TestSupport.Complete ((Task)typeof (WiserPlatformDriver).GetMethod ("ToggleAwayModeAsync", Private).Invoke (_driver, null));
+		Assert.That (_transport.AwayCommands, Is.EqualTo (1));
+		Assert.That (_transport.DomainReads, Is.GreaterThan (readsBeforeCommand));
+		Assert.That (_driver.AwayModeIsEnabled, Is.EqualTo (!initiallyAway));
+		}
 	[Test]
 	public async Task DiscoveryPublishesStableRoomIdsAndFallbackNames ()
 		{
@@ -184,13 +242,43 @@ public sealed class PlatformDiscoveryTests
 	private sealed class SnapshotTransport : HttpMessageHandler
 		{
 		internal string Rooms = "[]";
+		internal string HotWaterState;
+		internal bool AllowRoomCommands;
+		internal int RoomCommands;
+		internal bool AllowAwayCommands;
+		internal bool Away;
+		internal int AwayCommands;
+		internal int HotWaterCommands;
+		internal int DomainReads;
 		internal bool HoldNextDomain;
 		internal readonly TaskCompletionSource<bool> Entered = new (TaskCreationOptions.RunContinuationsAsynchronously);
 		internal readonly TaskCompletionSource<bool> Release = new (TaskCreationOptions.RunContinuationsAsynchronously);
 		protected override async Task<HttpResponseMessage> SendAsync (HttpRequestMessage request, CancellationToken cancellationToken)
 			{
+			if (request.Method.Method == "PATCH" && request.RequestUri.AbsolutePath.EndsWith ("/domain/HotWater/1") && HotWaterState != null)
+				{
+				string body = await request.Content.ReadAsStringAsync ();
+				bool requestedOn = HotWaterState == "Off";
+				Assert.That (body, Does.Contain (requestedOn ? "\"SetPoint\":110" : "\"SetPoint\":-20"));
+				HotWaterCommands++;
+				HotWaterState = requestedOn ? "On" : "Off";
+				return new HttpResponseMessage (HttpStatusCode.NoContent);
+				}
+			if (request.Method.Method == "PATCH" && request.RequestUri.AbsolutePath.EndsWith ("/domain/Room/4") && AllowRoomCommands)
+				{
+				RoomCommands++;
+				Rooms = Rooms.Replace ("Before command", "Hub confirmed");
+				return new HttpResponseMessage (HttpStatusCode.NoContent);
+				}
+			if (request.Method.Method == "PATCH" && request.RequestUri.AbsolutePath.EndsWith ("/domain/System") && AllowAwayCommands)
+				{
+				AwayCommands++;
+				Away = !Away;
+				return new HttpResponseMessage (HttpStatusCode.NoContent);
+				}
 			Assert.That (request.Method, Is.EqualTo (HttpMethod.Get), "Discovery must not operate a physical device.");
 			string path = request.RequestUri.AbsolutePath;
+			if (path.EndsWith ("/domain/")) DomainReads++;
 			if (path.EndsWith ("/domain/") && HoldNextDomain)
 				{
 				HoldNextDomain = false;
@@ -199,6 +287,12 @@ public sealed class PlatformDiscoveryTests
 				}
 			string json = path.EndsWith ("/domain/") ? "{\"System\":{},\"Device\":[],\"Room\":" + Rooms + ",\"HeatingChannel\":[],\"Moment\":[]}"
 				: path.EndsWith ("/network/") ? "{\"Station\":{}}" : "{\"Heating\":[]}";
+			if (path.EndsWith ("/schedules/") && AllowRoomCommands)
+				json = "{\"Heating\":[{\"id\":7,\"Name\":\"Test schedule\",\"Next\":{\"Day\":\"Monday\",\"Time\":1800,\"DegreesC\":215}}]}";
+			if (path.EndsWith ("/domain/") && AllowAwayCommands)
+				json = json.Replace ("\"System\":{}", "\"System\":{\"OverrideType\":\"" + (Away ? "Away" : "None") + "\"}");
+			if (path.EndsWith ("/domain/") && HotWaterState != null)
+				json = json.Substring (0, json.Length - 1) + ",\"HotWater\":[{\"id\":1,\"HotWaterDescription\":\"FromManualOverride\",\"HotWaterRelayState\":\"" + HotWaterState + "\",\"WaterHeatingState\":\"" + HotWaterState + "\"}]}";
 			return new HttpResponseMessage (path.EndsWith ("/opentherm/") ? HttpStatusCode.NotFound : HttpStatusCode.OK) { Content = new StringContent (json) };
 			}
 		}

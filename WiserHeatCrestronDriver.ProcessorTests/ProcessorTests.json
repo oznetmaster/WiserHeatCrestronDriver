@@ -14,7 +14,7 @@
       "Name": "WiserHeatCrestronDriver Tests  -  Processor Lifecycle",
       "FilterXml": "<filter><and><cat>Processor</cat><not><cat>Live</cat></not></and></filter>",
       "ManualOnly": false,
-      "ExpectedCount": 10
+      "ExpectedCount": 18
     },
     {
       "Id": "live",

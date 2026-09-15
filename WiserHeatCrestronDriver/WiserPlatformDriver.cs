@@ -843,7 +843,8 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 					bool requestedOn = !HotWaterIsOn;
 					bool success = await hotwater.OverrideStateAsync (requestedOn ? "On" : "Off", CancellationToken.None).ConfigureAwait (false);
 					if (success)
-						await RefreshSystemStateAsync ().ConfigureAwait (false);
+						// Command acknowledgements do not refresh the API snapshot. Read the hub before enabling another toggle.
+						await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
 				}).ConfigureAwait (false);
 
 			UpdatePlatformOptionsState ();
@@ -881,7 +882,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 					bool requestedOn = !system.AwayModeEnabled;
 					system.AwayModeEnabled = requestedOn;
-					await RefreshSystemStateAsync ().ConfigureAwait (false);
+					await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
 				}).ConfigureAwait (false);
 
 			UpdatePlatformOptionsState ();
@@ -1150,7 +1151,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		else
 			await room.BoostAsync (_boostDelta, _boostDurationMinutes, CancellationToken.None).ConfigureAwait (false);
 
-		await RefreshSystemStateAsync ().ConfigureAwait (false);
+		await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
 		return true;
 		}
 
@@ -1161,7 +1162,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			return false;
 
 		await room.ScheduleAdvanceAsync (CancellationToken.None).ConfigureAwait (false);
-		await RefreshSystemStateAsync ().ConfigureAwait (false);
+		await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
 		return true;
 		}
 
@@ -1220,7 +1221,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				await room.SetManualTemperatureAsync (room.CurrentTargetTemperature, CancellationToken.None).ConfigureAwait (false);
 			}
 
-		await RefreshSystemStateAsync ().ConfigureAwait (false);
+		await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
 		return true;
 		}
 

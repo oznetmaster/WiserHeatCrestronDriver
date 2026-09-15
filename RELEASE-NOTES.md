@@ -1,21 +1,17 @@
-# WiserHeatCrestronDriver v1.3.5
+# WiserHeatCrestronDriver v1.3.6
 
-Patch release correcting lifecycle, configuration and recovery defects while preserving the public API and intended driver behavior.
+Patch release fixing delayed UI state after Wiser control commands. No public API or dependency changes.
 
-## Fixes
+## Fix
 
-- Clearing configuration or disposing the platform removes its room controllers and prevents delayed connections or refresh responses from restoring old rooms or status.
-- A superseded connection cannot replace the current API client. Rediscovery preserves existing room identity while updating names and observed temperatures.
-- Reopening saved schedules preserves time slots; edits to cloned schedules do not mutate the original schedule collections. Compact times such as `630` are accepted.
-- Update WiserHeatAPIv2 to the already published 1.1.0.6 dependency.
+Successful hot-water, Away mode, room boost/cancel, schedule advance and schedule enable/disable commands now read fresh hub state immediately. Previously the normal polling throttle could reuse an old snapshot, re-enable the hot-water button with its previous state and make another press repeat the same command. Setpoint and schedule-edit commands already refreshed immediately and retain that behavior. Routine polling remains unchanged.
 
-## Tests and build process
+## Validation
 
-- 29 offline tests and 10 SDK lifecycle tests. The current implementation passes on Windows in Debug and Release; both processor suites passed twice in the same host process.
-- The shared net472 processor test package is available in the solution and appears under **Utility** in Configure. Its standalone Home tile and Windows NUnit runner select the test suites.
-- Driver Debug build versions follow the manifest; three-part release tags select the CI release version. Test builds do not increment or deploy the production driver.
-- Processor test packages are not published to NuGet. Private deployment settings, live inputs and desktop SDK runtime dependencies are excluded from source and release assets.
+- 47 local and 47 processor unit/entity tests passed, including eight command-refresh regressions.
+- Three read-only live hub tests passed, followed by three installed-driver health checks.
+- The installed driver was updated without rebooting or changing its configuration. A user-operated hot-water toggle updated promptly after one press.
 
-## Installation and documentation
+The processor test package contains 29 unit tests, 18 lifecycle tests and three optional read-only live hub tests. Processor packages remain GitHub-only and private settings are excluded from source and packages.
 
-The GitHub release includes the production driver package and a separate processor test package. The test package appears under Utility in Configure and is not included in the driver NuGet package. See [CHANGELOG.md](CHANGELOG.md) for release history and [README.md](README.md) for installation and testing.
+See [CHANGELOG.md](CHANGELOG.md) for history and [README.md](README.md) for installation and testing.

@@ -17,11 +17,11 @@ The package appears at `bin/Debug/net472/WiserHeatCrestronDriver.ProcessorTests.
 ## Suites
 
 - **Unit Tests**: 29 offline driver cases. Run on Windows through the NUnit Visual Studio adapter or on the processor. No account credentials or physical devices are needed.
-- **Processor Lifecycle**: 1 SDK lifecycle checks. Saved schedules can be reopened and saved again; integer lists and arrays are copied independently before editing; the root entity can be created and disposed repeatedly. Run these separately on the processor; the shared desktop harness provides additional validation.
+- **Processor Lifecycle**: 18 SDK entity/lifecycle checks, including command-state refresh. Saved schedules can be reopened and saved again; integer lists and arrays are copied independently before editing; the root entity can be created and disposed repeatedly. Run these separately on the processor; the shared desktop harness provides additional validation.
 
 Use the Windows runner's **Find packages**, select this package, connect, then select a suite and **Run all**. Discovery uses a dynamically assigned port. The standalone tile exposes the same suites and results. Nothing runs automatically on deployment. Original driver assets are under `DriverTestData`; the test tile's assets retain their own root paths.
 
-These suites do not authenticate with external services or operate physical devices. Processor lifecycle results must be verified on real hardware; desktop unit success does not establish processor lifecycle compatibility.
+The unit and lifecycle suites use synthetic data and do not operate physical devices. The separate **Live Hub** suite uses privately supplied live settings to authenticate, read room telemetry and reconnect; it sends no heating-control commands. Processor lifecycle results must be verified on real hardware; desktop unit success does not establish processor lifecycle compatibility.
 
 This project targets only `net472`. It is not packable or publishable to NuGet. See [third-party notices](THIRD-PARTY-NOTICES.md), the root LICENSE, and [runner documentation](https://github.com/oznetmaster/CrestronHomeNUnit#readme).
 
@@ -30,4 +30,4 @@ This project targets only `net472`. It is not packable or publishable to NuGet. 
 
 Saved schedules can be reopened and saved again; integer lists and arrays are copied independently before editing; the root entity can be created and disposed repeatedly.
 
-The package contains 29 offline cases and 10 lifecycle cases. Lifecycle tests exercise newly constructed test entities, not the installed production driver. Both suites are selectable in the Windows runner and through the standalone Utility tile. Processor hardware validation remains required.
+The package contains 29 offline cases, 18 lifecycle cases and three optional read-only live hub cases. Lifecycle tests exercise newly constructed test entities, not the installed production driver. Both suites are selectable in the Windows runner and through the standalone Utility tile. Processor hardware validation remains required.
