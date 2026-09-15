@@ -37,7 +37,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           [xml]$result = Get-Content TestResults/tests.trx -Raw
           $counts = $result.TestRun.ResultSummary.Counters
-          if ([int]$counts.passed -ne 29 -or [int]$counts.total -ne 39) { throw "Unexpected test counts: $($counts.OuterXml)" }
+          if ([int]$counts.passed -ne 29 -or [int]$counts.total -ne 47) { throw "Unexpected test counts: $($counts.OuterXml)" }
       - name: Restore private desktop SDK dependency
         env:
           COMPACT_1: ${{ secrets.CI_COMPACT_JSON_1 }}
@@ -61,7 +61,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           [xml]$result = Get-Content TestResults/lifecycle.trx -Raw
           $counts = $result.TestRun.ResultSummary.Counters
-          if ([int]$counts.passed -ne 39 -or [int]$counts.total -ne 39) { throw "Unexpected lifecycle harness counts: $($counts.OuterXml)" }
+          if ([int]$counts.passed -ne 47 -or [int]$counts.total -ne 47) { throw "Unexpected lifecycle harness counts: $($counts.OuterXml)" }
       - name: Build processor package
         run: |
           dotnet build WiserHeatCrestronDriver.ProcessorTests/WiserHeatCrestronDriver.ProcessorTests.csproj -c Release -p:BuildProcessorTestPackages=true -p:ReleaseVersion=1.0.0 -p:DeployAfterBuild=false "-p:ManifestUtilExe=$env:MANIFEST_UTIL_EXE"
@@ -71,7 +71,7 @@ jobs:
           $output = Join-Path $PWD 'WiserHeatCrestronDriver.ProcessorTests/bin/Release/net472'
           $extracted = Join-Path $env:RUNNER_TEMP 'driver-package-tests'
           [IO.Compression.ZipFile]::ExtractToDirectory((Join-Path $output 'WiserHeatCrestronDriver.ProcessorTests.pkg'), $extracted)
-          & ../CrestronHomeNUnit/ProcessorTestPackage.Validation/bin/Release/net472/ProcessorTestPackage.Validation.exe (Join-Path $extracted 'WiserHeatCrestronDriver.ProcessorTests.dll') (Join-Path $PWD 'TestResults/processor') 39 --run-twice
+          & ../CrestronHomeNUnit/ProcessorTestPackage.Validation/bin/Release/net472/ProcessorTestPackage.Validation.exe (Join-Path $extracted 'WiserHeatCrestronDriver.ProcessorTests.dll') (Join-Path $PWD 'TestResults/processor') 47 --run-twice
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         if: always()
