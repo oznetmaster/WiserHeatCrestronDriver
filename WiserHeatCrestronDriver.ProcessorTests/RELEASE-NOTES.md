@@ -1,9 +1,14 @@
 # WiserHeatCrestronDriver Tests
 
-## Unreleased
+## 1.0.1
+
+- Rebuild with CrestronHomeNUnit 1.2.1. Test execution now participates in the shared processor reservation used by the runner, Test Explorer, CLI and hardware CI.
+- The net472 package contains 42 discovered cases, with 39 in automatic suites. Live suites remain optional and require private inputs where documented.
+- Use the standalone Utility tile, Windows runner, or the solution's Test Explorer workflow project. Private workflow plans can remove the temporary instance after testing.
+- This is an independent processor-test package release on GitHub; it does not publish or update a driver/library NuGet package.
 
 - Add three optional read-only live hub tests, for 42 total cases (29 unit, 10 lifecycle, 3 live). Transfer private LiveTestSettings.json from the runner; the package contains no hub credentials.
-- Rebuild with NUnit tooling 1.2.0 to participate in shared processor reservations.
+- Use NUnit tooling 1.2.1 for shared processor reservations.
 
 ## 1.0.0 — 2026-09-14
 
