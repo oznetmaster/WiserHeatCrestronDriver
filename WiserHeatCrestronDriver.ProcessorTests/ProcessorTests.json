@@ -6,22 +6,19 @@
       "Id": "unit",
       "Name": "WiserHeatCrestronDriver Tests  -  Unit Tests",
       "FilterXml": "<filter><and><namespace re='1'>^WiserHeatCrestronDriver[.]Tests($|[.])</namespace><not><cat>Processor</cat></not></and></filter>",
-      "ManualOnly": false,
-      "ExpectedCount": 29
+      "ManualOnly": false
     },
     {
       "Id": "lifecycle",
       "Name": "WiserHeatCrestronDriver Tests  -  Processor Lifecycle",
       "FilterXml": "<filter><and><cat>Processor</cat><not><cat>Live</cat></not></and></filter>",
-      "ManualOnly": false,
-      "ExpectedCount": 18
+      "ManualOnly": false
     },
     {
       "Id": "live",
       "Name": "WiserHeatCrestronDriver Tests - Live Hub",
       "FilterXml": "<filter><cat>Live</cat></filter>",
-      "ManualOnly": true,
-      "ExpectedCount": 3
+      "ManualOnly": true
     }
   ]
 }

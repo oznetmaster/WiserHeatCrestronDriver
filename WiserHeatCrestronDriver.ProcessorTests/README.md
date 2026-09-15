@@ -31,3 +31,6 @@ This project targets only `net472`. It is not packable or publishable to NuGet. 
 Saved schedules can be reopened and saved again; integer lists and arrays are copied independently before editing; the root entity can be created and disposed repeatedly.
 
 The package contains 29 offline cases, 18 lifecycle cases and three optional read-only live hub cases. Lifecycle tests exercise newly constructed test entities, not the installed production driver. Both suites are selectable in the Windows runner and through the standalone Utility tile. Processor hardware validation remains required.
+
+
+CI discovers test identities from the built source assembly and compares them with desktop results and the merged processor package. Each suite must be nonempty; missing or unexpected cases and unexpected skips fail validation. Test totals are reported, not maintained as build constants. Live cases are discovered but never executed by ordinary hosted CI.

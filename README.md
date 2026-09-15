@@ -213,3 +213,6 @@ The complete initial-installation workflow has been validated on a development p
 ## Visual Studio processor workflow
 
 The solution includes [WiserHeatCrestronDriver.WorkflowTests](WiserHeatCrestronDriver.WorkflowTests/README.md), using the published Crestron Home Test Adapter. It exposes the complete gated workflow in Test Explorer while the ordinary NUnit fixtures remain available for local testing. Configure its private settings before execution; hosted CI verifies discovery without accessing hardware.
+
+
+CI discovers test identities from the built source assembly and compares them with desktop results and the merged processor package. Each suite must be nonempty; missing or unexpected cases and unexpected skips fail validation. Test totals are reported, not maintained as build constants. Live cases are discovered but never executed by ordinary hosted CI.

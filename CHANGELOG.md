@@ -2,6 +2,8 @@
 
 ## 1.3.6 - 2026-09-15
 
+- Replace duplicated test-count constants with discovery-to-execution and source-to-package identity checks; adding tests no longer requires editing CI totals.
+
 - Read fresh hub state after hot-water, Away, boost/cancel, schedule advance and schedule enable/disable commands instead of waiting for the polling throttle. This fixes delayed UI updates and repeated hot-water button presses. Routine polling and the public API are unchanged.
 - Add eight command-refresh regression cases; 47 local and 47 processor tests, three live hub checks and three installed-driver health checks passed. The hot-water interaction was also verified manually.
 - See [release notes](RELEASE-NOTES.md) for validation and package details.
