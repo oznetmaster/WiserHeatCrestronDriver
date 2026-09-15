@@ -1,5 +1,10 @@
 # WiserHeatCrestronDriver Tests
 
+## Unreleased
+
+- Add three optional read-only live hub tests, for 42 total cases (29 unit, 10 lifecycle, 3 live). Transfer private LiveTestSettings.json from the runner; the package contains no hub credentials.
+- Rebuild with NUnit tooling 1.2.0 to participate in shared processor reservations.
+
 ## 1.0.0 — 2026-09-14
 
 - 29 offline tests and 10 SDK lifecycle tests, shared between desktop validation and the net472 processor package.

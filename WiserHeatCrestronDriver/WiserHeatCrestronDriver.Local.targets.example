@@ -13,7 +13,7 @@
       <DeployScriptPath>$(MSBuildProjectDirectory)\Deploy.ps1</DeployScriptPath>
     </PropertyGroup>
     <Message Text="Deploying $(AssemblyName).pkg to $(CrestronHomeIP)..." Importance="High" />
-    <Exec Command="pwsh -NoProfile -NonInteractive -File &quot;$(DeployScriptPath)&quot; -PkgFile &quot;$(PkgFile)&quot; -ProcessorIP &quot;$(CrestronHomeIP)&quot; -User &quot;$(CrestronHomeFtpUser)&quot; -Password &quot;$(CrestronHomeSftpPassword)&quot;" ContinueOnError="true" />
+    <Exec Command="pwsh -NoProfile -NonInteractive -File &quot;$(DeployScriptPath)&quot; -PkgFile &quot;$(PkgFile)&quot; -ProjectUserFile &quot;$(MSBuildProjectFullPath).user&quot;" />
     <Touch Files="$(TargetDir)$(AssemblyName).deployed.stamp" AlwaysCreate="true" />
   </Target>
 </Project>

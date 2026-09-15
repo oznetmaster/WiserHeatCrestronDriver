@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: oznetmaster/CrestronHomeNUnit
-          ref: 76c23f5f8e1fe4a19e0a1d023bc04e187e66e056
+          ref: ad67729080f9d753c16b9f0d4acdd13c52bab5e3
           path: CrestronHomeNUnit
       - uses: actions/setup-dotnet@v4
         with:
@@ -33,7 +33,7 @@ jobs:
         run: ../CrestronHomeNUnit/tools/InstallCiTools.ps1
       - name: Run NUnit driver tests
         run: |
-          dotnet test WiserHeatCrestronDriver.Tests/WiserHeatCrestronDriver.Tests.csproj -c Release --logger "trx;LogFileName=tests.trx" --results-directory TestResults
+          dotnet test WiserHeatCrestronDriver.Tests/WiserHeatCrestronDriver.Tests.csproj -c Release --filter "TestCategory!=Live" --logger "trx;LogFileName=tests.trx" --results-directory TestResults
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           [xml]$result = Get-Content TestResults/tests.trx -Raw
           $counts = $result.TestRun.ResultSummary.Counters
@@ -57,7 +57,7 @@ jobs:
           "CompactJsonPath=$path" >> $env:GITHUB_ENV
       - name: Run desktop SDK lifecycle harness
         run: |
-          dotnet test WiserHeatCrestronDriver.Lifecycle.Tests/WiserHeatCrestronDriver.Lifecycle.Tests.csproj -c Release --logger "trx;LogFileName=lifecycle.trx" --results-directory TestResults -p:DeployAfterBuild=false
+          dotnet test WiserHeatCrestronDriver.Lifecycle.Tests/WiserHeatCrestronDriver.Lifecycle.Tests.csproj -c Release --filter "TestCategory!=Live" --logger "trx;LogFileName=lifecycle.trx" --results-directory TestResults -p:DeployAfterBuild=false
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           [xml]$result = Get-Content TestResults/lifecycle.trx -Raw
           $counts = $result.TestRun.ResultSummary.Counters
@@ -71,7 +71,7 @@ jobs:
           $output = Join-Path $PWD 'WiserHeatCrestronDriver.ProcessorTests/bin/Release/net472'
           $extracted = Join-Path $env:RUNNER_TEMP 'driver-package-tests'
           [IO.Compression.ZipFile]::ExtractToDirectory((Join-Path $output 'WiserHeatCrestronDriver.ProcessorTests.pkg'), $extracted)
-          & ../CrestronHomeNUnit/ProcessorTestPackage.Validation/bin/Release/net472/ProcessorTestPackage.Validation.exe (Join-Path $extracted 'WiserHeatCrestronDriver.ProcessorTests.dll') (Join-Path $PWD 'TestResults/processor') 29 --run-twice
+          & ../CrestronHomeNUnit/ProcessorTestPackage.Validation/bin/Release/net472/ProcessorTestPackage.Validation.exe (Join-Path $extracted 'WiserHeatCrestronDriver.ProcessorTests.dll') (Join-Path $PWD 'TestResults/processor') 39 --run-twice
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         if: always()

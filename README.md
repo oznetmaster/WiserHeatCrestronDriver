@@ -165,7 +165,7 @@ Cover room discovery, stable child identity, renamed/removed rooms, cleared sett
 
 Saved schedules can be reopened and saved again; integer lists and arrays are copied independently before editing; the root entity can be created and disposed repeatedly.
 
-The current package contains **29 offline tests** and **10 SDK entity/lifecycle tests**. The processor package remains **net472 only**, appears under **Utility** in Configure, and can run independently through its own tile or the Windows NUnit runner. These fixtures use synthetic data and do not operate installed devices or authenticate with real accounts.
+The current package contains **29 offline tests**, **10 SDK entity/lifecycle tests** and **3 optional live hub tests**. The processor package remains **net472 only**, appears under **Utility** in Configure, and can run independently through its own tile or the Windows NUnit runner. The offline and lifecycle fixtures use synthetic data. The separate live suite authenticates with the selected hub, discovers rooms, refreshes telemetry and reconnects; it sends no room-control commands.
 
 `WiserHeatCrestronDriver.Lifecycle.Tests` runs the entity checks against the real desktop SDK on .NET 10. It compiles the relevant driver sources and shares fixture sources with the net472 processor tests. Building this project does not deploy a driver. A locally supplied `Newtonsoft.Json.Compact.dll` is needed by the SDK's manifest reader; it is supplied by the processor at runtime and must not be added to source control or bundled with the processor test package.
 
@@ -176,7 +176,7 @@ dotnet test WiserHeatCrestronDriver.Lifecycle.Tests/WiserHeatCrestronDriver.Life
 
 Set `CompactJsonPath` in the desktop test project's private `DesktopTest.Local.props`, excluded through `.git/info/exclude`, or pass it as an MSBuild property. Keep machine paths and credentials out of tracked files.
 
-Desktop success does not establish Mono compatibility. Build the processor test project in Visual Studio, deploy it, and run both suites on the processor. The fixtures cover configuration, restoration, refresh/reconnect races and disposal using simulated responses. Real installed-driver health and optional live-device checks remain separate from these repeatable suites.
+Desktop success does not establish Mono compatibility. Build the processor test project in Visual Studio, deploy it, and run both suites on the processor. The fixtures cover configuration, restoration, refresh/reconnect races and disposal using simulated responses. Installed-driver health remains a separate gate from these test-host fixtures.
 
 
 ### Driver build and release versions
@@ -198,3 +198,14 @@ The SDK's desktop manifest reader needs its `Newtonsoft.Json.Compact.dll` runtim
 For automated local tests, processor tests and gated driver deployment, see the [Crestron Home NUnit CI development guide](https://github.com/oznetmaster/CrestronHomeNUnit/blob/HEAD/docs/ContinuousIntegration.md). It covers private configuration, live-test gates, install/update waits, results and optional test-package removal.
 
 Local build/deployment overrides can be created by copying [WiserHeatCrestronDriver.Local.targets.example](WiserHeatCrestronDriver/WiserHeatCrestronDriver.Local.targets.example) to `WiserHeatCrestronDriver.Local.targets` beside the project. Fill in your own paths privately and exclude the resulting local file with `.git/info/exclude`; it is not part of the published source.
+
+### Optional live hub tests
+
+Use [LiveTestSettings.example.json](WiserHeatCrestronDriver.Tests/LiveTestSettings.example.json) as the public template. The driver tests share the library's private `%LOCALAPPDATA%/WiserHeatAPIv2/LiveTestSettings.json` file (`enabled`, `hubHost`, `secret`). Keep the real file outside the repository or in `.git/info/exclude`; it is never embedded in the processor package.
+
+On Windows, run the `Live` category in the .NET 10 desktop SDK harness with private settings enabled, or pass NUnit parameter `EnableLiveTests=true`. Ordinary CI should filter `TestCategory!=Live`. On the processor, select **Live Hub**, supply the private JSON through the runner's **Test inputs**, and run that suite. Its explicit runner enablement applies only to that run. The library's optional room-control settings are ignored by these read-only driver tests.
+The complete initial-installation workflow has been validated on a development processor: 39 local tests, 39 processor tests, three live hub tests, then actual-driver installation/configuration and configured/online/ready checks. New installations use the planned Connection and HeatSettings wizard steps with explicit choices; see the NUnit CI guide for private initial-configuration files. This workflow enhancement is pending the next NUnit tooling release. No heating controls were operated.
+
+## Visual Studio processor workflow
+
+The solution includes [WiserHeatCrestronDriver.WorkflowTests](WiserHeatCrestronDriver.WorkflowTests/README.md), using the published Crestron Home Test Adapter. It exposes the complete gated workflow in Test Explorer while the ordinary NUnit fixtures remain available for local testing. Configure its private settings before execution; hosted CI verifies discovery without accessing hardware.

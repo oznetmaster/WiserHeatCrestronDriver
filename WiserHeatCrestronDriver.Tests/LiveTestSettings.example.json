@@ -1,0 +1,5 @@
+{
+  "enabled": false,
+  "hubHost": "192.0.2.10",
+  "secret": "REPLACE_WITH_YOUR_HUB_SECRET"
+}
