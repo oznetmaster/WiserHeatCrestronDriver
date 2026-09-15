@@ -8,7 +8,7 @@
 - Add three opt-in live driver checks for authenticated Wiser hub discovery, room identity/telemetry refresh and reconnect. Share the library's private live settings. Include a separate Live Hub processor suite; no room control commands are sent.
 - Coordinate build deployment through the shared DevTools processor reservation.
 
-## 1.3.5 â€” 2026-09-14
+## 1.3.5 — 2026-09-14
 
 [Driver release notes](RELEASE-NOTES.md). Test-only changes do not require a driver release.
 
