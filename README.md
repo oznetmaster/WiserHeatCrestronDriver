@@ -216,3 +216,9 @@ The solution includes [WiserHeatCrestronDriver.WorkflowTests](WiserHeatCrestronD
 
 
 CI discovers test identities from the built source assembly and compares them with desktop results and the merged processor package. Each suite must be nonempty; missing or unexpected cases and unexpected skips fail validation. Test totals are reported, not maintained as build constants. Live cases are discovered but never executed by ordinary hosted CI.
+
+## Publishing when local hardware is unavailable
+
+The publish/release workflows support an explicit manual override when the processor or local self-hosted GitHub Actions runner is unavailable. Select `skip_hardware_checks` and provide a single-line `hardware_skip_reason`. Use the workflow's normal source and version controls. The override applies only to that invocation and is recorded with the exact source revision in its warning and job summary; it does not create a passing hardware-test result.
+
+GitHub-hosted validation remains mandatory for the checked-out source, and the normal build, tests and packaging steps still run. Wait for the configured hosted workflows to pass, or run them on the same source revision first. None of these hosted checks needs the local runner or processor. Automatic tag/release-triggered runs retain the normal hardware checks; use a manual invocation of the updated release workflow when an offline override is needed.
