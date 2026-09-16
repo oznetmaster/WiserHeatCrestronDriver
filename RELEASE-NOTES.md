@@ -1,17 +1,17 @@
-# WiserHeatCrestronDriver v1.3.6
+# WiserHeatCrestronDriver v1.3.7
 
-Patch release fixing delayed UI state after Wiser control commands. No public API or dependency changes.
+Patch release fixing overlapping room schedule selection and adding diagnostics for installed-driver testing. Hub API dependencies and normal room control behavior are unchanged.
 
-## Fix
-
-Successful hot-water, Away mode, room boost/cancel, schedule advance and schedule enable/disable commands now read fresh hub state immediately. Previously the normal polling throttle could reuse an old snapshot, re-enable the hot-water button with its previous state and make another press repeat the same command. Setpoint and schedule-edit commands already refreshed immediately and retain that behavior. Routine polling remains unchanged.
+- Apply the room command guard to schedule selection, preventing a second room command from overlapping an unfinished action.
+- Expose room identity and command activity for the development test workflow. Completion is observed after command handling and fresh hub-state readback; independent readings determine whether the requested state was reached.
+- Add optional read-only desktop probes for installed-room control observation and exact-package configuration compatibility during code rollback. Neither probe sends device control commands.
+- Document private settings, strict state restoration, existing-tile preservation and the limits of compatibility verification.
 
 ## Validation
 
-- 47 local and 47 processor unit/entity tests passed, including eight command-refresh regressions.
-- Three read-only live hub tests passed, followed by three installed-driver health checks.
-- The installed driver was updated without rebooting or changing its configuration. A user-operated hot-water toggle updated promptly after one press.
+- Driver unit and lifecycle suites passed locally and on the processor. Probe tests cover observation, restoration and configuration/package refusal paths.
+- An existing Office room passed Auto → Manual → Auto through the installed driver, with independent hub readings, guarded settings unchanged and its tile retained.
+- A complete production workflow passed local, processor and read-only live checks, updated the driver, deliberately failed an installed read-only check, then restored the reviewed previous code. Configuration, gateway/child identities, room assignments and loaded health were preserved. The original workflow stayed failed as intended.
+- Rollback evidence applies only to the exact reviewed package pair, not arbitrary future versions. The temporary test instance and its owned archive were removed and the reservation released.
 
-The processor test package contains 29 unit tests, 18 lifecycle tests and three optional read-only live hub tests. Processor packages remain GitHub-only and private settings are excluded from source and packages.
-
-See [CHANGELOG.md](CHANGELOG.md) for history and [README.md](README.md) for installation and testing.
+See [CHANGELOG.md](CHANGELOG.md), [installed-room testing](docs/InstalledRoomControls.md) and [configuration verification](docs/ConfigurationRollback.md). Private inputs and recovery evidence are excluded. Processor test packages are separate GitHub-only releases.

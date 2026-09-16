@@ -203,12 +203,14 @@ For automated local tests, processor tests and gated driver deployment, see the 
 
 Local build/deployment overrides can be created by copying [WiserHeatCrestronDriver.Local.targets.example](WiserHeatCrestronDriver/WiserHeatCrestronDriver.Local.targets.example) to `WiserHeatCrestronDriver.Local.targets` beside the project. Fill in your own paths privately and exclude the resulting local file with `.git/info/exclude`; it is not part of the published source.
 
+Optional development probes are described in [installed room controls](docs/InstalledRoomControls.md) and [configuration-preserving rollback](docs/ConfigurationRollback.md). Their hardware validation status and restrictions are recorded in those guides.
+
 ### Optional live hub tests
 
 Use [LiveTestSettings.example.json](WiserHeatCrestronDriver.Tests/LiveTestSettings.example.json) as the public template. The driver tests share the library's private `%LOCALAPPDATA%/WiserHeatAPIv2/LiveTestSettings.json` file (`enabled`, `hubHost`, `secret`). Keep the real file outside the repository or in `.git/info/exclude`; it is never embedded in the processor package.
 
 On Windows, run the `Live` category in the .NET 10 desktop SDK harness with private settings enabled, or pass NUnit parameter `EnableLiveTests=true`. Ordinary CI should filter `TestCategory!=Live`. On the processor, select **Live Hub**, supply the private JSON through the runner's **Test inputs**, and run that suite. Its explicit runner enablement applies only to that run. The library's optional room-control settings are ignored by these read-only driver tests.
-The complete initial-installation workflow has been validated on a development processor: 39 local tests, 39 processor tests, three live hub tests, then actual-driver installation/configuration and configured/online/ready checks. New installations use the planned Connection and HeatSettings wizard steps with explicit choices; see the NUnit CI guide for private initial-configuration files. This workflow is supported by the published NUnit tooling. No heating controls were operated.
+The complete initial-installation workflow has been validated on a development processor: local unit/lifecycle tests, processor tests and read-only live hub tests, then actual-driver installation/configuration and configured/online/ready checks. New installations use the planned Connection and HeatSettings wizard steps with explicit choices; see the NUnit CI guide for private initial-configuration files. This workflow is supported by the published NUnit tooling. No heating controls were operated.
 
 ## Visual Studio processor workflow
 

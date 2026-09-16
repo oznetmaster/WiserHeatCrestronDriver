@@ -18,6 +18,7 @@ using Crestron.DeviceDrivers.SDK.EntityModel;
 using NUnit.Framework;
 
 using WiserHeat.CrestronDriver;
+
 using WiserHeatApiV2;
 
 namespace WiserHeatCrestronDriver.Tests;
@@ -97,9 +98,15 @@ public sealed class PlatformDiscoveryTests
 		switch (command)
 			{
 			case "boost":
-			case "cancel boost": accepted = await _driver.TriggerRoomBoostAsync (4); break;
-			case "advance schedule": accepted = await _driver.AdvanceRoomScheduleAsync (4); break;
-			default: accepted = await _driver.SetRoomScheduleEnabledAsync (4, false); break;
+			case "cancel boost":
+				accepted = await _driver.TriggerRoomBoostAsync (4);
+				break;
+			case "advance schedule":
+				accepted = await _driver.AdvanceRoomScheduleAsync (4);
+				break;
+			default:
+				accepted = await _driver.SetRoomScheduleEnabledAsync (4, false);
+				break;
 			}
 		Assert.That (accepted, Is.True);
 		Assert.That (_transport.RoomCommands, Is.GreaterThan (0));
@@ -163,11 +170,11 @@ public sealed class PlatformDiscoveryTests
 		Clear ();
 		Assert.Multiple (() =>
 			{
-			Assert.That (_driver.ManagedDevices, Is.Empty);
-			Assert.That (Entities, Is.Empty);
-			Assert.That (child.GetState ().PropertyValues["onlineIndicator:isOnline"].GetValue<bool> (), Is.False);
-			Assert.That (Field<string> ("_hubIpAddress"), Is.Empty);
-			Assert.That (Field<string> ("_hubSecret"), Is.Empty);
+				Assert.That (_driver.ManagedDevices, Is.Empty);
+				Assert.That (Entities, Is.Empty);
+				Assert.That (child.GetState ().PropertyValues["onlineIndicator:isOnline"].GetValue<bool> (), Is.False);
+				Assert.That (Field<string> ("_hubIpAddress"), Is.Empty);
+				Assert.That (Field<string> ("_hubSecret"), Is.Empty);
 			});
 		}
 	[TestCase (false)]
@@ -178,7 +185,10 @@ public sealed class PlatformDiscoveryTests
 		_transport.HoldNextDomain = true;
 		var refresh = _driver.RefreshSystemStateAsync (true);
 		await TestSupport.Complete (_transport.Entered.Task);
-		if (dispose) _driver.Dispose (); else Clear ();
+		if (dispose)
+			_driver.Dispose ();
+		else
+			Clear ();
 		_transport.Release.TrySetResult (true);
 		await TestSupport.Complete (refresh);
 		Assert.That (_driver.ManagedDevices, Is.Empty);
@@ -200,7 +210,10 @@ public sealed class PlatformDiscoveryTests
 		try
 			{
 			await TestSupport.Complete (transport.Entered.Task);
-			if (dispose) _driver.Dispose (); else Clear ();
+			if (dispose)
+				_driver.Dispose ();
+			else
+				Clear ();
 			}
 		finally { transport.Release.TrySetResult (true); }
 		await TestSupport.Complete (connect);
@@ -232,12 +245,64 @@ public sealed class PlatformDiscoveryTests
 		{
 		public override bool IsEnabled (string id, LogEntryLevel level) => false;
 		public override LogEntryLevel GetCurrentLevel (string id) => LogEntryLevel.Error;
-		public override void Exception (string id, Exception exception, string message, params object[] args) { }
-		public override void Log (string id, LogEntryLevel level, string message) { }
-		public override void Log (string id, LogEntryLevel level, string message, params object[] args) { }
-		public override void Log<T1> (string id, LogEntryLevel level, string message, T1 arg1) { }
-		public override void Log<T1, T2> (string id, LogEntryLevel level, string message, T1 arg1, T2 arg2) { }
-		public override void Log<T1, T2, T3> (string id, LogEntryLevel level, string message, T1 arg1, T2 arg2, T3 arg3) { }
+		public override void Exception (string id, Exception exception, string message, params object[] args)
+			{
+			}
+		public override void Log (string id, LogEntryLevel level, string message)
+			{
+			}
+		public override void Log (string id, LogEntryLevel level, string message, params object[] args)
+			{
+			}
+		public override void Log<T1> (string id, LogEntryLevel level, string message, T1 arg1)
+			{
+			}
+		public override void Log<T1, T2> (string id, LogEntryLevel level, string message, T1 arg1, T2 arg2)
+			{
+			}
+		public override void Log<T1, T2, T3> (string id, LogEntryLevel level, string message, T1 arg1, T2 arg2, T3 arg3)
+			{
+			}
+		}
+	[Test]
+	public async Task RoomControl_CompletesOnlyAfterFreshHubStateAndRejectsOverlappingScheduleSelection ()
+		{
+		_transport.AllowRoomCommands = true;
+		Set ("_hubIpAddress", "HUB.invalid");
+		await Refresh ("[{\"id\":4,\"Name\":\"Office\",\"ScheduleId\":7,\"Mode\":\"Auto\",\"CurrentSetPoint\":205,\"SetPointOrigin\":\"FromSchedule\"}]");
+		var room = Entities["room_4"];
+		Assert.That (room.ControlDeviceId, Is.EqualTo ("hub.invalid/room/4"));
+		Assert.That (room.GetState ().Definition.Properties.Keys, Does.Contain ("controlStatus"));
+		_transport.HoldNextDomain = true;
+		room.DisableSchedule ();
+		await TestSupport.Complete (_transport.Entered.Task);
+		Assert.That (room.ControlStatus, Does.Contain ("\"Completed\":0,\"Pending\":1"));
+		int commands = _transport.RoomCommands;
+		room.EnableSchedule ();
+		room.SetSelectedScheduleId ("7");
+		Assert.That (_transport.RoomCommands, Is.EqualTo (commands), "A busy room must reject other commands, including schedule selection.");
+		_transport.Release.TrySetResult (true);
+		await TestSupport.Complete (WaitForCompletion (room));
+		Assert.That (room.DeviceLabel, Is.EqualTo ("Office"));
+		Assert.That (room.ControlStatus, Does.Contain ("\"Completed\":1,\"Pending\":0"));
+		}
+	[TestCase (false)]
+	[TestCase (true)]
+	public async Task FailedRoomControl_ReleasesActivityAndAcceptsNextCommand (bool throws)
+		{
+		await Refresh ("[{\"id\":4,\"Name\":\"Office\",\"CurrentSetPoint\":205}]");
+		var room = Entities["room_4"];
+		Func<Task<bool>> action = () => throws ? Task.FromException<bool> (new InvalidOperationException ("synthetic failure")) : Task.FromResult (false);
+		var method = typeof (WiserRoomEntity).GetMethod ("TryFireAndForgetRoomAction", Private);
+		await TestSupport.Complete ((Task)method.Invoke (room, new object[] { action, "test failure" }));
+		Assert.That (room.ControlStatus, Does.Contain ("\"Completed\":1,\"Pending\":0"));
+		await TestSupport.Complete ((Task)method.Invoke (room, new object[] { (Func<Task<bool>>)(() => Task.FromResult (true)), "next command" }));
+		Assert.That (room.ControlStatus, Does.Contain ("\"Completed\":2,\"Pending\":0"));
+		}
+	private static async Task WaitForCompletion (WiserRoomEntity room)
+		{
+		for (int i = 0; i < 200 && !room.ControlStatus.Contains ("\"Completed\":1,\"Pending\":0"); i++)
+			await Task.Delay (10);
 		}
 	private sealed class SnapshotTransport : HttpMessageHandler
 		{
@@ -278,7 +343,8 @@ public sealed class PlatformDiscoveryTests
 				}
 			Assert.That (request.Method, Is.EqualTo (HttpMethod.Get), "Discovery must not operate a physical device.");
 			string path = request.RequestUri.AbsolutePath;
-			if (path.EndsWith ("/domain/")) DomainReads++;
+			if (path.EndsWith ("/domain/"))
+				DomainReads++;
 			if (path.EndsWith ("/domain/") && HoldNextDomain)
 				{
 				HoldNextDomain = false;

@@ -1,5 +1,13 @@
 # WiserHeatCrestronDriver Tests
 
+## 1.0.2
+
+- Include command activity and schedule-selection overlap regressions alongside the existing command-refresh coverage. Use discovered cases rather than fixed test-count gates.
+- Unit and lifecycle suites passed on the development processor; the separate read-only live hub suite also passed.
+- Select the standalone package in Configure’s **Utility** category or run it through the Windows runner, CLI or Test Explorer workflow.
+- Private live settings remain external. Installed-room controls and rollback probes are desktop workflow tooling, not automatic physical actions in this test package.
+- Published on GitHub only; no processor test NuGet package is produced.
+
 ## 1.0.1
 
 - Rebuild with CrestronHomeNUnit 1.2.1. Test execution now participates in the shared processor reservation used by the runner, Test Explorer, CLI and hardware CI.

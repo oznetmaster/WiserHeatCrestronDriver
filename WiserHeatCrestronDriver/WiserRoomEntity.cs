@@ -44,6 +44,13 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	private int _editScheduleId;
 	private string _editScheduleName = string.Empty;
 	private int _roomActionInProgress;
+	private readonly CommandActivity _controlActivity = new ();
+
+	[EntityProperty (Id = "controlDeviceId", Type = DriverEntityValueType.String)]
+	public string ControlDeviceId => _platform.ControlHubAddress + "/room/" + _room.Id.ToString (CultureInfo.InvariantCulture);
+
+	[EntityProperty (Id = "controlStatus", Type = DriverEntityValueType.String)]
+	public string ControlStatus => _controlActivity.Snapshot;
 	private int _debugLoggingEnabled;
 	private bool _suppressPropertyNotifications = true;
 
@@ -893,14 +900,33 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		if (Interlocked.Exchange (ref _roomActionInProgress, 1) != 0)
 			return false;
 
+		lock (_controlActivity)
+			{
+			_controlActivity.Begin ();
+			PublishControlActivity ();
+			}
 		NotifyRoomActionStateChanged ();
 		return true;
 		}
 
 	private void EndRoomAction ()
 		{
-		Interlocked.Exchange (ref _roomActionInProgress, 0);
+		lock (_controlActivity)
+			{
+			_controlActivity.Complete ();
+			Interlocked.Exchange (ref _roomActionInProgress, 0);
+			PublishControlActivity ();
+			}
 		NotifyRoomActionStateChanged ();
+		}
+
+	private void PublishControlActivity ()
+		{
+		try
+			{
+			NotifyPropertyChanged ("controlStatus", new DriverEntityValue (ControlStatus));
+			}
+		catch { /* Diagnostics must not prevent command completion or release of the room action. */ }
 		}
 
 	private void NotifyRoomActionStateChanged ()
@@ -1008,7 +1034,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		LogInfo ($"SelectSchedule resolved value='{scheduleIdText}' to scheduleId={scheduleId}");
 
 		int roomId = _room.Id;
-		_ = FireAndForgetAsync (
+		_ = TryFireAndForgetRoomAction (
 			() => AssignSelectedScheduleAsync (roomId, scheduleId),
 			"select schedule");
 		}

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.7 - 2026-09-16
+
+- Guard schedule selection against overlapping room commands and expose room identity/activity for installed-driver verification.
+- Add read-only observation and exact-package configuration probes, refusal/restoration tests, and documentation.
+- Validate existing-room Auto/Manual/Auto restoration and a complete production update, intentional failed check and verified code rollback. Preserve the existing tile and current configuration.
+- See [release notes](RELEASE-NOTES.md) for the exact validation scope and limitations.
+
 ## Offline release workflow option - 2026-09-15 (no package release)
 
 - Allow an explicit manual release when local hardware or the self-hosted runner is unavailable, with the reason and exact source recorded in the workflow summary.

@@ -366,41 +366,41 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		{
 		try
 			{
-				await Task.Yield ();
+			await Task.Yield ();
 
-				ConfigurableDriverEntity? currentController;
-				WiserRoomEntity? currentEntity;
-				Dictionary<string, PlatformManagedDevice> managedDevicesCopy;
-				lock (_entitiesLock)
-					{
-					if (!_roomControllers.TryGetValue (controllerId, out currentController) ||
-						!_roomEntities.TryGetValue (controllerId, out currentEntity))
-						return;
+			ConfigurableDriverEntity? currentController;
+			WiserRoomEntity? currentEntity;
+			Dictionary<string, PlatformManagedDevice> managedDevicesCopy;
+			lock (_entitiesLock)
+				{
+				if (!_roomControllers.TryGetValue (controllerId, out currentController) ||
+					!_roomEntities.TryGetValue (controllerId, out currentEntity))
+					return;
 
-					managedDevicesCopy = new Dictionary<string, PlatformManagedDevice> (ManagedDevices, StringComparer.OrdinalIgnoreCase);
-					_roomControllers[controllerId] = new ConfigurableDriverEntity (controllerId, currentEntity, null);
-					currentController = _roomControllers[controllerId];
-					}
+				managedDevicesCopy = new Dictionary<string, PlatformManagedDevice> (ManagedDevices, StringComparer.OrdinalIgnoreCase);
+				_roomControllers[controllerId] = new ConfigurableDriverEntity (controllerId, currentEntity, null);
+				currentController = _roomControllers[controllerId];
+				}
 
-				Log ($"Starting one-time room rebind for {controllerId}");
-				UpdateSubControllers (null, [controllerId]);
-				UpdateSubControllers ([currentController], null);
-				ManagedDevices = managedDevicesCopy;
-				currentEntity.StartPolling ();
-				Log ($"Completed one-time room rebind for {controllerId}");
+			Log ($"Starting one-time room rebind for {controllerId}");
+			UpdateSubControllers (null, [controllerId]);
+			UpdateSubControllers ([currentController], null);
+			ManagedDevices = managedDevicesCopy;
+			currentEntity.StartPolling ();
+			Log ($"Completed one-time room rebind for {controllerId}");
 			}
 		catch (Exception ex)
 			{
-				LogError ($"Failed one-time room rebind for {controllerId}: {ex}");
-				throw;
+			LogError ($"Failed one-time room rebind for {controllerId}: {ex}");
+			throw;
 			}
 		finally
 			{
-				lock (_entitiesLock)
-					{
-					_ = _roomsAwaitingRebind.Remove (controllerId);
-					_ = _roomsReboundThisSession.Add (controllerId);
-					}
+			lock (_entitiesLock)
+				{
+				_ = _roomsAwaitingRebind.Remove (controllerId);
+				_ = _roomsReboundThisSession.Add (controllerId);
+				}
 			}
 		}
 
@@ -510,10 +510,10 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 					{
 					await _workQueue.EnqueueAsync (async api =>
 						{
-						if (cancellationToken.IsCancellationRequested || !ReferenceEquals (api, _api))
-							return;
+							if (cancellationToken.IsCancellationRequested || !ReferenceEquals (api, _api))
+								return;
 
-						await RefreshSystemStateAsync ().ConfigureAwait (false);
+							await RefreshSystemStateAsync ().ConfigureAwait (false);
 						}).ConfigureAwait (false);
 					}
 				catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -1121,6 +1121,8 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
 		return true;
 		}
+
+	internal string ControlHubAddress => _hubIpAddress.Trim ().ToLowerInvariant ();
 
 	internal async Task<bool> SetRoomSetpointAsync (int roomId, double setpoint)
 		{

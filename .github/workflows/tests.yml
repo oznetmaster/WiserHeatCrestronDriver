@@ -36,6 +36,10 @@ jobs:
       - name: Run NUnit driver tests
         run: |
           ./tools/Test-DiscoveredCoverage.ps1 -Stage Desktop -Project WiserHeatCrestronDriver.Tests/WiserHeatCrestronDriver.Tests.csproj -Framework net472 -AllowProcessorSkips -ResultsDirectory TestResults
+      - name: Validate independent room observation
+        run: |
+          dotnet test WiserHeatCrestronDriver.ControlProbe.Tests/WiserHeatCrestronDriver.ControlProbe.Tests.csproj -c Release --logger "trx;LogFileName=control-probe.trx" --results-directory TestResults/ControlProbe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Restore private desktop SDK dependency
         env:
           COMPACT_1: ${{ secrets.CI_COMPACT_JSON_1 }}
