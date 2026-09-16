@@ -1,5 +1,9 @@
 # Changelog
 
+## WiserHeatCrestronDriver.ProcessorTests v1.0.2 - 2026-09-16
+
+Published processor test package on GitHub. This is a test-package release only; no driver or library NuGet package is published. See the matching package release notes for changes and validation.
+
 ## 1.3.7 - 2026-09-16
 
 - Guard schedule selection against overlapping room commands and expose room identity/activity for installed-driver verification.
