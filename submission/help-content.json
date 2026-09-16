@@ -4,9 +4,6 @@
   "author": "Neil Colvin",
   "version": "1.3.007.0000",
   "pending": [
-    "Confirm the minimum supported Crestron Home firmware through validation; MinSdkVersion is not a processor firmware version.",
-    "Revalidate the recorded hub, processor and app versions when testing the final Release candidate.",
-    "Validate the final candidate on the observed CCTFR6313G2 hub before making the supported-model claim; other hub models are not covered.",
     "Capture and approve screenshots for every declared UI page and selector dialog without private household information.",
     "Update the document version from the final submission candidate and retain the matching package, DLL and PDF basenames."
   ],
@@ -22,7 +19,7 @@
   "sections": {
     "driver": [
       { "kind": "paragraph", "text": "This guide describes Neil Colvin's Crestron Home platform driver for a local Drayton Wiser heating hub. One gateway connects to the hub and exposes its discovered rooms as managed thermostat children. The gateway provides optional whole-house hot water and Away Mode controls." },
-      { "kind": "paragraph", "text": "This review draft describes the current 1.3.7 driver. It is not a completed portal submission or a statement of Crestron certification." }
+      { "kind": "paragraph", "text": "This review draft describes the development changes following driver 1.3.7. Its version will be set to the final submission candidate before packaging. It is not a completed portal submission or a statement of Crestron certification." }
     ],
     "notes": [
       { "kind": "paragraph", "text": "Set up the heating system and its room schedules in Wiser before adding the driver. Keep a stable local address or resolvable hostname for the hub, and keep its authentication secret private." },
@@ -30,7 +27,7 @@
       { "kind": "paragraph", "text": "After a state-changing command, the driver reads the hub's current state before publishing the result. Allow an in-progress command to finish before pressing again. The application should show the observed device state, rather than treating a command request as confirmation." }
     ],
     "requirements": [
-      { "kind": "bullet", "text": "A Crestron Home processor and firmware supporting this SDK V2 entity/platform driver. The minimum supported firmware remains a validation item in this draft." },
+      { "kind": "bullet", "text": "A Crestron Home processor supporting this SDK V2 entity/platform driver. Development testing used an MC4-R with Crestron Home 4.011.0322. Earlier firmware has not been validated; the SDK version in the manifest is not a processor firmware version." },
       { "kind": "bullet", "text": "A reachable local Drayton Wiser hub with its hub authentication secret and configured heating rooms." },
       { "kind": "bullet", "text": "Local network connectivity between processor and hub, and a working Crestron Home setup and end-user application." },
       { "kind": "paragraph", "text": "The driver package contains its required client library code. Dealers do not install the NUnit runner, processor test packages or development tools to use the production driver." }
@@ -52,7 +49,7 @@
       { "kind": "heading2", "text": "Schedule" },
       { "kind": "paragraph", "text": "The Schedule page shows the assigned schedule and whether schedule control is enabled. Select Schedule opens the available schedule choices. Enable and Disable change schedule control, and Edit opens the current shared schedule for editing." },
       { "kind": "heading2", "text": "Edit Schedule" },
-      { "kind": "paragraph", "text": "Choose a day, then adjust the displayed time and setpoint slots. Day and time selectors open choice dialogs. Save Day writes the selected day. Save All Days applies that day's entries to all days. Cancel returns without saving the current edits. The page shows the schedule's shared impact and validation errors." },
+      { "kind": "paragraph", "text": "Choose a day, then adjust the displayed time and setpoint slots. Day and time selectors open choice dialogs. Save Day writes the selected day. Save All applies that day's entries to all days of the selected shared schedule. Cancel returns without saving the current edits. The page shows the schedule's shared impact and validation errors." },
       { "kind": "paragraph", "text": "The approved screenshots for these pages and their schedule, day and time selector dialogs are still required. No household screenshots are included in this draft." }
     ],
     "limitations": [

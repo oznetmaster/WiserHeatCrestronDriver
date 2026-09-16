@@ -18,7 +18,7 @@ Source changes require review of the coverage snapshot before updating its hashe
 
 This is a review draft for the current driver, not an approved portal submission. It is not embedded in the released driver package. Ordinary builds retain their existing package name and do not require document tools. The source manifest now contains the approved public GitHub support website and an empty Email field; runtime behavior, GUID and driver version are unchanged by this preparation.
 
-The content covers the root Home options page, the room thermostat, schedule selection and editing. Its declared UI inventory also includes schedule/day/time selector dialogs. The observed development hub, processor and app versions are recorded. Final candidate validation of those facts, minimum firmware, screenshots and candidate version are explicitly listed in `pending`. Final-mode help generation rejects pending items and missing declared UI screenshots; use `--draft` and a `.review.docx` output for review.
+The content covers the root Home options page, the room thermostat, schedule selection and editing. Its declared UI inventory also includes schedule/day/time selector dialogs. The observed development hub, processor and app versions are recorded without claiming support for untested earlier firmware. Public screenshot approval and the candidate version remain in `pending`. Final-mode help generation rejects pending items and missing declared UI screenshots; use `--draft` and a `.review.docx` output for review.
 
 Public support is provided through [the GitHub repository](https://github.com/oznetmaster/WiserHeatCrestronDriver) and its [issue tracker](https://github.com/oznetmaster/WiserHeatCrestronDriver/issues). No public support email is included. Keep the submission correspondence address, credentials, actual device bindings, source signature image and private screenshots outside this repository. Only approved public figures should be referenced by the content file, using relative paths and SHA-256 digests.
 
@@ -38,7 +38,20 @@ This option uses `NeilColvin_Thermostat_WiserHeat_IP_V2` as the matching package
 
 The build generates final-mode help before compilation, adds the PDF after copying the normal package assets, then verifies its bytes and the generated package identity after ManifestUtil. Build receipts are retained under `obj/submission-help/<unique-id>` and are not included in the package. Merge and packaging failures cannot be ignored in submission mode. Test/design-time builds skip these steps.
 
-The current content deliberately fails this option because its remaining facts and UI screenshots are incomplete. A real invocation confirmed that rejection without changing the manifest version; the ordinary test build still succeeds. No completed submission package has yet been built, tested or deployed by these hooks. Completing the content, visually reviewing the final PDF, building with ManifestUtil and connecting candidate-bound hardware evidence remain required.
+The current content deliberately fails this option because its public screenshots and candidate version are incomplete. A real invocation confirmed rejection of incomplete content without changing the manifest version; the ordinary test build still succeeds. No completed submission package has yet been built, tested or deployed by these hooks. Completing the content, visually reviewing the final PDF, building with ManifestUtil and connecting candidate-bound hardware evidence remain required.
+
+## Validation after the candidate is built
+
+The help PDF must already be inside the package that hardware tests execute. Requiring a passing final-package test before generating that PDF would make the build impossible. Help content therefore identifies the observed development environment and the limited intended model; it does not certify that the final candidate has passed.
+
+After the immutable candidate has been built, the submission workflow must retain evidence for all of the following:
+
+- Package, DLL and help names, GUID, version, embedded help and dependency notice bytes match the build receipts.
+- The recorded processor, hub and Android/app versions match the environment actually used for that candidate's tests. A material change requires review of the environment description and a new package if the help changes.
+- The actual candidate is installed on the stated CCTFR6313G2 model and passes every applicable official requirement, including the remaining physical controls, restoration, isolation, outage and endurance checks. Other hub models and earlier processor firmware are not covered by the current development results.
+- Complete observations map to the official self-test form, with the required private review, signature and delivery authorization.
+
+These are mandatory submission acceptance obligations, not all implemented automated checks. The coverage plan and the shared evidence validator remain separate from the help builder. An empty help `pending` list proves neither passing hardware tests nor submission readiness. Do not change the tested package's help after the run; rebuild and repeat candidate-bound validation when its bytes change.
 
 ## Dependency licenses and notices
 

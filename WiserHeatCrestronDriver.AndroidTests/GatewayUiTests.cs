@@ -5,6 +5,7 @@ using System.Net;
 using System.Text.Json;
 
 using CrestronHomeDevTools;
+
 using CrestronHomeNUnit.Android;
 using CrestronHomeNUnit.Client;
 
@@ -24,8 +25,14 @@ public sealed partial class GatewayUiTests
 	private sealed record Settings (string Host, string UserName, string Password, string CertificateSha256)
 		{
 		public RoomBinding[] Rooms { get; init; } = [];
-		public bool AllowNameBinding { get; init; }
-		public string? SshFingerprint { get; init; }
+		public bool AllowNameBinding
+			{
+			get; init;
+			}
+		public string? SshFingerprint
+			{
+			get; init;
+			}
 		}
 	private static readonly string[] StateKeys = ["hotWaterVisible", "hotWaterStateLabel", "hotWaterActionLabel", "hotWaterActionEnabled", "awayModeVisible", "awayModeStateLabel", "awayModeActionLabel", "awayModeActionEnabled"];
 
@@ -50,7 +57,11 @@ public sealed partial class GatewayUiTests
 		using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (3));
 		_session = await AndroidWorkflowSession.OpenFromEnvironmentAsync (timeout.Token);
 		_navigation = new (_session);
-		_processor = await ConfigurationClient.ConnectAsync (new () { Host = settings.Host, CertificateSha256 = settings.CertificateSha256 }, new NetworkCredential (settings.UserName, settings.Password), timeout.Token);
+		_processor = await ConfigurationClient.ConnectAsync (new ()
+			{
+			Host = settings.Host,
+			CertificateSha256 = settings.CertificateSha256
+			}, new NetworkCredential (settings.UserName, settings.Password), timeout.Token);
 		_ = await ReadGatewayAsync (timeout.Token);
 		await _navigation.VerifySavedEndpointAsync ("wiser.connection", context.Profile.LocalPort, timeout.Token);
 		}
@@ -72,12 +83,18 @@ public sealed partial class GatewayUiTests
 
 	private static string Label (JsonElement value) => value.GetString () switch
 		{
-		"^HotWaterOnLabel" => "On", "^HotWaterOffLabel" => "Off",
-		"^HotWaterTurnOnLabel" => "Hot Water On", "^HotWaterTurnOffLabel" => "Hot Water Off",
-		"^AwayEnabledLabel" => "Enabled", "^AwayDisabledLabel" => "Disabled",
-		"^AwayEnableActionLabel" => "Enable Away", "^AwayDisableActionLabel" => "Disable Away",
-		_ => throw new InvalidDataException ("An unexpected status needs explicit UI translation support.")
-		};
+			"^HotWaterOnLabel" => "On",
+			"^HotWaterOffLabel" => "Off",
+			"^HotWaterTurnOnLabel" => "Turn On",
+			"^HotWaterTurnOffLabel" => "Turn Off",
+			"^AwayEnabledLabel" => "Enabled",
+			"^AwayDisabledLabel" => "Disabled",
+			"^AwayEnableActionLabel" => "Enable Away",
+			"^AwayDisableActionLabel" => "Disable Away",
+			"^ScheduleEnabledLabel" => "Enabled",
+			"^ScheduleDisabledLabel" => "Disabled",
+			_ => throw new InvalidDataException ("An unexpected status needs explicit UI translation support.")
+			};
 
 	[TestCase (1), TestCase (2)]
 	public async Task GatewayControlsMatchFreshProcessorStateAndReturnHome (int repetition)
@@ -89,19 +106,24 @@ public sealed partial class GatewayUiTests
 		var values = StateKeys.ToDictionary (key => key, key => before.PropertyValues[key]);
 		await File.WriteAllTextAsync (Path.Combine (_session!.Context.EvidenceDirectory, check + ".processor.json"), JsonSerializer.Serialize (new
 			{
-			ObservedUtc = DateTimeOffset.UtcNow, before.Id, before.Name, before.Model, _session.Context.DriverVersion, Properties = values,
+			ObservedUtc = DateTimeOffset.UtcNow,
+			before.Id,
+			before.Name,
+			before.Model,
+			_session.Context.DriverVersion,
+			Properties = values,
 			Binding = _settings!.AllowNameBinding ? "A separate name-challenge result and UI captures must confirm instance association." : "Unique management inventory name and saved Android endpoint; not active-route proof."
 			}), timeout.Token);
 		Task Inspect (string name, CancellationToken token) => _navigation!.InspectHomeExtensionAsync (check, name, "Wiser Heat Options", hierarchy =>
 			{
-			foreach (var control in new[] { (Label: "Hot Water", Prefix: "hotWater"), (Label: "Away Mode", Prefix: "awayMode") })
-				{
-				Assert.That (values[control.Prefix + "Visible"].GetBoolean (), Is.True, "This fixture requires the configured gateway capability to be visible.");
-				var row = CrestronHomePages.ReadStatusAndButton (hierarchy, control.Label);
-				Assert.That (row.Status, Is.EqualTo (Label (values[control.Prefix + "StateLabel"])).IgnoreCase, control.Label);
-				Assert.That (row.Action, Is.EqualTo (Label (values[control.Prefix + "ActionLabel"])), control.Label);
-				Assert.That (row.Enabled, Is.EqualTo (values[control.Prefix + "ActionEnabled"].GetBoolean ()), control.Label);
-				}
+				foreach (var control in new[] { (Label: "Hot Water", Prefix: "hotWater"), (Label: "Away Mode", Prefix: "awayMode") })
+					{
+					Assert.That (values[control.Prefix + "Visible"].GetBoolean (), Is.True, "This fixture requires the configured gateway capability to be visible.");
+					var row = CrestronHomePages.ReadStatusAndButton (hierarchy, control.Label);
+					Assert.That (row.Status, Is.EqualTo (Label (values[control.Prefix + "StateLabel"])).IgnoreCase, control.Label);
+					Assert.That (row.Action, Is.EqualTo (Label (values[control.Prefix + "ActionLabel"])), control.Label);
+					Assert.That (row.Enabled, Is.EqualTo (values[control.Prefix + "ActionEnabled"].GetBoolean ()), control.Label);
+					}
 			}, token);
 		if (_settings!.AllowNameBinding)
 			await InspectWithNameBindingAsync (check, before, Inspect, timeout.Token);
@@ -134,25 +156,34 @@ public sealed partial class GatewayUiTests
 			var result = await DriverNameChallenge.RunAsync (_processor!, new (before.Id, before.Model!, context.DriverVersion, "Existing"),
 				folder, VerifyOwnership, async (observation, ct) =>
 					{
-					void Verify (AndroidHierarchy hierarchy)
-						{
-						CrestronHomePages.RequireHome (hierarchy, context.Profile.ExpectedHomeText);
-						var selector = new AndroidSelector (AndroidSelectorKind.Text, observation.ExpectedName)
-							{ AncestorResourceId = CrestronHomePages.ResourcePrefix + "fragmentHomeContainer" };
-						if (hierarchy.RequireUnique (selector).ResourceId != CrestronHomePages.ResourcePrefix + "titleSubtitle_title")
-							throw new InvalidOperationException ("The name challenge did not identify a Home tile.");
-						hierarchy.RequireAbsent (selector with { Value = observation.AbsentName });
-						}
-					while (true)
-						{
-						VerifyOwnership ();
-						var hierarchy = await _session.Device.CaptureAsync (ct);
-						try { Verify (hierarchy); break; }
-						catch (InvalidOperationException) { await Task.Delay (500, ct); }
-						}
-					await _session.CaptureAsync (check + ".binding-" + observation.Phase.ToString ().ToLowerInvariant (), Verify, ct);
-					if (observation.Phase == DriverNameChallengePhase.Challenge)
-						await inspect (observation.ExpectedName, ct);
+						void Verify (AndroidHierarchy hierarchy)
+							{
+							CrestronHomePages.RequireHome (hierarchy, context.Profile.ExpectedHomeText);
+							var selector = new AndroidSelector (AndroidSelectorKind.Text, observation.ExpectedName)
+								{
+								AncestorResourceId = CrestronHomePages.ResourcePrefix + "fragmentHomeContainer"
+								};
+							if (hierarchy.RequireUnique (selector).ResourceId != CrestronHomePages.ResourcePrefix + "titleSubtitle_title")
+								throw new InvalidOperationException ("The name challenge did not identify a Home tile.");
+							hierarchy.RequireAbsent (selector with
+								{
+								Value = observation.AbsentName
+								});
+							}
+						while (true)
+							{
+							VerifyOwnership ();
+							var hierarchy = await _session.Device.CaptureAsync (ct);
+							try
+								{
+								Verify (hierarchy);
+								break;
+								}
+							catch (InvalidOperationException) { await Task.Delay (500, ct); }
+							}
+						await _session.CaptureAsync (check + ".binding-" + observation.Phase.ToString ().ToLowerInvariant (), Verify, ct);
+						if (observation.Phase == DriverNameChallengePhase.Challenge)
+							await inspect (observation.ExpectedName, ct);
 					}, TimeSpan.FromSeconds (55), token);
 			_nameRestored = result.NameRestored;
 			}
@@ -177,13 +208,14 @@ public sealed partial class GatewayUiTests
 		{
 		try
 			{
-			if (_session == null) return;
+			if (_session == null)
+				return;
 			bool restored = false;
 			try
 				{
 				using var cleanup = new CancellationTokenSource (TimeSpan.FromMinutes (2));
 				await _navigation!.RestoreHomeAsync (cleanup.Token);
-					restored = _navigation.HomeRestored && _nameRestored && _roomStatePreserved;
+				restored = _navigation.HomeRestored && _nameRestored && _roomStatePreserved;
 				}
 			finally { _session.Complete (restorationConfirmed: restored); }
 			}

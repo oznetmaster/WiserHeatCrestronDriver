@@ -1,5 +1,13 @@
 # Changelog
 
+## Submission candidate development - 2026-09-16 (not included in 1.3.7)
+
+- Fix schedule, day and time selection dialogs so their choice lists and selected values are available to the Home app. The complete lists were checked in the minimized Google Android emulator.
+- Shorten the hot-water actions to Turn On and Turn Off, and the shared schedule action to Save All, so their meaning remains visible on portrait screens. Save All applies the selected day's entries to all days of the selected shared schedule.
+- Extend the Wiser Android fixture to inspect the thermostat, Schedule and Edit Schedule pages before checking the full selection lists. Use the published TestAdapter 1.8.0; Wiser page names and expected values remain in this repository.
+- The complete Debug workflow passed local and processor tests, live hub reads, the installed driver update, health checks and every discovered Android case. Checked state and Home were restored; the temporary test instance and uploaded archive were removed. These runtime fixes await a driver patch release and final Release-candidate validation.
+- Prepare submission help and reviewed dependency notices. Public help screenshots, completed acceptance evidence and signed submission remain separate requirements; this source update is not a Crestron submission.
+
 ## Android UI test development - 2026-09-16 (no driver release)
 
 - Optional private name binding temporarily renames the gateway, observes the corresponding app tile and restores the name. Uses DevTools 1.5.0 and TestAdapter 1.7.1; both cases passed in the minimized Google emulator with the original inventory and observed states preserved. No physical control commands or new driver release.

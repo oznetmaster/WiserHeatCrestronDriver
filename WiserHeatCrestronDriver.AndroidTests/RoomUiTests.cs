@@ -6,6 +6,7 @@ using System.Net;
 using System.Text.Json;
 
 using CrestronHomeDevTools;
+
 using CrestronHomeNUnit.Android;
 
 using NUnit.Framework;
@@ -39,20 +40,38 @@ public sealed partial class GatewayUiTests
 			try
 				{
 				await _navigation!.InspectRoomExtensionPagesAsync (check, binding.RoomName, before.Name!, binding.PageTitle, async (pages, token) =>
-					{
-					await pages.OpenPageAsync (Text ("Open"), "Schedule", CrestronHomePages.Resource ("customdevices_toolbarClose"), token);
-					var schedule = await ReadRoomAsync (binding, token);
-					var labels = schedule.PropertyValues["selectedScheduleOptions"].EnumerateArray ().Select (value => value.GetProperty ("label").GetProperty ("text").GetString ()!).ToArray ();
-					await SaveRoomObservationAsync (check + ".schedule", schedule, token);
-					await pages.InspectSelectionAsync (check + ".schedules", Text ("SELECT SCHEDULE"), labels, schedule.PropertyValues["selectedScheduleName"].GetString ()!, token);
-					await pages.OpenPageAsync (Text ("Edit"), "Edit Schedule", Text ("Cancel"), token);
-					var editor = await ReadRoomAsync (binding, token);
-					await SaveRoomObservationAsync (check + ".editor", editor, token);
-					string day = _dayLabels.Single (label => label.Trim () == editor.PropertyValues["editSelectedDay"].GetString ());
-					await pages.InspectSelectionAsync (check + ".days", Text ("DAY"), _dayLabels, day, token);
-					var times = Enumerable.Range (0, 48).Select (index => (index / 2).ToString ("00", CultureInfo.InvariantCulture) + ":" + (index % 2 * 30).ToString ("00", CultureInfo.InvariantCulture)).ToArray ();
-					await pages.InspectSelectionAsync (check + ".times", Text ("TIME 1"), times, editor.PropertyValues["editSlot1Time"].GetString ()!, token);
-					}, timeout.Token);
+						{
+							await pages.InspectAsync (check + ".thermostat", hierarchy =>
+								{
+									var scheduleRow = CrestronHomePages.ReadStatusAndButton (hierarchy, "Schedule");
+									Assert.That (scheduleRow.Action, Is.EqualTo ("Open"));
+									Assert.That (scheduleRow.Enabled, Is.True);
+								}, token);
+							await pages.OpenPageAsync (Text ("Open"), "Schedule", CrestronHomePages.Resource ("customdevices_toolbarClose"), token);
+							var schedule = await ReadRoomAsync (binding, token);
+							var labels = schedule.PropertyValues["selectedScheduleOptions"].EnumerateArray ().Select (value => value.GetProperty ("label").GetProperty ("text").GetString ()!).ToArray ();
+							await SaveRoomObservationAsync (check + ".schedule", schedule, token);
+							await pages.InspectAsync (check + ".schedule-page", hierarchy =>
+								{
+									var control = CrestronHomePages.ReadStatusAndButton (hierarchy, "Schedule Control");
+									Assert.That (control.Status, Is.EqualTo (Label (schedule.PropertyValues["scheduleStatusLabel"])).IgnoreCase);
+									hierarchy.RequireUnique (Text ("SELECT SCHEDULE"));
+								}, token);
+							await pages.InspectSelectionAsync (check + ".schedules", Text ("SELECT SCHEDULE"), labels, schedule.PropertyValues["selectedScheduleName"].GetString ()!, token);
+							await pages.OpenPageAsync (Text ("Edit"), "Edit Schedule", Text ("Cancel"), token);
+							var editor = await ReadRoomAsync (binding, token);
+							await SaveRoomObservationAsync (check + ".editor", editor, token);
+							await pages.InspectAsync (check + ".editor-page", hierarchy =>
+								{
+									hierarchy.RequireUnique (Text ("DAY"));
+									hierarchy.RequireUnique (Text ("TIME 1"));
+									hierarchy.RequireUnique (Text ("Save All"));
+								}, token);
+							string day = _dayLabels.Single (label => label.Trim () == editor.PropertyValues["editSelectedDay"].GetString ());
+							await pages.InspectSelectionAsync (check + ".days", Text ("DAY"), _dayLabels, day, token);
+							var times = Enumerable.Range (0, 48).Select (index => (index / 2).ToString ("00", CultureInfo.InvariantCulture) + ":" + (index % 2 * 30).ToString ("00", CultureInfo.InvariantCulture)).ToArray ();
+							await pages.InspectSelectionAsync (check + ".times", Text ("TIME 1"), times, editor.PropertyValues["editSlot1Time"].GetString ()!, token);
+						}, timeout.Token);
 				Assert.That (_navigation.HomeRestored, Is.True);
 				}
 			catch (Exception e) { failure = e; throw; }
@@ -67,8 +86,12 @@ public sealed partial class GatewayUiTests
 						_roomStateKeys.All (key => after.PropertyValues[key].GetRawText () == before.PropertyValues[key].GetRawText ());
 					await File.WriteAllTextAsync (Path.Combine (_session!.Context.EvidenceDirectory, check + ".preservation.json"), JsonSerializer.Serialize (new
 						{
-						_session.Context.RunId, _session.Context.PackageSha256, binding.DeviceId,
-						CheckedStatePreserved = _roomStatePreserved, HomeRestored = _navigation!.HomeRestored, PhysicalCommandsSent = false
+						_session.Context.RunId,
+						_session.Context.PackageSha256,
+						binding.DeviceId,
+						CheckedStatePreserved = _roomStatePreserved,
+						HomeRestored = _navigation!.HomeRestored,
+						PhysicalCommandsSent = false
 						}), verification.Token);
 					Assert.That (_roomStatePreserved, Is.True, "Room identity, assignment or checked control state changed during read-only inspection.");
 					}
@@ -83,7 +106,11 @@ public sealed partial class GatewayUiTests
 	private async Task<DeviceInfo> ReadRoomAsync (RoomBinding binding, CancellationToken token)
 		{
 		// Long UI traversals can outlast a configuration session's idle lifetime.
-		await using var client = await ConfigurationClient.ConnectAsync (new () { Host = _settings!.Host, CertificateSha256 = _settings.CertificateSha256 },
+		await using var client = await ConfigurationClient.ConnectAsync (new ()
+			{
+			Host = _settings!.Host,
+			CertificateSha256 = _settings.CertificateSha256
+			},
 			new NetworkCredential (_settings.UserName, _settings.Password), token);
 		var gateway = await client.GetDeviceAsync (_session!.Context.InstalledDriverId, token) ?? throw new InvalidDataException ("The workflow gateway is missing.");
 		if (gateway.Model != "Wiser Heat Gateway" || gateway.PropertyValues["cp.driverInformation:version"].GetString () != _session.Context.DriverVersion ||
@@ -107,8 +134,14 @@ public sealed partial class GatewayUiTests
 		string[] properties = [.. _roomStateKeys, "selectedScheduleOptions", "editSelectedDay", "editSlot1Time"];
 		return File.WriteAllTextAsync (Path.Combine (_session!.Context.EvidenceDirectory, check + ".processor.json"), JsonSerializer.Serialize (new
 			{
-			ObservedUtc = DateTimeOffset.UtcNow, _session.Context.RunId, _session.Context.PackageSha256, _session.Context.DriverVersion,
-			device.Id, device.Name, device.ParentDeviceId, device.LocationId,
+			ObservedUtc = DateTimeOffset.UtcNow,
+			_session.Context.RunId,
+			_session.Context.PackageSha256,
+			_session.Context.DriverVersion,
+			device.Id,
+			device.Name,
+			device.ParentDeviceId,
+			device.LocationId,
 			Properties = properties.ToDictionary (key => key, key => device.PropertyValues[key]),
 			Binding = "Explicit child ID and location under the workflow gateway; unique named tile and verified saved endpoint. Not cryptographic route attestation."
 			}), token);
