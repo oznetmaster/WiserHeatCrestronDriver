@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
@@ -64,6 +65,51 @@ public sealed class PlatformDiscoveryTests
 		{
 		_transport.Rooms = rooms;
 		await TestSupport.Complete (_driver.RefreshSystemStateAsync (true));
+		}
+	[Test]
+	public async Task SchedulePicker_DefinitionContainsCurrentHubOptions ()
+		{
+		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Office schedule\"}]";
+		await _api.ReadHubDataAsync ();
+		await Refresh ("[{\"id\":4,\"Name\":\"Office\",\"ScheduleId\":7}]");
+		var state = Entities["room_4"].GetState ();
+		var definition = state.Definition.Properties["selectedScheduleId"];
+		Assert.That (definition.TypeDef.AvailableValues, Is.Not.Null.And.Not.Empty,
+			"The Home extension bridge needs inline options; a reference to a separate array is sent to the app as null.");
+		Assert.That (definition.TypeDef.AvailableValues.Select (option => option.Value), Is.EqualTo (new[] { "7" }));
+		Assert.That (definition.TypeDef.AvailableValues.Single ().Label.Text, Is.EqualTo ("Office schedule"));
+		Assert.That (state.PropertyValues["selectedScheduleId"].GetValue<string> (), Is.EqualTo ("7"));
+		}
+	[Test]
+	public async Task SchedulePicker_RefreshesOptionsWithoutReplacingRoomOrChangingEarlierDefinition ()
+		{
+		const string rooms = "[{\"id\":4,\"Name\":\"Office\",\"ScheduleId\":7}]";
+		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Original\"}]";
+		await _api.ReadHubDataAsync ();
+		await Refresh (rooms);
+		var room = Entities["room_4"];
+		room.StartPolling ();
+		var original = room.GetState ().Definition.Properties["selectedScheduleId"];
+		int changes = 0;
+		room.DefinitionChanged += (_, _) => changes++;
+		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Renamed\"},{\"id\":9,\"Name\":\"Other\"}]";
+		await _api.ReadHubDataAsync ();
+		await Refresh (rooms);
+		Assert.That (Entities["room_4"], Is.SameAs (room));
+		var updated = room.GetState ().Definition.Properties["selectedScheduleId"].TypeDef.AvailableValues;
+		Assert.That (updated, Is.Not.Null.And.Not.Empty);
+		Assert.That (updated.Select (option => option.Value), Is.EquivalentTo (new[] { "7", "9" }));
+		Assert.That (updated.Single (option => option.Value == "7").Label.Text, Is.EqualTo ("Renamed"));
+		Assert.That (original.TypeDef.AvailableValues.Single ().Label.Text, Is.EqualTo ("Original"));
+		Assert.That (changes, Is.EqualTo (1));
+		await Refresh (rooms);
+		Assert.That (changes, Is.EqualTo (1), "An unchanged poll must not rebuild the UI definition.");
+		_transport.HeatingSchedules = "[]";
+		await _api.ReadHubDataAsync ();
+		await Refresh (rooms);
+		Assert.That (room.GetState ().Definition.Properties["selectedScheduleId"].TypeDef.AvailableValues, Is.Empty);
+		Assert.That (room.ScheduleSelectorEnabled, Is.False);
+		Assert.That (changes, Is.EqualTo (2));
 		}
 	[TestCase (false)]
 	[TestCase (true)]
@@ -307,6 +353,7 @@ public sealed class PlatformDiscoveryTests
 	private sealed class SnapshotTransport : HttpMessageHandler
 		{
 		internal string Rooms = "[]";
+		internal string HeatingSchedules;
 		internal string HotWaterState;
 		internal bool AllowRoomCommands;
 		internal int RoomCommands;
@@ -355,6 +402,8 @@ public sealed class PlatformDiscoveryTests
 				: path.EndsWith ("/network/") ? "{\"Station\":{}}" : "{\"Heating\":[]}";
 			if (path.EndsWith ("/schedules/") && AllowRoomCommands)
 				json = "{\"Heating\":[{\"id\":7,\"Name\":\"Test schedule\",\"Next\":{\"Day\":\"Monday\",\"Time\":1800,\"DegreesC\":215}}]}";
+			if (path.EndsWith ("/schedules/") && HeatingSchedules != null)
+				json = "{\"Heating\":" + HeatingSchedules + "}";
 			if (path.EndsWith ("/domain/") && AllowAwayCommands)
 				json = json.Replace ("\"System\":{}", "\"System\":{\"OverrideType\":\"" + (Away ? "Away" : "None") + "\"}");
 			if (path.EndsWith ("/domain/") && HotWaterState != null)

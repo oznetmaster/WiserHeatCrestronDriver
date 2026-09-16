@@ -30,6 +30,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	private readonly UiDefinitionProperty _uiDefinition;
 	private string _selectedScheduleId = string.Empty;
 	private DriverEntityAvailableValue[] _scheduleValues = [];
+	private DriverEntityAvailableValue[]? _publishedScheduleValues;
 	private WiserRoom _room;
 	private const int MAX_EDITABLE_SCHEDULE_SLOTS = 10;
 	private static readonly string[] _editableScheduleDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -119,6 +120,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 		var setPropertyValue = new ExtensionSetPropertyValueExecutor (GetCommand, resources.Logger);
 		AddCommand (this, ExtensionSetPropertyValueExecutor.CommandName, setPropertyValue);
+		UpdateScheduleSelectionDefinition (ScheduleValues);
 
 		_suppressPropertyNotifications = false;
 		NotifyEditStateChanged ();
@@ -821,6 +823,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		ScheduleStatusLabel = BuildScheduleStatusLabel (_room);
 		SelectedScheduleName = BuildSelectedScheduleName (_room);
 		ScheduleSelectorEnabled = _platform.HasHeatingSchedules;
+		RefreshScheduleValues (notify: _frameworkReady != 0);
 		CurrentTemperatureLabel = $"{CurrentTemperature:0.0}°";
 		TileIcon = BuildTileIcon (_room);
 		LoadEditScheduleState (notify: _frameworkReady != 0);
@@ -1042,6 +1045,29 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	private Task<bool> AssignSelectedScheduleAsync (int roomId, int scheduleId) =>
 		_platform.SetRoomAssignedScheduleAsync (roomId, scheduleId);
 
+	private bool UpdateScheduleSelectionDefinition (DriverEntityAvailableValue[] values)
+		{
+		using (DefinitionLock.Enter ())
+			{
+			if (_publishedScheduleValues != null && _publishedScheduleValues.Length == values.Length &&
+				_publishedScheduleValues.Zip (values, (before, after) => before.Value == after.Value &&
+					before.Label.Text == after.Label.Text && before.Label.LocalizationKey == after.Label.LocalizationKey &&
+					before.IsUnavailable == after.IsUnavailable).All (equal => equal))
+				return false;
+
+			// Home's extension bridge sends AvailableValuesProperty as a null option list.
+			// Publish an immutable inline list and notify definition changes when hub schedules change.
+			var snapshot = values.ToArray ();
+			var definition = DriverEntityPropertyDefinition.Create (DriverEntityValueType.String,
+				name: new DriverEntityLocalizedString ("Selected Schedule Id", null), availableValues: snapshot);
+			AddProperty (this, "selectedScheduleId", new DelegatePropertyInstance (definition,
+				new DriverEntityPropertyMetadata (programmable: false, extensionUiProperty: true),
+				(instance, _) => new DriverEntityValue (((WiserRoomEntity)instance).SelectedScheduleId)));
+			_publishedScheduleValues = snapshot;
+			return true;
+			}
+		}
+
 	private void RefreshScheduleValues (bool notify)
 		{
 		string previousSelectedScheduleId = SelectedScheduleId ?? string.Empty;
@@ -1051,10 +1077,13 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 		ScheduleValues = nextScheduleValues;
 		SelectedScheduleId = nextSelectedScheduleId;
+		bool definitionChanged = UpdateScheduleSelectionDefinition (nextScheduleValues);
 		LogScheduleValues ($"RefreshScheduleValues(notify={notify})");
 
 		if (notify)
 			{
+			if (definitionChanged)
+				RaiseDefinitionChangedEvent ();
 			LogBreadcrumb ($"RefreshScheduleValues publishing selectedScheduleOptions; count={SelectedScheduleOptions.Length}, selectedScheduleId='{SelectedScheduleId ?? string.Empty}'");
 			NotifyPropertyChanged ("selectedScheduleOptions", new DriverEntityValue (SelectedScheduleOptions));
 			NotifyPropertyChanged ("selectedScheduleId", new DriverEntityValue (SelectedScheduleId ?? string.Empty));
