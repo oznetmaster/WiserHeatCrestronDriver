@@ -39,3 +39,11 @@ This option uses `NeilColvin_Thermostat_WiserHeat_IP_V2` as the matching package
 The build generates final-mode help before compilation, adds the PDF after copying the normal package assets, then verifies its bytes and the generated package identity after ManifestUtil. Build receipts are retained under `obj/submission-help/<unique-id>` and are not included in the package. Merge and packaging failures cannot be ignored in submission mode. Test/design-time builds skip these steps.
 
 The current content deliberately fails this option because its remaining facts and UI screenshots are incomplete. A real invocation confirmed that rejection without changing the manifest version; the ordinary test build still succeeds. No completed submission package has yet been built, tested or deployed by these hooks. Completing the content, visually reviewing the final PDF, building with ManifestUtil and connecting candidate-bound hardware evidence remain required.
+
+## Dependency licenses and notices
+
+`dependency-notices.json` records the actual merged dependency DLL hashes, package versions, original copyright metadata and reviewed license/NOTICE documents in `license-sources`. Those documents retain their original bytes and notices, including the WiserHeatAPIv2 authors and YamlDotNet's separate libyaml license. They are third-party notices, not project-owned source files.
+
+The submission build generates `THIRD-PARTY-NOTICES.txt` from that inventory after copying package assets. It refuses changed, missing or additional merge dependencies and verifies the exact notice file in the resulting package. The project rejects older tooling that lacks this check. Ordinary/test builds do not invoke the submission renderer or this notice-generation hook.
+
+After a dependency update, review its package license and upstream notices before updating the inventory; a new DLL hash alone is not a license review. The current inventory matched all 18 dependency DLLs in the development build. Inclusion by ManifestUtil in the final Release candidate remains to be verified. See [the reusable notice-build documentation](https://github.com/oznetmaster/CrestronHomeDevTools/blob/main/docs/submission/DependencyNotices.md).

@@ -9,7 +9,7 @@
     "Confirm supported hub part numbers rather than extending the supported-model claim from the Wiser family name.",
     "Capture and approve screenshots for every declared UI page and selector dialog without private household information.",
     "Update the document version from the final submission candidate and retain the matching package, DLL and PDF basenames.",
-    "Complete the merged dependency license inventory and include its required notices in the final package."
+    "Verify the reviewed merged dependency notices are included in the final ManifestUtil submission candidate."
   ],
   "uiPages": [
     "platform.options",
@@ -86,7 +86,8 @@
     "license": [
       { "kind": "paragraph", "text": "Copyright (c) 2026 Neil Colvin. The driver is licensed under the MIT License with Commons Clause, including the repository's explicit system-integration and commissioning exception. The full license and required notices govern use: https://github.com/oznetmaster/WiserHeatCrestronDriver/blob/master/LICENSE" },
       { "kind": "paragraph", "text": "Drayton, Wiser and Schneider Electric are trademarks of Schneider Electric SE, its subsidiaries or affiliated companies. Crestron and Crestron Home are trademarks or registered trademarks of Crestron Electronics, Inc. This independent driver is not affiliated with, endorsed by or sponsored by Schneider Electric or Crestron." },
-      { "kind": "paragraph", "text": "Crestron SDK libraries are subject to Crestron's separate SDK license agreement. Certain Crestron products contain open source software; see www.crestron.com/opensource. Required third-party notices for the merged package must accompany the final submission build." }
+      { "kind": "paragraph", "text": "The submission package includes THIRD-PARTY-NOTICES.txt with the driver license and the original license and copyright notices for its merged dependencies. These include WiserHeatAPIv2, Newtonsoft.Json, YamlDotNet and libyaml, Apache log4net, Hafner compatibility libraries and Microsoft compatibility libraries. Their respective terms remain applicable." },
+      { "kind": "paragraph", "text": "Crestron SDK libraries are subject to Crestron's separate SDK license agreement. Certain Crestron products contain open source software; see www.crestron.com/opensource. Final package verification must confirm the reviewed notice file accompanies this help document." }
     ]
   }
 }

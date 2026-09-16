@@ -91,12 +91,14 @@ Licensed under the MIT License with Commons Clause. See LICENSE in the repositor
   <PropertyGroup Condition="'$(CrestronSubmission)' == 'true' And '$(BuildForTests)' != 'true' And '$(DesignTimeBuild)' != 'true'">
     <AssemblyName>NeilColvin_Thermostat_WiserHeat_IP_V2</AssemblyName>
     <SubmissionHelpContent>$(MSBuildProjectDirectory)/../submission/help-content.json</SubmissionHelpContent>
+    <SubmissionDependencyNotices>$(MSBuildProjectDirectory)/../submission/dependency-notices.json</SubmissionDependencyNotices>
     <SubmissionDeveloperToken>NeilColvin</SubmissionDeveloperToken>
     <SubmissionSupportWebsite>https://github.com/oznetmaster/WiserHeatCrestronDriver</SubmissionSupportWebsite>
   </PropertyGroup>
   <Import Project="$(SubmissionToolsDirectory)/CrestronSubmissionHelp.targets" Condition="'$(CrestronSubmission)' == 'true' And Exists('$(SubmissionToolsDirectory)/CrestronSubmissionHelp.targets')" />
   <Target Name="ValidateCrestronSubmission" Condition="'$(CrestronSubmission)' == 'true' And '$(BuildForTests)' != 'true' And '$(DesignTimeBuild)' != 'true'">
     <Error Condition="'$(SubmissionHelpTargetsImported)' != 'true'" Text="Set SubmissionToolsDirectory to the pinned CrestronHomeDevTools tools/submission directory." />
+    <Error Condition="'$(SubmissionDependencyNoticesSupported)' != 'true'" Text="The selected submission tooling must support reviewed dependency notices; use the pinned current tooling source." />
     <CallTarget Targets="ValidateSubmissionHelpSettings" />
   </Target>
 
