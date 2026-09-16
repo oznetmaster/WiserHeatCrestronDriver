@@ -152,7 +152,7 @@ Free to use and modify. You may not sell the Software as a standalone product or
 
 ## Automated tests
 
-The opt-in [Android gateway UI project](WiserHeatCrestronDriver.AndroidTests/README.md) compares the real Hot Water and Away controls with fresh processor state and restores the Home screen. It uses the Crestron Home NUnit UI automation library included in the test adapter package and runs only when selected by a private processor workflow. These read-only checks do not complete the Crestron submission test plan. Use test adapter 1.7.0 or later.
+The opt-in [Android gateway UI project](WiserHeatCrestronDriver.AndroidTests/README.md) compares the real Hot Water and Away controls with fresh processor state and restores the Home screen. It uses TestAdapter 1.7.1 and DevTools 1.5.0, and runs only when selected by a private processor workflow. A separate private `AllowNameBinding` option temporarily renames the gateway to associate its app tile with the installed instance, then restores the name. Heating and Away commands are never sent. These checks do not complete the Crestron submission test plan.
 
 The solution includes `WiserHeatCrestronDriver.Tests` (NUnit 4 with the Visual Studio NUnit adapter) and `WiserHeatCrestronDriver.ProcessorTests` (a standalone Crestron Home Utility test package). The 29 offline tests exercise driver logic without credentials or real device commands. The 18 processor lifecycle cases are excluded on Windows in this project; the dedicated desktop SDK harness exercises the same fixture sources.
 

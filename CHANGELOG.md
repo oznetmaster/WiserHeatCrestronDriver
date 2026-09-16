@@ -2,6 +2,7 @@
 
 ## Android UI test development - 2026-09-16 (no driver release)
 
+- Optional private name binding temporarily renames the gateway, observes the corresponding app tile and restores the name. Uses DevTools 1.5.0 and TestAdapter 1.7.1; both cases passed in the minimized Google emulator with the original inventory and observed states preserved. No physical control commands or new driver release.
 - Add an opt-in NUnit project that opens the gateway page twice, checks the Hot Water and Away status/action/enabled state against fresh management data, verifies unchanged gateway state and returns to Home.
 - Keep settings and captures private. Ordinary desktop runs skip without connecting; hosted CI verifies this behavior. Include the project in the solution and consume the Crestron Home NUnit UI automation library from the test adapter package, eliminating the source-checkout dependency. Use test adapter 1.7.0 from NuGet. The complete packaged development workflow passed; submission evidence acceptance remains separate work.
 
