@@ -18,10 +18,10 @@ public static class ScheduleObservation
 		if (room.GetProperty ("CurrentSetPoint").GetInt32 () is < 55 or > 300)
 			throw new InvalidDataException ("The room must have a normal heating setpoint.");
 		// Some hubs create ManualSetPoint on the first mode change and cannot remove it again.
-		// Refuse before control unless its original value exists and is safe to restore unchanged.
+		// Existing manual and scheduled targets are independent; either may be higher.
 		if (!room.TryGetProperty ("ManualSetPoint", out var manual) || !manual.TryGetInt32 (out var setpoint)
-			|| setpoint < 50 || setpoint > room.GetProperty ("CurrentSetPoint").GetInt32 ())
-			throw new InvalidDataException ("An existing manual setpoint no higher than the current setpoint is required.");
+			|| setpoint < 50 || setpoint > 300)
+			throw new InvalidDataException ("An existing manual setpoint between 5 and 30 degrees Celsius is required.");
 		}
 	public static bool Read (JsonElement original, JsonElement room)
 		{

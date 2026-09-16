@@ -6,6 +6,8 @@ A room case opens each explicitly bound thermostat, verifies its Schedule action
 
 Ordinary desktop test runs skip these cases without connecting to Android or a processor. They are separate from the processor test package and must run on the Android worker while the processor workflow owns both reservations.
 
+The separately selected [Android control project](../WiserHeatCrestronDriver.AndroidControlTests/README.md) adds an independently observed and restored schedule-mode cycle. Choosing this inspection project does not enable it.
+
 ## UI automation dependency
 
 The project uses the Android assembly included in `CrestronHomeNUnit.TestAdapter` 1.8.0 and the name-challenge API in `CrestronHomeDevTools` 1.5.0. It is included in the driver solution. The adapter supports portrait screens where the saved local-port field needs scrolling. No second source checkout is required. Hosted CI builds the project and verifies that all cases skip without a hardware context.

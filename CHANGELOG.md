@@ -2,6 +2,7 @@
 
 ## Submission candidate development - 2026-09-16 (not included in 1.3.7)
 
+- Add a separate opt-in Android control project for an independently observed Auto/Manual/Auto schedule cycle, with durable intents and bounded restoration. Offline failure-path checks pass; live UI control validation remains pending. Existing manual targets below, equal to or above the scheduled target are supported and preserved; absent manual targets require a separate initialization policy. Existing inspection workflows remain read-only.
 - Fix schedule, day and time selection dialogs so their choice lists and selected values are available to the Home app. The complete lists were checked in the minimized Google Android emulator.
 - Shorten the hot-water actions to Turn On and Turn Off, and the shared schedule action to Save All, so their meaning remains visible on portrait screens. Save All applies the selected day's entries to all days of the selected shared schedule.
 - Extend the Wiser Android fixture to inspect the thermostat, Schedule and Edit Schedule pages before checking the full selection lists. Use the published TestAdapter 1.8.0; Wiser page names and expected values remain in this repository.

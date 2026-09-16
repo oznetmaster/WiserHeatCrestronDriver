@@ -1,5 +1,7 @@
 # Crestron submission help
 
+The [Wiser submission status](ValidationStatus.md) records this driver's pilot, tested pages and remaining acceptance work. Shared tool documentation describes reusable contracts; Wiser-specific fixtures and results belong here.
+
 ## Driver-specific test coverage
 
 [extension-coverage-plan.json](extension-coverage-plan.json) is a draft breakdown of every item in the official Extension self-test form. It covers the gateway Home tile, managed-room thermostats, all declared pages/controls and conditional schedule slots, configuration, restoration, outages, endurance and repeated multi-instance checks. The source [DevTools coverage generator](https://github.com/oznetmaster/CrestronHomeDevTools/blob/main/docs/submission/CoveragePlanning.md) expands it into a draft policy, form mapping and execution contract. It checks the recorded UI/behavior/configuration source hashes and rejects omitted UI targets or official items.

@@ -13,7 +13,7 @@ using NUnit.Framework;
 
 namespace WiserHeatCrestronDriver.AndroidTests;
 
-/// <summary>UI comparisons with an optional restored name challenge. Never sends a heating or away command.</summary>
+/// <summary>Shared UI inspection fixture. Control cases are compiled only by the separate opt-in control project.</summary>
 [TestFixture, NonParallelizable]
 public sealed partial class GatewayUiTests
 	{
@@ -22,7 +22,7 @@ public sealed partial class GatewayUiTests
 	private ConfigurationClient? _processor;
 	private Settings? _settings;
 	private bool _nameRestored = true;
-	private sealed record Settings (string Host, string UserName, string Password, string CertificateSha256)
+	private sealed partial record Settings (string Host, string UserName, string Password, string CertificateSha256)
 		{
 		public RoomBinding[] Rooms { get; init; } = [];
 		public bool AllowNameBinding

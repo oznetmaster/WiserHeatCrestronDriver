@@ -63,8 +63,25 @@ public sealed class ScheduleObservationTests
 	[Test]
 	public void AbsentManualSetpoint_IsRejectedBeforeHubCanCreateIt ()
 		=> Assert.Throws<InvalidDataException> (() => ScheduleObservation.ValidateCapture (Read (Original.Replace ("\"ManualSetPoint\":220,", ""))));
-	[TestCase (225)]
+	[TestCase (301)]
 	[TestCase (0)]
-	public void ManualSetpointThatWouldRaiseHeatOrTurnOffRoom_IsRejected (int value)
+	public void ManualSetpointOutsideHeatingRange_IsRejected (int value)
 		=> Assert.Throws<InvalidDataException> (() => ScheduleObservation.ValidateCapture (Changed ("ManualSetPoint", value.ToString (System.Globalization.CultureInfo.InvariantCulture))));
+	[TestCase (170, 220)]
+	[TestCase (220, 170)]
+	[TestCase (220, 220)]
+	public void DifferentManualAndScheduledTargets_AreObservedAndPreserved (int scheduled, int manual)
+		{
+		var start = JsonNode.Parse (Original)!;
+		start["CurrentSetPoint"] = scheduled;
+		start["ScheduledSetPoint"] = scheduled;
+		start["ManualSetPoint"] = manual;
+		var original = Read (start.ToJsonString ());
+		ScheduleObservation.ValidateCapture (original);
+		start["Mode"] = "Manual";
+		start["SetpointOrigin"] = "FromManualMode";
+		start["CurrentSetPoint"] = manual;
+		Assert.That (ScheduleObservation.Read (original, Read (start.ToJsonString ())), Is.False);
+		Assert.That (ScheduleObservation.Read (original, original), Is.True);
+		}
 	}
