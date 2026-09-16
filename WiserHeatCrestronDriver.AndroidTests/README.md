@@ -6,7 +6,7 @@ Ordinary desktop test runs skip these cases without connecting to Android or a p
 
 ## UI automation dependency
 
-The project uses the Android assembly included in `CrestronHomeNUnit.TestAdapter` 1.7.0 and is included in the driver solution. No second source checkout is required. Hosted CI builds the project and verifies that all cases skip without a hardware context. Restore that version from NuGet before using this project.
+The project uses the Android assembly included in `CrestronHomeNUnit.TestAdapter` 1.7.1 and is included in the driver solution. This patch supports portrait screens where the saved local-port field needs scrolling. No second source checkout is required. Hosted CI builds the project and verifies that all cases skip without a hardware context. Restore that version from NuGet before using this project.
 
 ## Private settings and invocation
 
