@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "title": "Drayton Wiser Heat Gateway Driver Help",
+  "author": "Neil Colvin",
+  "version": "1.3.007.0000",
+  "pending": [
+    "Confirm the minimum supported Crestron Home firmware through validation; MinSdkVersion is not a processor firmware version.",
+    "Record the exact hub model and firmware, processor firmware, and app version for the final candidate's test environment.",
+    "Confirm supported hub part numbers rather than extending the supported-model claim from the Wiser family name.",
+    "Capture and approve screenshots for every declared UI page and selector dialog without private household information.",
+    "Update the document version from the final submission candidate and retain the matching package, DLL and PDF basenames.",
+    "Complete the merged dependency license inventory and include its required notices in the final package."
+  ],
+  "uiPages": [
+    "platform.options",
+    "room.thermostat",
+    "room.schedule",
+    "room.schedule-edit",
+    "room.schedule-picker",
+    "room.day-picker",
+    "room.time-picker"
+  ],
+  "sections": {
+    "driver": [
+      { "kind": "paragraph", "text": "This guide describes Neil Colvin's Crestron Home platform driver for a local Drayton Wiser heating hub. One gateway connects to the hub and exposes its discovered rooms as managed thermostat children. The gateway provides optional whole-house hot water and Away Mode controls." },
+      { "kind": "paragraph", "text": "This review draft describes the current 1.3.7 driver. It is not a completed portal submission or a statement of Crestron certification." }
+    ],
+    "notes": [
+      { "kind": "paragraph", "text": "Set up the heating system and its room schedules in Wiser before adding the driver. Keep a stable local address or resolvable hostname for the hub, and keep its authentication secret private." },
+      { "kind": "paragraph", "text": "Schedules are shared hub objects. Editing an assigned schedule may affect other rooms that use the same schedule. Review the impact shown on the Edit Schedule page before saving. Away Mode applies to the system; individual room and hot water settings can subsequently be overridden." },
+      { "kind": "paragraph", "text": "After a state-changing command, the driver reads the hub's current state before publishing the result. Allow an in-progress command to finish before pressing again. The application should show the observed device state, rather than treating a command request as confirmation." }
+    ],
+    "requirements": [
+      { "kind": "bullet", "text": "A Crestron Home processor and firmware supporting this SDK V2 entity/platform driver. The minimum supported firmware remains a validation item in this draft." },
+      { "kind": "bullet", "text": "A reachable local Drayton Wiser hub with its hub authentication secret and configured heating rooms." },
+      { "kind": "bullet", "text": "Local network connectivity between processor and hub, and a working Crestron Home setup and end-user application." },
+      { "kind": "paragraph", "text": "The driver package contains its required client library code. Dealers do not install the NUnit runner, processor test packages or development tools to use the production driver." }
+    ],
+    "installation": [
+      { "kind": "bullet", "text": "Obtain the installable .pkg release asset. GitHub source ZIP and TAR archives are source code, not installable driver packages. Import the package using your normal Crestron Home driver installation process." },
+      { "kind": "bullet", "text": "Add the Wiser Heat Gateway platform driver in Crestron Home Setup or Configure Pro. Supply the Hub IP Address / Hostname and Hub Secret. Keep the secret out of shared screenshots and support logs." },
+      { "kind": "bullet", "text": "Choose Celsius or Fahrenheit, the room Boost Delta (1 to 10), and Boost Duration Minutes (5 to 1440). The defaults are Celsius, a delta of 2, and 60 minutes." },
+      { "kind": "bullet", "text": "Enable Whole House Hot Water Control only when the hub supports hot water and you want that control exposed. Enable Allow Away Mode if the optional global Away control is required. Both settings default to disabled." },
+      { "kind": "bullet", "text": "Allow the gateway to discover Wiser rooms, then assign its managed thermostat children to the appropriate Crestron Home rooms. Verify each child's identity and current temperature before operating it." },
+      { "kind": "paragraph", "text": "For an update, import the new package, wait for it to become available in the driver catalogue, and update the installed gateway through the configuration application. Importing a package alone does not update an installed instance. This is a V2 entity driver; its update does not require a full processor reboot. Verify room identities, assignments and current state after the update." },
+      { "kind": "paragraph", "text": "The driver has no activation-key purchase step. Its source and use remain subject to the repository's MIT License with Commons Clause; see Licensing and Copyright Information." }
+    ],
+    "experience": [
+      { "kind": "heading2", "text": "Wiser Heat Options" },
+      { "kind": "paragraph", "text": "The gateway tile is shown on the Home screen. Its options page presents Hot Water and Away Mode when those features are enabled. Each control shows its current state and the available action. An unavailable or in-progress action must not be treated as a successful device change." },
+      { "kind": "heading2", "text": "Room thermostat" },
+      { "kind": "paragraph", "text": "Each managed thermostat tile appears in its assigned room. Open it to view current temperature, adjust the heating target, start or stop a boost, or open Schedule. This is a heat-only interface; cooling and automatic heating/cooling changeover are not offered." },
+      { "kind": "heading2", "text": "Schedule" },
+      { "kind": "paragraph", "text": "The Schedule page shows the assigned schedule and whether schedule control is enabled. Select Schedule opens the available schedule choices. Enable and Disable change schedule control, and Edit opens the current shared schedule for editing." },
+      { "kind": "heading2", "text": "Edit Schedule" },
+      { "kind": "paragraph", "text": "Choose a day, then adjust the displayed time and setpoint slots. Day and time selectors open choice dialogs. Save Day writes the selected day. Save All Days applies that day's entries to all days. Cancel returns without saving the current edits. The page shows the schedule's shared impact and validation errors." },
+      { "kind": "paragraph", "text": "The approved screenshots for these pages and their schedule, day and time selector dialogs are still required. No household screenshots are included in this draft." }
+    ],
+    "limitations": [
+      { "kind": "bullet", "text": "Only local Drayton Wiser heating behavior implemented by this driver is covered. Other products with Wiser branding and unvalidated hub variants are not implicitly supported." },
+      { "kind": "bullet", "text": "Hot water controls depend on the hub's capabilities. Room heating controls do not provide cooling." },
+      { "kind": "bullet", "text": "Schedule edits affect a shared hub schedule, not a private copy belonging to one Crestron room." },
+      { "kind": "bullet", "text": "Crestron Home may retain stale child metadata after a driver entity or UI shape change. Check version and configuration first; consult support before removing a child, since its assignments or references may need to be restored." },
+      { "kind": "paragraph", "text": "If the gateway is offline, check hub power, local network reachability, the configured address and the hub secret. Compare the Wiser app's state, then refresh or reconnect the gateway. Include the driver, hub and processor versions when contacting support, but do not send credentials." }
+    ],
+    "features": [
+      { "kind": "bullet", "text": "Local hub connection and discovery of managed room thermostat devices." },
+      { "kind": "bullet", "text": "Current and target temperatures, Celsius/Fahrenheit display, heat-only thermostat control and room boost." },
+      { "kind": "bullet", "text": "Schedule enablement, assignment, selection and shared day editing." },
+      { "kind": "bullet", "text": "Heating and schedule feedback through room tile icons and status." },
+      { "kind": "bullet", "text": "Optional whole-house Hot Water and global Away Mode controls on the gateway's Home tile." }
+    ],
+    "environment": [
+      { "kind": "paragraph", "text": "The release notes record desktop and processor tests plus installed-driver validation for the current release. That history does not establish a completed Crestron self-test for the new submission package. Exact processor, hub and app versions must be recorded with the final candidate's evidence before this section is finalized." }
+    ],
+    "models": [
+      { "kind": "paragraph", "text": "The current driver identifies its base model as Wiser Heat Gateway under manufacturer Drayton Wiser. No additional model part numbers are declared in its manifest. Confirm the exact validated hub models before expanding this list." }
+    ],
+    "contact": [
+      { "kind": "paragraph", "text": "Developer: Neil Colvin\nPublic support: support@marvelous.com\nProject and releases: https://github.com/oznetmaster/WiserHeatCrestronDriver\nIssue tracker: https://github.com/oznetmaster/WiserHeatCrestronDriver/issues" }
+    ],
+    "history": [
+      { "kind": "heading2", "text": "Version 1.3.7" },
+      { "kind": "paragraph", "text": "Guards room schedule selection against overlapping commands and adds diagnostics for installed-driver tests. Normal room control behavior and hub API dependencies are unchanged in that release. This help draft has not yet been included in a released package." }
+    ],
+    "license": [
+      { "kind": "paragraph", "text": "Copyright (c) 2026 Neil Colvin. The driver is licensed under the MIT License with Commons Clause, including the repository's explicit system-integration and commissioning exception. The full license and required notices govern use: https://github.com/oznetmaster/WiserHeatCrestronDriver/blob/master/LICENSE" },
+      { "kind": "paragraph", "text": "Drayton, Wiser and Schneider Electric are trademarks of Schneider Electric SE, its subsidiaries or affiliated companies. Crestron and Crestron Home are trademarks or registered trademarks of Crestron Electronics, Inc. This independent driver is not affiliated with, endorsed by or sponsored by Schneider Electric or Crestron." },
+      { "kind": "paragraph", "text": "Crestron SDK libraries are subject to Crestron's separate SDK license agreement. Certain Crestron products contain open source software; see www.crestron.com/opensource. Required third-party notices for the merged package must accompany the final submission build." }
+    ]
+  }
+}

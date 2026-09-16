@@ -2,6 +2,8 @@
 
 See the [changelog](CHANGELOG.md) for release history and the [release notes](RELEASE-NOTES.md) for the current driver update. Driver releases are made for runtime fixes or dependency changes; adding tests alone does not require a driver release.
 
+The [Crestron submission help source](submission/README.md) is being prepared separately. It is a review draft and is not included in the current release or a completed portal submission.
+
 A **Crestron Home** platform driver that integrates a **Drayton Wiser Heating** hub and exposes discovered rooms as managed child thermostat devices.
 
 Drayton, Wiser, and Schneider Electric are trademarks of Schneider Electric SE, its subsidiaries, or affiliated companies. This project is an independent, unofficial Crestron Home driver and is not affiliated with or endorsed by Schneider Electric or Crestron.
@@ -111,7 +113,7 @@ dotnet build WiserHeatCrestronDriver/WiserHeatCrestronDriver.csproj -c Release
 
 The build pipeline:
 1. Compiles the driver targeting `net472`
-2. Bumps `DriverVersion` and `VersionDate` in `Thermostat_WiserHeat_IP_V2.json`
+2. Reads the manifest version; Debug builds increment its fourth component, while local Release builds preserve it and release CI verifies the selected tag
 3. Merges runtime dependencies into the driver assembly
 4. Patches the merged assembly for Crestron runtime compatibility
 5. Packages everything into `Thermostat_WiserHeat_IP_V2.pkg`
@@ -120,7 +122,7 @@ The build pipeline:
 
 This repository includes a GitHub Actions workflow that builds and attaches the `.pkg` when a GitHub Release is published.
 
-The same release workflow also publishes the `WiserHeatCrestronDriver` NuGet package, which wraps the final `Thermostat_WiserHeat_IP_V2.pkg` artifact.
+The same release workflow also publishes the `CrestronHomeDriver.Wiser.WiserHeat` NuGet package, which wraps the final `Thermostat_WiserHeat_IP_V2.pkg` artifact.
 
 Typical release flow:
 
