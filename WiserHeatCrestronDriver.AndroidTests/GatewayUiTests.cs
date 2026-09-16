@@ -14,7 +14,7 @@ namespace WiserHeatCrestronDriver.AndroidTests;
 
 /// <summary>UI comparisons with an optional restored name challenge. Never sends a heating or away command.</summary>
 [TestFixture, NonParallelizable]
-public sealed class GatewayUiTests
+public sealed partial class GatewayUiTests
 	{
 	private AndroidWorkflowSession? _session;
 	private CrestronHomeNavigation? _navigation;
@@ -23,6 +23,7 @@ public sealed class GatewayUiTests
 	private bool _nameRestored = true;
 	private sealed record Settings (string Host, string UserName, string Password, string CertificateSha256)
 		{
+		public RoomBinding[] Rooms { get; init; } = [];
 		public bool AllowNameBinding { get; init; }
 		public string? SshFingerprint { get; init; }
 		}
@@ -81,7 +82,7 @@ public sealed class GatewayUiTests
 	[TestCase (1), TestCase (2)]
 	public async Task GatewayControlsMatchFreshProcessorStateAndReturnHome (int repetition)
 		{
-		Assert.That (_nameRestored, Is.True, "An earlier name challenge needs reconciliation before further UI tests.");
+		Assert.That (_nameRestored && _roomStatePreserved, Is.True, "An earlier name challenge needs reconciliation before further UI tests.");
 		using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (5));
 		var before = await ReadGatewayAsync (timeout.Token);
 		string check = $"wiser.gateway-{repetition}";
@@ -182,7 +183,7 @@ public sealed class GatewayUiTests
 				{
 				using var cleanup = new CancellationTokenSource (TimeSpan.FromMinutes (2));
 				await _navigation!.RestoreHomeAsync (cleanup.Token);
-					restored = _navigation.HomeRestored && _nameRestored;
+					restored = _navigation.HomeRestored && _nameRestored && _roomStatePreserved;
 				}
 			finally { _session.Complete (restorationConfirmed: restored); }
 			}

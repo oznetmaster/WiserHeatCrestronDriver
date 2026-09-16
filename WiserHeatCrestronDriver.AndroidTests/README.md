@@ -1,12 +1,14 @@
-# Android gateway UI tests
+# Android gateway and room UI tests
 
 This opt-in NUnit project compares the real Crestron Home Android gateway page with fresh configuration-management state. It opens the uniquely named gateway tile, checks the Hot Water and Away Mode status, action caption and enabled state, and closes the page. Two consecutive cases exercise repeatability. No heating, away or room-assignment commands are sent. An additional private opt-in can temporarily rename the gateway to associate the observed app tile with the installed instance, then restore its original name.
+
+A room case opens each explicitly bound thermostat and checks every schedule, day and half-hour time choice against expected state. It does not select a different value or save a schedule. It cancels the editor, returns Home and verifies that the room identity, assignment, target, boost and schedule state stayed unchanged.
 
 Ordinary desktop test runs skip these cases without connecting to Android or a processor. They are separate from the processor test package and must run on the Android worker while the processor workflow owns both reservations.
 
 ## UI automation dependency
 
-The project uses the Android assembly included in `CrestronHomeNUnit.TestAdapter` 1.7.1 and the name-challenge API in `CrestronHomeDevTools` 1.5.0. It is included in the driver solution. The adapter supports portrait screens where the saved local-port field needs scrolling. No second source checkout is required. Hosted CI builds the project and verifies that all cases skip without a hardware context.
+The project uses the Android assembly included in `CrestronHomeNUnit.TestAdapter` 1.8.0 and the name-challenge API in `CrestronHomeDevTools` 1.5.0. It is included in the driver solution. The adapter supports portrait screens where the saved local-port field needs scrolling. No second source checkout is required. Hosted CI builds the project and verifies that all cases skip without a hardware context.
 
 ## Private settings and invocation
 
@@ -20,9 +22,14 @@ Set `CRESTRON_HOME_WISER_UI_SETTINGS` to an absolute path outside the repository
   "UserName": "YOUR_PROCESSOR_USER",
   "Password": "YOUR_PROCESSOR_PASSWORD",
   "CertificateSha256": "YOUR_VERIFIED_PROCESSOR_CERTIFICATE_SHA256",
-  "AllowNameBinding": false
+  "AllowNameBinding": false,
+  "Rooms": [
+    { "DeviceId": 1234, "RoomName": "Test Room", "PageTitle": "Test Room" }
+  ]
 }
 ```
+
+Replace the example room ID with an installed Wiser thermostat child's ID. `RoomName` is its assigned Crestron Home room; `PageTitle` is the heading shown when opening that thermostat. The device must be a loaded, online child of the workflow's gateway, assigned to the uniquely named room, with a unique tile name in that room. At least one explicit binding is required; no thermostat is chosen automatically. Additional bindings are inspected in turn. These are local household settings, so keep them outside the repository.
 
 The processor address must match the workflow context. Its gateway must be online, loaded, have the expected version and have a unique name in the management inventory. Both Hot Water and Away capabilities must be visible for this initial fixture. It currently checks the English captions. Unavailable capabilities and other languages require additional fixtures.
 
@@ -30,13 +37,13 @@ To enable instance association on a development processor, set `AllowNameBinding
 
 Add this project as `androidTests.project` in the existing private [processor workflow](../WiserHeatCrestronDriver.WorkflowTests/README.md), with `androidTests.profilePath` pointing to your private Android profile. Keep the actual-driver target and required local/processor suites in that plan. Run the workflow through Test Explorer or the CLI; do not add this project to `localTests`, because it belongs after the actual-driver update. Export the private settings environment variable in the worker process before starting that workflow. The coordinator suppresses Android context during discovery and supplies it only during execution.
 
-Keep credentials, contexts, test reports and captures outside the repository and public release assets. The tests save only selected gateway UI properties, screenshots and masked UI hierarchies in the private evidence directory.
+Keep credentials, contexts, test reports and captures outside the repository and public release assets. The tests save only selected gateway/room UI properties, restoration records, screenshots and masked UI hierarchies in the private evidence directory.
 
 ## What these results prove
 
 The assertions compare real UI rows with the selected management device and verify Home restoration. Repeated Android resource IDs are resolved within each labelled control row, so the Hot Water assertion cannot accidentally read the Away button.
 
-A matching saved Home endpoint and familiar tile name are not proof of the application's active network route. The optional fresh name challenge provides stronger association with the management instance. It is not cryptographic route or package attestation. This project does not authorize physical controls, validate the Office/second-room isolation cases, prove all submission requirements or produce a signed/approved submission. The management snapshot and challenge records are diagnostic evidence; they are not yet bound into the submission producer contract.
+A matching saved Home endpoint and familiar tile name are not proof of the application's active network route. The optional fresh name challenge provides stronger association with the management instance. It is not cryptographic route or package attestation. The room case validates the configured child identity, visible option lists and checked state preservation. It does not test physical heating changes, writes to shared schedules, or isolation between two rooms. This project does not prove all submission requirements or produce a signed/approved submission. The management snapshot and challenge records are diagnostic evidence; they are not yet bound into the submission producer contract.
 
 ## Development validation
 
@@ -44,4 +51,6 @@ On 16 September 2026, the complete Debug workflow passed local tests, processor 
 
 Both gateway cases also passed separately under the Windows GitHub runner service account against an already-running Google emulator. This verifies service access and fixture execution; it does not establish emulator startup after logout/reboot or a complete deployment workflow running as a service.
 
-These results are development checks, not an exact Release-candidate submission or certification. Room-page inspection and physical-control/restoration coverage remain separate from this gateway fixture.
+These historical results are development checks, not an exact Release-candidate submission or certification. The new room case adds read-only page and selector coverage; physical-control/restoration and cross-room isolation remain separate requirements.
+
+The expanded fixture subsequently passed every discovered case against the local stable TestAdapter 1.8.0 candidate: both gateway association checks and the configured room's complete schedule/day/time selector check. All 27 accepted capture pairs matched their retained hashes. Gateway names, room control settings, installed-device identities and Home were preserved, and both reservations were released. This run used the already-installed Debug driver; it did not repeat deployment or establish an exact Release-candidate submission. The fixture also compiled and skipped every case in an ordinary offline test run.
