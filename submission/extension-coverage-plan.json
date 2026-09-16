@@ -1,0 +1,1457 @@
+{
+  "schemaVersion": 1,
+  "status": "draft",
+  "inventorySha256": "3fd0821d27e35e79692e46f3eb23103f90cb698bb0f26f87cdc4637e75eece54",
+  "sourceHashMode": "line-endings-lf",
+  "driver": "Wiser Heat Gateway and managed room thermostats",
+  "sources": [
+    {
+      "path": "WiserHeatCrestronDriver/IncludeInPkg/UiDefinitions/UiDefinition.xml",
+      "sha256": "2515e7a0e8373d923731f897eb87e8cc1a4114ac8c2af495a407ca972795c4c0",
+      "surface": "platform"
+    },
+    {
+      "path": "WiserHeatCrestronDriver/IncludeInPkg/room/uidefinitions/UiDefinition.xml",
+      "sha256": "61251602b4bce8aa67b2fed1acd832f3338cc3d1e64a839a55920e4ef22684e1",
+      "surface": "room"
+    },
+    {
+      "path": "WiserHeatCrestronDriver/CommandActivity.cs",
+      "sha256": "f2012a6e867aef39f743c21ac4f88da4f049109d2544e50a317251b293859c14",
+      "surface": null
+    },
+    {
+      "path": "WiserHeatCrestronDriver/crestron-driver-package.json",
+      "sha256": "a98543bcdd8e71234258cb67e1c8b2cc1478070ec5aeea6dbdba3c851e5658c8",
+      "surface": null
+    },
+    {
+      "path": "WiserHeatCrestronDriver/IncludeInPkg/Translations/en-US.json",
+      "sha256": "81b87faae12a1474cb9f7f11838ffd25090345b4921e6ab382abd53b7789f1d3",
+      "surface": null
+    },
+    {
+      "path": "WiserHeatCrestronDriver/TestAssemblyAccess.cs",
+      "sha256": "5ae48b3443bd58830be3329fd538a0a7af8f320fe059823549832a63b5f48053",
+      "surface": null
+    },
+    {
+      "path": "WiserHeatCrestronDriver/Thermostat_WiserHeat_IP_V2.json",
+      "sha256": "a0a3196fbd387e5da065bbd45bafce467666f93962d2d1f892a155f5826207ff",
+      "surface": null
+    },
+    {
+      "path": "WiserHeatCrestronDriver/WiserDriverEntryPoint.cs",
+      "sha256": "ab6869e3fc323f2d4a051b8e59d8db737c24d43273b40ad0694d0812ef7d0c74",
+      "surface": null
+    },
+    {
+      "path": "WiserHeatCrestronDriver/WiserPlatformDriver.cs",
+      "sha256": "ff695340fec4c9114facc3515a0ebd9883241b61143fe297536f6f725c6c9ed6",
+      "surface": null
+    },
+    {
+      "path": "WiserHeatCrestronDriver/WiserRoomEntity.cs",
+      "sha256": "ccba4b0a0ee5b426945937081c3311b044b4527d38c59ea6d347e0c59a152fef",
+      "surface": null
+    },
+    {
+      "path": "WiserHeatCrestronDriver/WiserWorkQueue.cs",
+      "sha256": "0aa95284cc68adaa2d06e869209464c817cce71ecf7559d5a683de620914585d",
+      "surface": null
+    }
+  ],
+  "requirements": [
+    {
+      "id": "extension.configuration.01",
+      "checks": [
+        {
+          "id": "category",
+          "targets": [
+            "$catalogue"
+          ],
+          "method": "configuration",
+          "expectation": "Verify category in the refreshed Configure/Setup catalogue against the final candidate and approved supported-model inventory; retain the visible hierarchy and package identity.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "manufacturer",
+          "targets": [
+            "$catalogue"
+          ],
+          "method": "configuration",
+          "expectation": "Verify manufacturer in the refreshed Configure/Setup catalogue against the final candidate and approved supported-model inventory; retain the visible hierarchy and package identity.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "supported-models",
+          "targets": [
+            "$catalogue"
+          ],
+          "method": "configuration",
+          "expectation": "Verify supported-models in the refreshed Configure/Setup catalogue against the final candidate and approved supported-model inventory; retain the visible hierarchy and package identity.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        }
+      ]
+    },
+    {
+      "id": "extension.configuration.02",
+      "checks": [
+        {
+          "id": "connection-fields",
+          "targets": [
+            "$config.hub-host",
+            "$config.hub-secret"
+          ],
+          "method": "configuration",
+          "expectation": "During initial room addition verify the displayed connection field, label, input type and required validation. Secret content remains masked and excluded from public evidence.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        }
+      ]
+    },
+    {
+      "id": "extension.configuration.03",
+      "checks": [
+        {
+          "id": "attribute-dialog",
+          "targets": [
+            "$config.away-mode",
+            "$config.boost-delta",
+            "$config.boost-minutes",
+            "$config.hot-water",
+            "$config.temperature-units"
+          ],
+          "method": "configuration",
+          "expectation": "Inspect the appropriate installation step, description, defaults, permitted values/range and error feedback; exercise each supported option, then restore the initial setting.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.configuration.04",
+      "checks": [
+        {
+          "id": "installed-identity",
+          "targets": [
+            "$gateway",
+            "$managed-rooms"
+          ],
+          "method": "combined",
+          "expectation": "Verify successful installation, exact candidate GUID/version, selected room assignment and stable managed-child identities against the configuration API and app.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        }
+      ]
+    },
+    {
+      "id": "extension.configuration.05",
+      "checks": [
+        {
+          "id": "persistent-value",
+          "targets": [
+            "$config.away-mode",
+            "$config.boost-delta",
+            "$config.boost-minutes",
+            "$config.hot-water",
+            "$config.hub-host",
+            "$config.hub-secret",
+            "$config.temperature-units"
+          ],
+          "method": "configuration",
+          "expectation": "Reopen Installer settings after connection and reload; confirm the previously supplied value, using private masked comparison for secrets.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "change-and-reconnect",
+          "targets": [
+            "$config.away-mode",
+            "$config.boost-delta",
+            "$config.boost-minutes",
+            "$config.hot-water",
+            "$config.hub-host",
+            "$config.hub-secret",
+            "$config.temperature-units"
+          ],
+          "method": "combined",
+          "expectation": "On the isolated test hub, change the setting, observe reconnection and correct independent hub/device state, restore the original setting and verify recovery. Do not rotate credentials or global settings on another installed driver.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.views.01",
+      "checks": [
+        {
+          "id": "home-presence",
+          "targets": [
+            "platform/tile"
+          ],
+          "method": "android",
+          "expectation": "Gateway appears on Home for the pinned installed instance, including hot-water/Away enabled and disabled variants.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "room-absence",
+          "targets": [
+            "platform/tile"
+          ],
+          "method": "android",
+          "expectation": "Gateway is absent from room pages for the pinned installed instance, including hot-water/Away enabled and disabled variants.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "icon",
+          "targets": [
+            "platform/tile"
+          ],
+          "method": "android",
+          "expectation": "Expected gateway icon renders correctly for the pinned installed instance, including hot-water/Away enabled and disabled variants.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "title",
+          "targets": [
+            "platform/tile"
+          ],
+          "method": "android",
+          "expectation": "Expected gateway title renders correctly for the pinned installed instance, including hot-water/Away enabled and disabled variants.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "arrow",
+          "targets": [
+            "platform/tile"
+          ],
+          "method": "android",
+          "expectation": "Navigation arrow is displayed for the pinned installed instance, including hot-water/Away enabled and disabled variants.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "navigation",
+          "targets": [
+            "platform/tile"
+          ],
+          "method": "android",
+          "expectation": "Tile and arrow open the gateway controls for the pinned installed instance, including hot-water/Away enabled and disabled variants.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.views.02",
+      "checks": [
+        {
+          "id": "room-presence",
+          "targets": [
+            "room/tile"
+          ],
+          "method": "android",
+          "expectation": "Each managed thermostat appears only in its assigned room. Bind each visible tile to its exact managed device ID and check all configured rooms.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "home-absence",
+          "targets": [
+            "room/tile"
+          ],
+          "method": "android",
+          "expectation": "Managed thermostat is absent from Home. Bind each visible tile to its exact managed device ID and check all configured rooms.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "icon-title",
+          "targets": [
+            "room/tile"
+          ],
+          "method": "android",
+          "expectation": "Thermostat icon and room-specific title render correctly. Bind each visible tile to its exact managed device ID and check all configured rooms.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "affordance",
+          "targets": [
+            "room/tile"
+          ],
+          "method": "android",
+          "expectation": "Tile affordance matches its navigation-only behavior; reconcile with the conditional default-action rule. Bind each visible tile to its exact managed device ID and check all configured rooms.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        }
+      ]
+    },
+    {
+      "id": "extension.views.03",
+      "checks": [
+        {
+          "id": "navigation-only",
+          "targets": [
+            "platform/tile",
+            "room/tile"
+          ],
+          "method": "combined",
+          "expectation": "Verify there is no physical default action: pressing different tile areas opens the correct controls with no device change. Check navigation-only icon/ellipsis behavior; restore the originating page.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.views.04",
+      "checks": [
+        {
+          "id": "return-to-origin",
+          "targets": [
+            "platform/layout/MainPage",
+            "room/layout/EditSchedulePage",
+            "room/layout/MainPage",
+            "room/layout/SchedulePage"
+          ],
+          "method": "combined",
+          "expectation": "Open this page from each supported entry point; close/back returns to the correct Home/room or parent page without sending a device command or saving uncommitted edits.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.views.05",
+      "checks": [
+        {
+          "id": "observed-tile-feedback",
+          "targets": [
+            "platform/tile",
+            "room/tile"
+          ],
+          "method": "combined",
+          "expectation": "Cause each supported state change independently on the test hub; compare gateway/thermostat tile status and icon with the observed device state. Record response latency against an explicitly reviewed prompt-feedback budget and restore state.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.views.06",
+      "checks": [
+        {
+          "id": "offline-indication",
+          "targets": [
+            "platform/tile",
+            "room/tile"
+          ],
+          "method": "outage",
+          "expectation": "Physically remove the isolated hub connection/power, timestamp that event, and verify every affected tile reports offline within 15 seconds. Preserve captures and independent disconnection timing.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": 15,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.views.07",
+      "checks": [
+        {
+          "id": "online-recovery",
+          "targets": [
+            "platform/tile",
+            "room/tile"
+          ],
+          "method": "outage",
+          "expectation": "Restore the isolated hub connection; timestamp first independently observed communication and the tile recovery. Verify valid current state and recovery latency against the reviewed prompt-feedback budget.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.01",
+      "checks": [
+        {
+          "id": "visible-inventory",
+          "targets": [
+            "platform/MainPage/AwayModeButton",
+            "platform/MainPage/HotWaterButton",
+            "platform/layout/MainPage",
+            "platform/tile",
+            "room/EditSchedulePage/CancelEditScheduleBtn",
+            "room/EditSchedulePage/EditScheduleDaySelector",
+            "room/EditSchedulePage/EditScheduleSummary",
+            "room/EditSchedulePage/EditSlot10Temperature",
+            "room/EditSchedulePage/EditSlot10Time",
+            "room/EditSchedulePage/EditSlot1Temperature",
+            "room/EditSchedulePage/EditSlot1Time",
+            "room/EditSchedulePage/EditSlot2Temperature",
+            "room/EditSchedulePage/EditSlot2Time",
+            "room/EditSchedulePage/EditSlot3Temperature",
+            "room/EditSchedulePage/EditSlot3Time",
+            "room/EditSchedulePage/EditSlot4Temperature",
+            "room/EditSchedulePage/EditSlot4Time",
+            "room/EditSchedulePage/EditSlot5Temperature",
+            "room/EditSchedulePage/EditSlot5Time",
+            "room/EditSchedulePage/EditSlot6Temperature",
+            "room/EditSchedulePage/EditSlot6Time",
+            "room/EditSchedulePage/EditSlot7Temperature",
+            "room/EditSchedulePage/EditSlot7Time",
+            "room/EditSchedulePage/EditSlot8Temperature",
+            "room/EditSchedulePage/EditSlot8Time",
+            "room/EditSchedulePage/EditSlot9Temperature",
+            "room/EditSchedulePage/EditSlot9Time",
+            "room/EditSchedulePage/SaveEditScheduleAllDaysBtn",
+            "room/EditSchedulePage/SaveEditScheduleDayBtn",
+            "room/EditSchedulePage/buttongroup-1",
+            "room/MainPage/BoostButton",
+            "room/MainPage/RoomThermostat",
+            "room/MainPage/ScheduleButton",
+            "room/SchedulePage/DisableScheduleButton",
+            "room/SchedulePage/EditScheduleBtn",
+            "room/SchedulePage/EnableScheduleButton",
+            "room/SchedulePage/ScheduleSelector",
+            "room/SchedulePage/ScheduleSummaryDisplay",
+            "room/SchedulePage/buttongroup-1",
+            "room/layout/EditSchedulePage",
+            "room/layout/MainPage",
+            "room/layout/SchedulePage",
+            "room/tile"
+          ],
+          "method": "android",
+          "expectation": "Compare the final candidate definition/localization with this rendered target. Exercise all visibility/enabled variants, error states and conditional schedule slots. Record the complete observed inventory; source parsing alone is insufficient.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.02",
+      "checks": [
+        {
+          "id": "confirm-absence",
+          "targets": [
+            "$segmented-sliders"
+          ],
+          "method": "absence",
+          "expectation": "Inspect the final candidate definitions and all runtime/configuration variants. Record NotApplicable with retained absence evidence only if no segmented-sliders exist. A framework-generated control or new definition invalidates this absence proposal.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.03",
+      "checks": [
+        {
+          "id": "toggle-feedback",
+          "targets": [
+            "platform/MainPage/AwayModeButton",
+            "platform/MainPage/HotWaterButton",
+            "room/MainPage/BoostButton",
+            "room/SchedulePage/DisableScheduleButton",
+            "room/SchedulePage/EnableScheduleButton"
+          ],
+          "method": "combined",
+          "expectation": "Check name/status, operate both transitions repeatedly and rapidly, observe independent device state after each accepted action, and verify UI/device agreement. Busy disabling must not leave stale state; restore the full initial state.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.04",
+      "checks": [
+        {
+          "id": "status-button",
+          "targets": [
+            "platform/MainPage/AwayModeButton",
+            "platform/MainPage/HotWaterButton",
+            "room/MainPage/BoostButton",
+            "room/MainPage/ScheduleButton",
+            "room/SchedulePage/DisableScheduleButton",
+            "room/SchedulePage/EnableScheduleButton"
+          ],
+          "method": "combined",
+          "expectation": "Verify label, status and repeated intended response. Exercise each defined busy/disabled/error condition for its full duration and recovery; compare device feedback. For undeclared alert behavior record explicit absence evidence rather than inventing an alert.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.05",
+      "checks": [
+        {
+          "id": "confirm-absence",
+          "targets": [
+            "$toggle-sliders"
+          ],
+          "method": "absence",
+          "expectation": "Inspect the final candidate definitions and all runtime/configuration variants. Record NotApplicable with retained absence evidence only if no toggle-sliders exist. A framework-generated control or new definition invalidates this absence proposal.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.06",
+      "checks": [
+        {
+          "id": "native-thermostat-gauge",
+          "targets": [
+            "room/MainPage/RoomThermostat"
+          ],
+          "method": "combined",
+          "expectation": "Inspect the framework-rendered thermostat gauge, defined labels and supported bounds; independently vary reported temperature and verify display/feedback. Do not exempt native-rendered gauges solely because the XML tag is thermostat.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.07",
+      "checks": [
+        {
+          "id": "button-action",
+          "targets": [
+            "platform/MainPage/AwayModeButton",
+            "platform/MainPage/HotWaterButton",
+            "room/EditSchedulePage/CancelEditScheduleBtn",
+            "room/EditSchedulePage/SaveEditScheduleAllDaysBtn",
+            "room/EditSchedulePage/SaveEditScheduleDayBtn",
+            "room/MainPage/BoostButton",
+            "room/MainPage/ScheduleButton",
+            "room/SchedulePage/DisableScheduleButton",
+            "room/SchedulePage/EditScheduleBtn",
+            "room/SchedulePage/EnableScheduleButton"
+          ],
+          "method": "combined",
+          "expectation": "Verify label/icon and repeated operation of this button, with independent command/state evidence and measured feedback. Save Day and Save All Days must use isolated schedules; verify intended scope and restore all affected shared schedules/rooms.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.08",
+      "checks": [
+        {
+          "id": "button-group",
+          "targets": [
+            "room/EditSchedulePage/buttongroup-1",
+            "room/SchedulePage/buttongroup-1"
+          ],
+          "method": "android",
+          "expectation": "Capture grouping, order and spacing in every visibility variant; all members must remain visually grouped and usable.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.09",
+      "checks": [
+        {
+          "id": "selector-choices",
+          "targets": [
+            "room/EditSchedulePage/EditScheduleDaySelector",
+            "room/EditSchedulePage/EditSlot10Time",
+            "room/EditSchedulePage/EditSlot1Time",
+            "room/EditSchedulePage/EditSlot2Time",
+            "room/EditSchedulePage/EditSlot3Time",
+            "room/EditSchedulePage/EditSlot4Time",
+            "room/EditSchedulePage/EditSlot5Time",
+            "room/EditSchedulePage/EditSlot6Time",
+            "room/EditSchedulePage/EditSlot7Time",
+            "room/EditSchedulePage/EditSlot8Time",
+            "room/EditSchedulePage/EditSlot9Time",
+            "room/SchedulePage/ScheduleSelector"
+          ],
+          "method": "combined",
+          "expectation": "Verify labels and every supported choice. Capture the complete choice inventory and each selection result. Day/time changes affect the editor until save; schedule selection changes the assignment. Verify those intended semantics and restore original editor/hub state.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.10",
+      "checks": [
+        {
+          "id": "confirm-absence",
+          "targets": [
+            "$button-lists"
+          ],
+          "method": "absence",
+          "expectation": "Inspect the final candidate definitions and all runtime/configuration variants. Record NotApplicable with retained absence evidence only if no button-lists exist. A framework-generated control or new definition invalidates this absence proposal.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.11",
+      "checks": [
+        {
+          "id": "confirm-absence",
+          "targets": [
+            "$navigation-pads"
+          ],
+          "method": "absence",
+          "expectation": "Inspect the final candidate definitions and all runtime/configuration variants. Record NotApplicable with retained absence evidence only if no navigation-pads exist. A framework-generated control or new definition invalidates this absence proposal.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.12",
+      "checks": [
+        {
+          "id": "confirm-absence",
+          "targets": [
+            "$driver-keypads"
+          ],
+          "method": "absence",
+          "expectation": "Inspect the final candidate definitions and all runtime/configuration variants. Record NotApplicable with retained absence evidence only if no driver-keypads exist. A framework-generated control or new definition invalidates this absence proposal.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.13",
+      "checks": [
+        {
+          "id": "modes",
+          "targets": [
+            "room/MainPage/RoomThermostat"
+          ],
+          "method": "combined",
+          "expectation": "Exercise every actually supported thermostat mode and its UI state; verify unsupported cool/auto controls are absent and explicitly document whether off is offered. Use the isolated room and retain measured response timings.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "setpoint-bounds",
+          "targets": [
+            "room/MainPage/RoomThermostat"
+          ],
+          "method": "combined",
+          "expectation": "Set heat target to supported minimum and maximum through the actual UI; verify independent device state and restore target/mode. Use the isolated room and retain measured response timings.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "temperature-feedback",
+          "targets": [
+            "room/MainPage/RoomThermostat"
+          ],
+          "method": "combined",
+          "expectation": "Compare current temperature and gauge with an independent hub read before/after reported temperature changes. Use the isolated room and retain measured response timings.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "units",
+          "targets": [
+            "room/MainPage/RoomThermostat"
+          ],
+          "method": "combined",
+          "expectation": "Repeat temperatures, labels and setpoint bounds in Celsius and Fahrenheit; verify conversions against the same physical value and restore configured units. Use the isolated room and retain measured response timings.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "schedule-setpoint-adjusters",
+          "targets": [
+            "room/EditSchedulePage/EditSlot10Temperature",
+            "room/EditSchedulePage/EditSlot1Temperature",
+            "room/EditSchedulePage/EditSlot2Temperature",
+            "room/EditSchedulePage/EditSlot3Temperature",
+            "room/EditSchedulePage/EditSlot4Temperature",
+            "room/EditSchedulePage/EditSlot5Temperature",
+            "room/EditSchedulePage/EditSlot6Temperature",
+            "room/EditSchedulePage/EditSlot7Temperature",
+            "room/EditSchedulePage/EditSlot8Temperature",
+            "room/EditSchedulePage/EditSlot9Temperature"
+          ],
+          "method": "combined",
+          "expectation": "Exercise lower/raise through min/max and error bounds in every visible slot. Validate formatting and units; changes remain uncommitted until save. Restore editor and shared schedule state.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.14",
+      "checks": [
+        {
+          "id": "configuration-text-input",
+          "targets": [
+            "$config.boost-delta",
+            "$config.boost-minutes",
+            "$config.hub-host",
+            "$config.hub-secret"
+          ],
+          "method": "configuration",
+          "expectation": "Inspect configuration label/hint/guidance, keyboard type, numeric ranges and all declared error messages. Any field declared obscured must mask its value; independently redact known private values from retained evidence even if the driver does not mark them masked. Invalid input must not produce a connection/device command; restore valid values.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.15",
+      "checks": [
+        {
+          "id": "configuration-boolean",
+          "targets": [
+            "$config.away-mode",
+            "$config.hot-water"
+          ],
+          "method": "configuration",
+          "expectation": "Inspect labels/descriptions and both boolean transitions in setup; record the actual framework control type. Verify resulting feature visibility/enabled state and restore initial flags.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.16",
+      "checks": [
+        {
+          "id": "confirm-absence",
+          "targets": [
+            "$driver-confirmation-dialogs"
+          ],
+          "method": "absence",
+          "expectation": "Inspect the final candidate definitions and all runtime/configuration variants. Record NotApplicable with retained absence evidence only if no driver-confirmation-dialogs exist. A framework-generated control or new definition invalidates this absence proposal.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.17",
+      "checks": [
+        {
+          "id": "selector-dialog",
+          "targets": [
+            "room/EditSchedulePage/EditScheduleDaySelector",
+            "room/EditSchedulePage/EditSlot10Time",
+            "room/EditSchedulePage/EditSlot1Time",
+            "room/EditSchedulePage/EditSlot2Time",
+            "room/EditSchedulePage/EditSlot3Time",
+            "room/EditSchedulePage/EditSlot4Time",
+            "room/EditSchedulePage/EditSlot5Time",
+            "room/EditSchedulePage/EditSlot6Time",
+            "room/EditSchedulePage/EditSlot7Time",
+            "room/EditSchedulePage/EditSlot8Time",
+            "room/EditSchedulePage/EditSlot9Time",
+            "room/SchedulePage/ScheduleSelector"
+          ],
+          "method": "combined",
+          "expectation": "Inspect native selection dialog title, complete choices and cancel/back behavior. Cancel must close without change; each choice must perform only its intended selection action. Restore the original selected/editor/device state.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.18",
+      "checks": [
+        {
+          "id": "subpage-completeness",
+          "targets": [
+            "platform/layout/MainPage",
+            "room/EditSchedulePage/EditScheduleDaySelector",
+            "room/EditSchedulePage/EditSlot10Time",
+            "room/EditSchedulePage/EditSlot1Time",
+            "room/EditSchedulePage/EditSlot2Time",
+            "room/EditSchedulePage/EditSlot3Time",
+            "room/EditSchedulePage/EditSlot4Time",
+            "room/EditSchedulePage/EditSlot5Time",
+            "room/EditSchedulePage/EditSlot6Time",
+            "room/EditSchedulePage/EditSlot7Time",
+            "room/EditSchedulePage/EditSlot8Time",
+            "room/EditSchedulePage/EditSlot9Time",
+            "room/SchedulePage/ScheduleSelector",
+            "room/layout/EditSchedulePage",
+            "room/layout/MainPage",
+            "room/layout/SchedulePage"
+          ],
+          "method": "combined",
+          "expectation": "Repeat applicable control checks on this page/dialog in every reachable conditional state. Retain a per-control result matrix tied to the explicit target inventory, including all ten possible schedule slots and shared-schedule impact/error text.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.controls.19",
+      "checks": [
+        {
+          "id": "repeat-01-visible-inventory",
+          "targets": [
+            "$instance-one.platform.layout.mainpage",
+            "$instance-one.platform.mainpage.awaymodebutton",
+            "$instance-one.platform.mainpage.hotwaterbutton",
+            "$instance-one.platform.tile",
+            "$instance-one.room.editschedulepage.buttongroup-1",
+            "$instance-one.room.editschedulepage.canceleditschedulebtn",
+            "$instance-one.room.editschedulepage.editscheduledayselector",
+            "$instance-one.room.editschedulepage.editschedulesummary",
+            "$instance-one.room.editschedulepage.editslot10temperature",
+            "$instance-one.room.editschedulepage.editslot10time",
+            "$instance-one.room.editschedulepage.editslot1temperature",
+            "$instance-one.room.editschedulepage.editslot1time",
+            "$instance-one.room.editschedulepage.editslot2temperature",
+            "$instance-one.room.editschedulepage.editslot2time",
+            "$instance-one.room.editschedulepage.editslot3temperature",
+            "$instance-one.room.editschedulepage.editslot3time",
+            "$instance-one.room.editschedulepage.editslot4temperature",
+            "$instance-one.room.editschedulepage.editslot4time",
+            "$instance-one.room.editschedulepage.editslot5temperature",
+            "$instance-one.room.editschedulepage.editslot5time",
+            "$instance-one.room.editschedulepage.editslot6temperature",
+            "$instance-one.room.editschedulepage.editslot6time",
+            "$instance-one.room.editschedulepage.editslot7temperature",
+            "$instance-one.room.editschedulepage.editslot7time",
+            "$instance-one.room.editschedulepage.editslot8temperature",
+            "$instance-one.room.editschedulepage.editslot8time",
+            "$instance-one.room.editschedulepage.editslot9temperature",
+            "$instance-one.room.editschedulepage.editslot9time",
+            "$instance-one.room.editschedulepage.saveeditschedulealldaysbtn",
+            "$instance-one.room.editschedulepage.saveeditscheduledaybtn",
+            "$instance-one.room.layout.editschedulepage",
+            "$instance-one.room.layout.mainpage",
+            "$instance-one.room.layout.schedulepage",
+            "$instance-one.room.mainpage.boostbutton",
+            "$instance-one.room.mainpage.roomthermostat",
+            "$instance-one.room.mainpage.schedulebutton",
+            "$instance-one.room.schedulepage.buttongroup-1",
+            "$instance-one.room.schedulepage.disableschedulebutton",
+            "$instance-one.room.schedulepage.editschedulebtn",
+            "$instance-one.room.schedulepage.enableschedulebutton",
+            "$instance-one.room.schedulepage.scheduleselector",
+            "$instance-one.room.schedulepage.schedulesummarydisplay",
+            "$instance-one.room.tile",
+            "$instance-two.platform.layout.mainpage",
+            "$instance-two.platform.mainpage.awaymodebutton",
+            "$instance-two.platform.mainpage.hotwaterbutton",
+            "$instance-two.platform.tile",
+            "$instance-two.room.editschedulepage.buttongroup-1",
+            "$instance-two.room.editschedulepage.canceleditschedulebtn",
+            "$instance-two.room.editschedulepage.editscheduledayselector",
+            "$instance-two.room.editschedulepage.editschedulesummary",
+            "$instance-two.room.editschedulepage.editslot10temperature",
+            "$instance-two.room.editschedulepage.editslot10time",
+            "$instance-two.room.editschedulepage.editslot1temperature",
+            "$instance-two.room.editschedulepage.editslot1time",
+            "$instance-two.room.editschedulepage.editslot2temperature",
+            "$instance-two.room.editschedulepage.editslot2time",
+            "$instance-two.room.editschedulepage.editslot3temperature",
+            "$instance-two.room.editschedulepage.editslot3time",
+            "$instance-two.room.editschedulepage.editslot4temperature",
+            "$instance-two.room.editschedulepage.editslot4time",
+            "$instance-two.room.editschedulepage.editslot5temperature",
+            "$instance-two.room.editschedulepage.editslot5time",
+            "$instance-two.room.editschedulepage.editslot6temperature",
+            "$instance-two.room.editschedulepage.editslot6time",
+            "$instance-two.room.editschedulepage.editslot7temperature",
+            "$instance-two.room.editschedulepage.editslot7time",
+            "$instance-two.room.editschedulepage.editslot8temperature",
+            "$instance-two.room.editschedulepage.editslot8time",
+            "$instance-two.room.editschedulepage.editslot9temperature",
+            "$instance-two.room.editschedulepage.editslot9time",
+            "$instance-two.room.editschedulepage.saveeditschedulealldaysbtn",
+            "$instance-two.room.editschedulepage.saveeditscheduledaybtn",
+            "$instance-two.room.layout.editschedulepage",
+            "$instance-two.room.layout.mainpage",
+            "$instance-two.room.layout.schedulepage",
+            "$instance-two.room.mainpage.boostbutton",
+            "$instance-two.room.mainpage.roomthermostat",
+            "$instance-two.room.mainpage.schedulebutton",
+            "$instance-two.room.schedulepage.buttongroup-1",
+            "$instance-two.room.schedulepage.disableschedulebutton",
+            "$instance-two.room.schedulepage.editschedulebtn",
+            "$instance-two.room.schedulepage.enableschedulebutton",
+            "$instance-two.room.schedulepage.scheduleselector",
+            "$instance-two.room.schedulepage.schedulesummarydisplay",
+            "$instance-two.room.tile"
+          ],
+          "method": "android",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Compare the final candidate definition/localization with this rendered target. Exercise all visibility/enabled variants, error states and conditional schedule slots. Record the complete observed inventory; source parsing alone is insufficient. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "repeat-02-confirm-absence",
+          "targets": [
+            "$instance-one.context.segmented-sliders",
+            "$instance-two.context.segmented-sliders"
+          ],
+          "method": "absence",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Inspect the final candidate definitions and all runtime/configuration variants. Record NotApplicable with retained absence evidence only if no segmented-sliders exist. A framework-generated control or new definition invalidates this absence proposal. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "repeat-03-toggle-feedback",
+          "targets": [
+            "$instance-one.platform.mainpage.awaymodebutton",
+            "$instance-one.platform.mainpage.hotwaterbutton",
+            "$instance-one.room.mainpage.boostbutton",
+            "$instance-one.room.schedulepage.disableschedulebutton",
+            "$instance-one.room.schedulepage.enableschedulebutton",
+            "$instance-two.platform.mainpage.awaymodebutton",
+            "$instance-two.platform.mainpage.hotwaterbutton",
+            "$instance-two.room.mainpage.boostbutton",
+            "$instance-two.room.schedulepage.disableschedulebutton",
+            "$instance-two.room.schedulepage.enableschedulebutton"
+          ],
+          "method": "combined",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Check name/status, operate both transitions repeatedly and rapidly, observe independent device state after each accepted action, and verify UI/device agreement. Busy disabling must not leave stale state; restore the full initial state. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-04-status-button",
+          "targets": [
+            "$instance-one.platform.mainpage.awaymodebutton",
+            "$instance-one.platform.mainpage.hotwaterbutton",
+            "$instance-one.room.mainpage.boostbutton",
+            "$instance-one.room.mainpage.schedulebutton",
+            "$instance-one.room.schedulepage.disableschedulebutton",
+            "$instance-one.room.schedulepage.enableschedulebutton",
+            "$instance-two.platform.mainpage.awaymodebutton",
+            "$instance-two.platform.mainpage.hotwaterbutton",
+            "$instance-two.room.mainpage.boostbutton",
+            "$instance-two.room.mainpage.schedulebutton",
+            "$instance-two.room.schedulepage.disableschedulebutton",
+            "$instance-two.room.schedulepage.enableschedulebutton"
+          ],
+          "method": "combined",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Verify label, status and repeated intended response. Exercise each defined busy/disabled/error condition for its full duration and recovery; compare device feedback. For undeclared alert behavior record explicit absence evidence rather than inventing an alert. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-05-confirm-absence",
+          "targets": [
+            "$instance-one.context.toggle-sliders",
+            "$instance-two.context.toggle-sliders"
+          ],
+          "method": "absence",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Inspect the final candidate definitions and all runtime/configuration variants. Record NotApplicable with retained absence evidence only if no toggle-sliders exist. A framework-generated control or new definition invalidates this absence proposal. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "repeat-06-native-thermostat-gauge",
+          "targets": [
+            "$instance-one.room.mainpage.roomthermostat",
+            "$instance-two.room.mainpage.roomthermostat"
+          ],
+          "method": "combined",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Inspect the framework-rendered thermostat gauge, defined labels and supported bounds; independently vary reported temperature and verify display/feedback. Do not exempt native-rendered gauges solely because the XML tag is thermostat. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-07-button-action",
+          "targets": [
+            "$instance-one.platform.mainpage.awaymodebutton",
+            "$instance-one.platform.mainpage.hotwaterbutton",
+            "$instance-one.room.editschedulepage.canceleditschedulebtn",
+            "$instance-one.room.editschedulepage.saveeditschedulealldaysbtn",
+            "$instance-one.room.editschedulepage.saveeditscheduledaybtn",
+            "$instance-one.room.mainpage.boostbutton",
+            "$instance-one.room.mainpage.schedulebutton",
+            "$instance-one.room.schedulepage.disableschedulebutton",
+            "$instance-one.room.schedulepage.editschedulebtn",
+            "$instance-one.room.schedulepage.enableschedulebutton",
+            "$instance-two.platform.mainpage.awaymodebutton",
+            "$instance-two.platform.mainpage.hotwaterbutton",
+            "$instance-two.room.editschedulepage.canceleditschedulebtn",
+            "$instance-two.room.editschedulepage.saveeditschedulealldaysbtn",
+            "$instance-two.room.editschedulepage.saveeditscheduledaybtn",
+            "$instance-two.room.mainpage.boostbutton",
+            "$instance-two.room.mainpage.schedulebutton",
+            "$instance-two.room.schedulepage.disableschedulebutton",
+            "$instance-two.room.schedulepage.editschedulebtn",
+            "$instance-two.room.schedulepage.enableschedulebutton"
+          ],
+          "method": "combined",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Verify label/icon and repeated operation of this button, with independent command/state evidence and measured feedback. Save Day and Save All Days must use isolated schedules; verify intended scope and restore all affected shared schedules/rooms. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-08-button-group",
+          "targets": [
+            "$instance-one.room.editschedulepage.buttongroup-1",
+            "$instance-one.room.schedulepage.buttongroup-1",
+            "$instance-two.room.editschedulepage.buttongroup-1",
+            "$instance-two.room.schedulepage.buttongroup-1"
+          ],
+          "method": "android",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Capture grouping, order and spacing in every visibility variant; all members must remain visually grouped and usable. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "repeat-09-selector-choices",
+          "targets": [
+            "$instance-one.room.editschedulepage.editscheduledayselector",
+            "$instance-one.room.editschedulepage.editslot10time",
+            "$instance-one.room.editschedulepage.editslot1time",
+            "$instance-one.room.editschedulepage.editslot2time",
+            "$instance-one.room.editschedulepage.editslot3time",
+            "$instance-one.room.editschedulepage.editslot4time",
+            "$instance-one.room.editschedulepage.editslot5time",
+            "$instance-one.room.editschedulepage.editslot6time",
+            "$instance-one.room.editschedulepage.editslot7time",
+            "$instance-one.room.editschedulepage.editslot8time",
+            "$instance-one.room.editschedulepage.editslot9time",
+            "$instance-one.room.schedulepage.scheduleselector",
+            "$instance-two.room.editschedulepage.editscheduledayselector",
+            "$instance-two.room.editschedulepage.editslot10time",
+            "$instance-two.room.editschedulepage.editslot1time",
+            "$instance-two.room.editschedulepage.editslot2time",
+            "$instance-two.room.editschedulepage.editslot3time",
+            "$instance-two.room.editschedulepage.editslot4time",
+            "$instance-two.room.editschedulepage.editslot5time",
+            "$instance-two.room.editschedulepage.editslot6time",
+            "$instance-two.room.editschedulepage.editslot7time",
+            "$instance-two.room.editschedulepage.editslot8time",
+            "$instance-two.room.editschedulepage.editslot9time",
+            "$instance-two.room.schedulepage.scheduleselector"
+          ],
+          "method": "combined",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Verify labels and every supported choice. Capture the complete choice inventory and each selection result. Day/time changes affect the editor until save; schedule selection changes the assignment. Verify those intended semantics and restore original editor/hub state. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-10-confirm-absence",
+          "targets": [
+            "$instance-one.context.button-lists",
+            "$instance-two.context.button-lists"
+          ],
+          "method": "absence",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Inspect the final candidate definitions and all runtime/configuration variants. Record NotApplicable with retained absence evidence only if no button-lists exist. A framework-generated control or new definition invalidates this absence proposal. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "repeat-11-confirm-absence",
+          "targets": [
+            "$instance-one.context.navigation-pads",
+            "$instance-two.context.navigation-pads"
+          ],
+          "method": "absence",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Inspect the final candidate definitions and all runtime/configuration variants. Record NotApplicable with retained absence evidence only if no navigation-pads exist. A framework-generated control or new definition invalidates this absence proposal. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "repeat-12-confirm-absence",
+          "targets": [
+            "$instance-one.context.driver-keypads",
+            "$instance-two.context.driver-keypads"
+          ],
+          "method": "absence",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Inspect the final candidate definitions and all runtime/configuration variants. Record NotApplicable with retained absence evidence only if no driver-keypads exist. A framework-generated control or new definition invalidates this absence proposal. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "repeat-13-modes",
+          "targets": [
+            "$instance-one.room.mainpage.roomthermostat",
+            "$instance-two.room.mainpage.roomthermostat"
+          ],
+          "method": "combined",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Exercise every actually supported thermostat mode and its UI state; verify unsupported cool/auto controls are absent and explicitly document whether off is offered. Use the isolated room and retain measured response timings. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-13-setpoint-bounds",
+          "targets": [
+            "$instance-one.room.mainpage.roomthermostat",
+            "$instance-two.room.mainpage.roomthermostat"
+          ],
+          "method": "combined",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Set heat target to supported minimum and maximum through the actual UI; verify independent device state and restore target/mode. Use the isolated room and retain measured response timings. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-13-temperature-feedback",
+          "targets": [
+            "$instance-one.room.mainpage.roomthermostat",
+            "$instance-two.room.mainpage.roomthermostat"
+          ],
+          "method": "combined",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Compare current temperature and gauge with an independent hub read before/after reported temperature changes. Use the isolated room and retain measured response timings. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-13-units",
+          "targets": [
+            "$instance-one.room.mainpage.roomthermostat",
+            "$instance-two.room.mainpage.roomthermostat"
+          ],
+          "method": "combined",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Repeat temperatures, labels and setpoint bounds in Celsius and Fahrenheit; verify conversions against the same physical value and restore configured units. Use the isolated room and retain measured response timings. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-13-schedule-setpoint-adjusters",
+          "targets": [
+            "$instance-one.room.editschedulepage.editslot10temperature",
+            "$instance-one.room.editschedulepage.editslot1temperature",
+            "$instance-one.room.editschedulepage.editslot2temperature",
+            "$instance-one.room.editschedulepage.editslot3temperature",
+            "$instance-one.room.editschedulepage.editslot4temperature",
+            "$instance-one.room.editschedulepage.editslot5temperature",
+            "$instance-one.room.editschedulepage.editslot6temperature",
+            "$instance-one.room.editschedulepage.editslot7temperature",
+            "$instance-one.room.editschedulepage.editslot8temperature",
+            "$instance-one.room.editschedulepage.editslot9temperature",
+            "$instance-two.room.editschedulepage.editslot10temperature",
+            "$instance-two.room.editschedulepage.editslot1temperature",
+            "$instance-two.room.editschedulepage.editslot2temperature",
+            "$instance-two.room.editschedulepage.editslot3temperature",
+            "$instance-two.room.editschedulepage.editslot4temperature",
+            "$instance-two.room.editschedulepage.editslot5temperature",
+            "$instance-two.room.editschedulepage.editslot6temperature",
+            "$instance-two.room.editschedulepage.editslot7temperature",
+            "$instance-two.room.editschedulepage.editslot8temperature",
+            "$instance-two.room.editschedulepage.editslot9temperature"
+          ],
+          "method": "combined",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Exercise lower/raise through min/max and error bounds in every visible slot. Validate formatting and units; changes remain uncommitted until save. Restore editor and shared schedule state. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-14-configuration-text-input",
+          "targets": [
+            "$instance-one.context.config.boost-delta",
+            "$instance-one.context.config.boost-minutes",
+            "$instance-one.context.config.hub-host",
+            "$instance-one.context.config.hub-secret",
+            "$instance-two.context.config.boost-delta",
+            "$instance-two.context.config.boost-minutes",
+            "$instance-two.context.config.hub-host",
+            "$instance-two.context.config.hub-secret"
+          ],
+          "method": "configuration",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Inspect configuration label/hint/guidance, keyboard type, numeric ranges and all declared error messages. Any field declared obscured must mask its value; independently redact known private values from retained evidence even if the driver does not mark them masked. Invalid input must not produce a connection/device command; restore valid values. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-15-configuration-boolean",
+          "targets": [
+            "$instance-one.context.config.away-mode",
+            "$instance-one.context.config.hot-water",
+            "$instance-two.context.config.away-mode",
+            "$instance-two.context.config.hot-water"
+          ],
+          "method": "configuration",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Inspect labels/descriptions and both boolean transitions in setup; record the actual framework control type. Verify resulting feature visibility/enabled state and restore initial flags. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-16-confirm-absence",
+          "targets": [
+            "$instance-one.context.driver-confirmation-dialogs",
+            "$instance-two.context.driver-confirmation-dialogs"
+          ],
+          "method": "absence",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Inspect the final candidate definitions and all runtime/configuration variants. Record NotApplicable with retained absence evidence only if no driver-confirmation-dialogs exist. A framework-generated control or new definition invalidates this absence proposal. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "repeat-17-selector-dialog",
+          "targets": [
+            "$instance-one.room.editschedulepage.editscheduledayselector",
+            "$instance-one.room.editschedulepage.editslot10time",
+            "$instance-one.room.editschedulepage.editslot1time",
+            "$instance-one.room.editschedulepage.editslot2time",
+            "$instance-one.room.editschedulepage.editslot3time",
+            "$instance-one.room.editschedulepage.editslot4time",
+            "$instance-one.room.editschedulepage.editslot5time",
+            "$instance-one.room.editschedulepage.editslot6time",
+            "$instance-one.room.editschedulepage.editslot7time",
+            "$instance-one.room.editschedulepage.editslot8time",
+            "$instance-one.room.editschedulepage.editslot9time",
+            "$instance-one.room.schedulepage.scheduleselector",
+            "$instance-two.room.editschedulepage.editscheduledayselector",
+            "$instance-two.room.editschedulepage.editslot10time",
+            "$instance-two.room.editschedulepage.editslot1time",
+            "$instance-two.room.editschedulepage.editslot2time",
+            "$instance-two.room.editschedulepage.editslot3time",
+            "$instance-two.room.editschedulepage.editslot4time",
+            "$instance-two.room.editschedulepage.editslot5time",
+            "$instance-two.room.editschedulepage.editslot6time",
+            "$instance-two.room.editschedulepage.editslot7time",
+            "$instance-two.room.editschedulepage.editslot8time",
+            "$instance-two.room.editschedulepage.editslot9time",
+            "$instance-two.room.schedulepage.scheduleselector"
+          ],
+          "method": "combined",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Inspect native selection dialog title, complete choices and cancel/back behavior. Cancel must close without change; each choice must perform only its intended selection action. Restore the original selected/editor/device state. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-18-subpage-completeness",
+          "targets": [
+            "$instance-one.platform.layout.mainpage",
+            "$instance-one.room.editschedulepage.editscheduledayselector",
+            "$instance-one.room.editschedulepage.editslot10time",
+            "$instance-one.room.editschedulepage.editslot1time",
+            "$instance-one.room.editschedulepage.editslot2time",
+            "$instance-one.room.editschedulepage.editslot3time",
+            "$instance-one.room.editschedulepage.editslot4time",
+            "$instance-one.room.editschedulepage.editslot5time",
+            "$instance-one.room.editschedulepage.editslot6time",
+            "$instance-one.room.editschedulepage.editslot7time",
+            "$instance-one.room.editschedulepage.editslot8time",
+            "$instance-one.room.editschedulepage.editslot9time",
+            "$instance-one.room.layout.editschedulepage",
+            "$instance-one.room.layout.mainpage",
+            "$instance-one.room.layout.schedulepage",
+            "$instance-one.room.schedulepage.scheduleselector",
+            "$instance-two.platform.layout.mainpage",
+            "$instance-two.room.editschedulepage.editscheduledayselector",
+            "$instance-two.room.editschedulepage.editslot10time",
+            "$instance-two.room.editschedulepage.editslot1time",
+            "$instance-two.room.editschedulepage.editslot2time",
+            "$instance-two.room.editschedulepage.editslot3time",
+            "$instance-two.room.editschedulepage.editslot4time",
+            "$instance-two.room.editschedulepage.editslot5time",
+            "$instance-two.room.editschedulepage.editslot6time",
+            "$instance-two.room.editschedulepage.editslot7time",
+            "$instance-two.room.editschedulepage.editslot8time",
+            "$instance-two.room.editschedulepage.editslot9time",
+            "$instance-two.room.layout.editschedulepage",
+            "$instance-two.room.layout.mainpage",
+            "$instance-two.room.layout.schedulepage",
+            "$instance-two.room.schedulepage.scheduleselector"
+          ],
+          "method": "combined",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Repeat applicable control checks on this page/dialog in every reachable conditional state. Retain a per-control result matrix tied to the explicit target inventory, including all ten possible schedule slots and shared-schedule impact/error text. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.system.01",
+      "checks": [
+        {
+          "id": "outage-hold",
+          "targets": [
+            "$power-outage"
+          ],
+          "method": "outage",
+          "expectation": "Use independently controlled test equipment to remove power from processor, hub and network equipment for at least 60 continuous seconds. Timestamp physical loss/restoration and preserve independent evidence; a software reboot is not this test. Restore all starting state.",
+          "minimumSeconds": 60,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "functional-recovery",
+          "targets": [
+            "$power-recovery"
+          ],
+          "method": "outage",
+          "expectation": "After the Home program loads, verify reconnection and every applicable driver function within 60 seconds using independent feedback and retained timestamps. Do not substitute reachability alone.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": 60,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.system.02",
+      "checks": [
+        {
+          "id": "outage-hold",
+          "targets": [
+            "$network-outage"
+          ],
+          "method": "outage",
+          "expectation": "Use independently controlled test equipment to remove all relevant processor/hub network connectivity for at least 60 continuous seconds. Timestamp physical loss/restoration and preserve independent evidence; a software reboot is not this test. Restore all starting state.",
+          "minimumSeconds": 60,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "functional-recovery",
+          "targets": [
+            "$network-recovery"
+          ],
+          "method": "outage",
+          "expectation": "After network connectivity returns, verify reconnection and every applicable driver function within 60 seconds using independent feedback and retained timestamps. Do not substitute reachability alone.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": 60,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.system.03",
+      "checks": [
+        {
+          "id": "continuous-function",
+          "targets": [
+            "$endurance"
+          ],
+          "method": "endurance",
+          "expectation": "Observe the same Release candidate continuously for at least 24 hours. Use a reviewed periodic sampling schedule covering all applicable functions, log missing samples, connection state and latency/feedback against baseline, verify final functionality and no degradation, then restore state. Elapsed timestamps alone do not satisfy this requirement.",
+          "minimumSeconds": 86400,
+          "responseLimitSeconds": null,
+          "restore": true
+        }
+      ]
+    },
+    {
+      "id": "extension.system.04",
+      "checks": [
+        {
+          "id": "clean-removal",
+          "targets": [
+            "$configuration-removal"
+          ],
+          "method": "combined",
+          "expectation": "Remove the isolated driver instance and verify its gateway/managed children disappear from configuration and all end-user views. Capture live logs across the operation and require no attributable removal exception. Preserve unrelated installed drivers and room assignments.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "clean-removal",
+          "targets": [
+            "$home-ui-removal"
+          ],
+          "method": "combined",
+          "expectation": "Remove the isolated driver instance and verify its gateway/managed children disappear from configuration and all end-user views. Capture live logs across the operation and require no attributable removal exception. Preserve unrelated installed drivers and room assignments.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "clean-removal",
+          "targets": [
+            "$room-ui-removal"
+          ],
+          "method": "combined",
+          "expectation": "Remove the isolated driver instance and verify its gateway/managed children disappear from configuration and all end-user views. Capture live logs across the operation and require no attributable removal exception. Preserve unrelated installed drivers and room assignments.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "clean-removal",
+          "targets": [
+            "$live-driver-log"
+          ],
+          "method": "combined",
+          "expectation": "Remove the isolated driver instance and verify its gateway/managed children disappear from configuration and all end-user views. Capture live logs across the operation and require no attributable removal exception. Preserve unrelated installed drivers and room assignments.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
+        }
+      ]
+    }
+  ]
+}

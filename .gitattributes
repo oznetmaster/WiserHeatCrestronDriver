@@ -3,6 +3,9 @@
 ###############################################################################
 * text=auto
 
+# Keep reviewed submission coverage blueprint digests stable across checkouts.
+submission/*-coverage-plan.json text eol=lf
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #

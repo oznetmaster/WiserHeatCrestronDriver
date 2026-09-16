@@ -1,5 +1,19 @@
 # Crestron submission help
 
+## Driver-specific test coverage
+
+[extension-coverage-plan.json](extension-coverage-plan.json) is a draft breakdown of every item in the official Extension self-test form. It covers the gateway Home tile, managed-room thermostats, all declared pages/controls and conditional schedule slots, configuration, restoration, outages, endurance and repeated multi-instance checks. The source [DevTools coverage generator](https://github.com/oznetmaster/CrestronHomeDevTools/blob/main/docs/submission/CoveragePlanning.md) expands it into a draft policy, form mapping and execution contract. It checks the recorded UI/behavior/configuration source hashes and rejects omitted UI targets or official items.
+
+This is planned coverage, not a test result. Producer bindings, real Release candidate evidence, visual review and policy approval remain incomplete. The generated contract records response deadlines and restoration requirements, which future producers must enforce; generic hash/evidence validation alone does not measure them. Repeated assertions can share a controlled sequence and captures when each assertion is actually verified.
+
+Two actual thermostat rooms can test managed-child isolation with state restoration. Whether those count as the formal two-instance test for this platform driver remains unresolved; do not automatically equate two children with two gateway instances. Keep actual room names, device IDs, hub credentials, emulator settings and evidence in private local bindings. A dedicated test room is useful for temporary installation/removal fixtures but is not itself an independent physical thermostat or hub.
+
+Outage cases require independent control of the specified test equipment, with recorded loss/recovery timings. A Home reboot does not replace the physical power-outage test. Endurance requires periodic functional observation over at least 24 hours, not just elapsed timestamps. Unsupported-control proposals need retained absence evidence across the final candidate's runtime variants; they are never silently passed.
+
+Source changes require review of the coverage snapshot before updating its hashes. No ordinary driver behavior, build/deploy workflow or published version changes as a result of this planning file.
+
+## Help source
+
 [help-content.json](help-content.json) is public source for the driver's help document, using the official Crestron help template and the source tools in [CrestronHomeDevTools](https://github.com/oznetmaster/CrestronHomeDevTools). The builder and renderer are currently local source changes, not released tooling. See its `docs/submission/HelpBuild.md` for the content format and commands.
 
 This is a review draft for the current driver, not an approved portal submission. It is not embedded in the released driver package. Ordinary builds retain their existing package name and do not require document tools. The source manifest now contains the approved public support email; runtime behavior, GUID and driver version are unchanged by this preparation.
