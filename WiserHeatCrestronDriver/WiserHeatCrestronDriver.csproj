@@ -92,7 +92,7 @@ Licensed under the MIT License with Commons Clause. See LICENSE in the repositor
     <AssemblyName>NeilColvin_Thermostat_WiserHeat_IP_V2</AssemblyName>
     <SubmissionHelpContent>$(MSBuildProjectDirectory)/../submission/help-content.json</SubmissionHelpContent>
     <SubmissionDeveloperToken>NeilColvin</SubmissionDeveloperToken>
-    <SubmissionSupportEmail>support@marvelous.com</SubmissionSupportEmail>
+    <SubmissionSupportWebsite>https://github.com/oznetmaster/WiserHeatCrestronDriver</SubmissionSupportWebsite>
   </PropertyGroup>
   <Import Project="$(SubmissionToolsDirectory)/CrestronSubmissionHelp.targets" Condition="'$(CrestronSubmission)' == 'true' And Exists('$(SubmissionToolsDirectory)/CrestronSubmissionHelp.targets')" />
   <Target Name="ValidateCrestronSubmission" Condition="'$(CrestronSubmission)' == 'true' And '$(BuildForTests)' != 'true' And '$(DesignTimeBuild)' != 'true'">

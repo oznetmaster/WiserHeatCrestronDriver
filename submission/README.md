@@ -14,13 +14,13 @@ Source changes require review of the coverage snapshot before updating its hashe
 
 ## Help source
 
-[help-content.json](help-content.json) is public source for the driver's help document, using the official Crestron help template and the source tools in [CrestronHomeDevTools](https://github.com/oznetmaster/CrestronHomeDevTools). The builder and renderer are currently local source changes, not released tooling. See its `docs/submission/HelpBuild.md` for the content format and commands.
+[help-content.json](help-content.json) is public source for the driver's help document, using the official Crestron help template and the source tools in [CrestronHomeDevTools](https://github.com/oznetmaster/CrestronHomeDevTools). The builder and renderer are source tools in DevTools; use the reviewed source revision providing website support. See its `docs/submission/HelpBuild.md` for the content format and commands.
 
-This is a review draft for the current driver, not an approved portal submission. It is not embedded in the released driver package. Ordinary builds retain their existing package name and do not require document tools. The source manifest now contains the approved public support email; runtime behavior, GUID and driver version are unchanged by this preparation.
+This is a review draft for the current driver, not an approved portal submission. It is not embedded in the released driver package. Ordinary builds retain their existing package name and do not require document tools. The source manifest now contains the approved public GitHub support website and an empty Email field; runtime behavior, GUID and driver version are unchanged by this preparation.
 
 The content covers the root Home options page, the room thermostat, schedule selection and editing. Its declared UI inventory also includes schedule/day/time selector dialogs. The remaining model/firmware facts, screenshots, license inventory and final candidate version are explicitly listed in `pending`. Final-mode help generation rejects pending items and missing declared UI screenshots; use `--draft` and a `.review.docx` output for review.
 
-The public support email is `support@marvelous.com`. Keep the submission correspondence address, credentials, actual device bindings, source signature image and private screenshots outside this repository. Only approved public figures should be referenced by the content file, using relative paths and SHA-256 digests.
+Public support is provided through [the GitHub repository](https://github.com/oznetmaster/WiserHeatCrestronDriver) and its [issue tracker](https://github.com/oznetmaster/WiserHeatCrestronDriver/issues). No public support email is included. Keep the submission correspondence address, credentials, actual device bindings, source signature image and private screenshots outside this repository. Only approved public figures should be referenced by the content file, using relative paths and SHA-256 digests.
 
 The help must identify this driver's MIT License with Commons Clause accurately. The generator's separate MIT license does not change the driver's license.
 
@@ -32,7 +32,7 @@ The driver project now imports the reusable help packaging targets when `Crestro
 dotnet build WiserHeatCrestronDriver/WiserHeatCrestronDriver.csproj -c Release -p:CrestronSubmission=true -p:DeployAfterBuild=false -p:SubmissionToolsDirectory=TOOLS_DIRECTORY -p:SubmissionPython=PYTHON_EXE -p:SubmissionSoffice=LIBREOFFICE_EXE -p:SubmissionHelpTemplate=OFFICIAL_DOCX -p:SubmissionHelpTemplateSha256=PINNED_SHA256
 ```
 
-Replace the uppercase placeholders with local paths and the reviewed template digest; quote arguments containing spaces. These source tools are not in the published DevTools package yet. Do not enable the option in the ordinary release workflow until a complete candidate has passed validation.
+Replace the uppercase placeholders with local paths and the reviewed template digest; quote arguments containing spaces. These Python source tools are not embedded in the DevTools NuGet package or console ZIP. Website support requires the updated source checkout. Do not enable the option in the ordinary release workflow until a complete candidate has passed validation.
 
 This option uses `NeilColvin_Thermostat_WiserHeat_IP_V2` as the matching package/DLL/help basename. It preserves the driver GUID. Release version preparation remains authoritative, and the content's four-component version must match the prepared manifest. Before deploying a future submission candidate, select a new version and update the content; do not replace the bytes of an already published or tested version.
 
