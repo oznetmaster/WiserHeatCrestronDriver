@@ -1,5 +1,10 @@
 # Changelog
 
+## Android UI test development - 2026-09-16 (no driver release)
+
+- Add an opt-in NUnit project that opens the gateway page twice, checks the Hot Water and Away status/action/enabled state against fresh management data, verifies unchanged gateway state and returns to Home.
+- Keep settings and captures private. Ordinary desktop runs skip without connecting. The project currently requires the developing Android toolkit source and is not yet wired into distributed CI or submission evidence acceptance.
+
 ## WiserHeatCrestronDriver.ProcessorTests v1.0.2 - 2026-09-16
 
 Published processor test package on GitHub. This is a test-package release only; no driver or library NuGet package is published. See the matching package release notes for changes and validation.
