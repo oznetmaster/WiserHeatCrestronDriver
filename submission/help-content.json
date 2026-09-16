@@ -5,11 +5,10 @@
   "version": "1.3.007.0000",
   "pending": [
     "Confirm the minimum supported Crestron Home firmware through validation; MinSdkVersion is not a processor firmware version.",
-    "Record the exact hub model and firmware, processor firmware, and app version for the final candidate's test environment.",
-    "Confirm supported hub part numbers rather than extending the supported-model claim from the Wiser family name.",
+    "Revalidate the recorded hub, processor and app versions when testing the final Release candidate.",
+    "Validate the final candidate on the observed CCTFR6313G2 hub before making the supported-model claim; other hub models are not covered.",
     "Capture and approve screenshots for every declared UI page and selector dialog without private household information.",
-    "Update the document version from the final submission candidate and retain the matching package, DLL and PDF basenames.",
-    "Verify the reviewed merged dependency notices are included in the final ManifestUtil submission candidate."
+    "Update the document version from the final submission candidate and retain the matching package, DLL and PDF basenames."
   ],
   "uiPages": [
     "platform.options",
@@ -71,10 +70,10 @@
       { "kind": "bullet", "text": "Optional whole-house Hot Water and global Away Mode controls on the gateway's Home tile." }
     ],
     "environment": [
-      { "kind": "paragraph", "text": "The release notes record desktop and processor tests plus installed-driver validation for the current release. That history does not establish a completed Crestron self-test for the new submission package. Exact processor, hub and app versions must be recorded with the final candidate's evidence before this section is finalized." }
+      { "kind": "paragraph", "text": "Read-only identification on 16 September 2026 recorded a Crestron MC4-R running Crestron Home 4.011.0322 and a Wiser CCTFR6313G2 hub, hardware generation 2, with firmware 4.36.33 (system version 4.36.33-9ad5712). The Google Android emulator runs Android 16 with Crestron Home app 4.6.18+pr (build 13148). These are observed development-environment versions; repeat and retain the checks with the final Release candidate. This record does not establish a minimum supported firmware version or completed Crestron self-test." }
     ],
     "models": [
-      { "kind": "paragraph", "text": "The current driver identifies its base model as Wiser Heat Gateway under manufacturer Drayton Wiser. No additional model part numbers are declared in its manifest. Confirm the exact validated hub models before expanding this list." }
+      { "kind": "paragraph", "text": "The connected hub reports model CCTFR6313G2. Final submission validation is limited to that model unless additional models are independently tested. The driver manifest uses the display model Wiser Heat Gateway under manufacturer Drayton Wiser; that display name is not evidence of compatibility with every Wiser hub." }
     ],
     "contact": [
       { "kind": "paragraph", "text": "Developer: Neil Colvin\nProject, releases and support: https://github.com/oznetmaster/WiserHeatCrestronDriver\nIssue tracker: https://github.com/oznetmaster/WiserHeatCrestronDriver/issues" }
