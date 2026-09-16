@@ -14,6 +14,8 @@ Outage cases require independent control of the specified test equipment, with r
 
 Source changes require review of the coverage snapshot before updating its hashes. No ordinary driver behavior, build/deploy workflow or published version changes as a result of this planning file.
 
+See the [coverage source review](CoverageReview.md) for the current snapshot and the additional live-definition behavior that still needs executable coverage. Validate against the reviewed tracked sources; local builds can change Debug manifest revisions and must not be silently substituted for that snapshot.
+
 ## Help source
 
 [help-content.json](help-content.json) is public source for the driver's help document, using the official Crestron help template and the source tools in [CrestronHomeDevTools](https://github.com/oznetmaster/CrestronHomeDevTools). The builder and renderer are source tools in DevTools; use the reviewed source revision providing website support. See its `docs/submission/HelpBuild.md` for the content format and commands.

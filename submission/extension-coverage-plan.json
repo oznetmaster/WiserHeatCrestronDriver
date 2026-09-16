@@ -27,7 +27,7 @@
     },
     {
       "path": "WiserHeatCrestronDriver/IncludeInPkg/Translations/en-US.json",
-      "sha256": "81b87faae12a1474cb9f7f11838ffd25090345b4921e6ab382abd53b7789f1d3",
+      "sha256": "2fd59c8932d646f3c8eb3a2014445539d6f3028a436c80e604a9ec9e79f61671",
       "surface": null
     },
     {
@@ -52,7 +52,7 @@
     },
     {
       "path": "WiserHeatCrestronDriver/WiserRoomEntity.cs",
-      "sha256": "ccba4b0a0ee5b426945937081c3311b044b4527d38c59ea6d347e0c59a152fef",
+      "sha256": "ba9236df1600f2d70b50cc28f402d9e2acdb2c48db5f6d4875d4a51a4f2a8562",
       "surface": null
     },
     {
@@ -565,7 +565,7 @@
             "room/SchedulePage/EnableScheduleButton"
           ],
           "method": "combined",
-          "expectation": "Verify label/icon and repeated operation of this button, with independent command/state evidence and measured feedback. Save Day and Save All Days must use isolated schedules; verify intended scope and restore all affected shared schedules/rooms.",
+          "expectation": "Verify label/icon and repeated operation of this button, with independent command/state evidence and measured feedback. Save Day and Save All must use isolated schedules; verify intended scope and restore all affected shared schedules/rooms.",
           "minimumSeconds": 0,
           "responseLimitSeconds": null,
           "restore": true
@@ -610,6 +610,17 @@
           ],
           "method": "combined",
           "expectation": "Verify labels and every supported choice. Capture the complete choice inventory and each selection result. Day/time changes affect the editor until save; schedule selection changes the assignment. Verify those intended semantics and restore original editor/hub state.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "live-schedule-definition",
+          "targets": [
+            "room/SchedulePage/ScheduleSelector"
+          ],
+          "method": "combined",
+          "expectation": "On an isolated, explicitly bound test schedule, verify that changed hub schedule labels and available choices are republished to the already-open Home selector without reloading the driver. Verify the selected ID remains correctly associated with its label, unchanged lists do not disrupt selection, and unavailable/deleted choices cannot assign an unintended schedule. Independently verify hub assignment and restore all affected schedule definitions and room assignments. Initial list inspection alone does not satisfy this check.",
           "minimumSeconds": 0,
           "responseLimitSeconds": null,
           "restore": true
@@ -1045,7 +1056,7 @@
             "$instance-two.room.schedulepage.enableschedulebutton"
           ],
           "method": "combined",
-          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Verify label/icon and repeated operation of this button, with independent command/state evidence and measured feedback. Save Day and Save All Days must use isolated schedules; verify intended scope and restore all affected shared schedules/rooms. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Verify label/icon and repeated operation of this button, with independent command/state evidence and measured feedback. Save Day and Save All must use isolated schedules; verify intended scope and restore all affected shared schedules/rooms. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
           "minimumSeconds": 0,
           "responseLimitSeconds": null,
           "restore": true
