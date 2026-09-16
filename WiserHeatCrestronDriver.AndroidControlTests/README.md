@@ -33,6 +33,6 @@ Cancellation has a separate bounded restoration deadline. An uncertain restorati
 
 ## Validation status
 
-Offline regressions cover successful UI control/restoration, lost input responses, cancellation, journal failures, changed physical identity, driver restart, concurrent commands and unsafe initial setpoints. The project builds against published TestAdapter 1.8.0, DevTools 1.5.0 and WiserHeatAPIv2 1.1.0.6, and every fixture skips without a hardware context.
+Offline regressions cover successful UI control/restoration, lost input responses, cancellation, journal failures, changed physical identity, driver restart, concurrent commands and unsafe initial setpoints. The project builds against published TestAdapter 1.8.1, DevTools 1.5.0 and WiserHeatAPIv2 1.1.0.6, and every fixture skips without a hardware context.
 
 The live UI control case has not yet passed hardware validation. The first independent preflight sent no control. Its original restriction against a higher manual target has since been removed and covered by offline regression tests; a missing manual target still requires a separate initialization/restoration policy. Successful read-only UI runs do not prove this cycle, the remaining controls, room isolation, outage/endurance requirements or final submission acceptance.

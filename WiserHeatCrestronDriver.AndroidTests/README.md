@@ -10,7 +10,7 @@ The separately selected [Android control project](../WiserHeatCrestronDriver.And
 
 ## UI automation dependency
 
-The project uses the Android assembly included in `CrestronHomeNUnit.TestAdapter` 1.8.0 and the name-challenge API in `CrestronHomeDevTools` 1.5.0. It is included in the driver solution. The adapter supports portrait screens where the saved local-port field needs scrolling. No second source checkout is required. Hosted CI builds the project and verifies that all cases skip without a hardware context.
+The project uses the Android assembly included in `CrestronHomeNUnit.TestAdapter` 1.8.1 and the name-challenge API in `CrestronHomeDevTools` 1.5.0. It is included in the driver solution. The adapter supports portrait screens where the saved local-port field needs scrolling. Version 1.8.1 also searches for offscreen room tiles and recognizes compact room headings; missing tiles fail inspection and trigger observed Home restoration. No second source checkout is required. Hosted CI builds the project and verifies that all cases skip without a hardware context.
 
 ## Private settings and invocation
 
