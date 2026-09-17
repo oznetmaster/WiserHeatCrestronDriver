@@ -12,6 +12,8 @@ The normal combined workflow subsequently passed on Debug `1.3.007.0023`, packag
 
 The producer was a private source-pinned copy selecting only that Cancel case, with exact discovery verified. This is bounded development integration evidence, not a run of every Android control case or final candidate acceptance. The complete local adapter release build subsequently passed isolated package acceptance and all current Android regressions. Earlier failed attempts remain failed; neither recovery nor this success replaces remaining conditional-slot, adjustment, save or conflict evidence.
 
+A later focused run on exact Debug `1.3.007.0026` bytes passed with test-source checkpoint `c13aeb4`. It verified every active payload file before commissioning a temporary child, then checked all eight current rendered time/setpoint controls before and after a pending time edit. Cancel/reopen, unchanged independent schedules and assignments, Home restoration, original inventory and removal/released reservations passed. This used the published TestAdapter 1.10.0 without a local Android assembly override. Thirty additional synthetic SDK/Mono cases cover all ten model slots and variable day lengths; those cases do not replace ten-slot rendered UI, adjustment or live conflict coverage.
+
 | Source | Subsequent change | Required evidence |
 | --- | --- | --- |
 | `WiserDriverEntryPoint.cs`, `WiserPlatformDriver.cs` | Keep room controllers registered during reads; use standard SDK dispatch. | Preserve existing-room identity/registration during reads and verify discovery/removal. Initial commissioning is resolved by the independently verified DevTools configuration entry described above; retain the earlier failure evidence and repeat the final candidate lifecycle checks. |
