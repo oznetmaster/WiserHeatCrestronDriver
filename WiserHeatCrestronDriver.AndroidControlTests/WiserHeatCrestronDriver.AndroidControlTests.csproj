@@ -8,7 +8,7 @@
     <IsTestProject>true</IsTestProject>
     <IsPackable>false</IsPackable>
     <IsPublishable>false</IsPublishable>
-    <TestAdapterVersion Condition="'$(TestAdapterVersion)' == ''">1.10.0</TestAdapterVersion>
+    <TestAdapterVersion Condition="'$(TestAdapterVersion)' == ''">1.11.0</TestAdapterVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="NUnit" Version="4.6.1" />
