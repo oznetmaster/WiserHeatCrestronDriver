@@ -1261,7 +1261,6 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 	private void SetEditSlotTemperatureProperty (int slotIndex, string propertyId, double value)
 		{
-		_editingSchedule = true;
 		LogInfo ($"UI requested {propertyId}={value.ToString (CultureInfo.InvariantCulture)}");
 		UpdateEditSlotTemperature (slotIndex, value.ToString (CultureInfo.InvariantCulture));
 		}
@@ -1322,12 +1321,15 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			return;
 			}
 
-		if (!double.TryParse (temperatureText, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed))
+		if (!double.TryParse (temperatureText, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) ||
+			double.IsNaN (parsed) || double.IsInfinity (parsed) || parsed < 5.0 || parsed > 35.0)
 			{
-			LogInfo ($"Ignored edit slot temperature update for slot={slotIndex + 1} because '{temperatureText}' could not be parsed");
+			LogInfo ($"Ignored edit slot temperature update for slot={slotIndex + 1} because '{temperatureText}' is not a finite value in the supported 5-35 degree range");
 			return;
 			}
 
+		// Only valid input starts an edit; ignored commands must keep following hub refreshes.
+		_editingSchedule = true;
 		parsed = Math.Round (parsed * 2.0, MidpointRounding.AwayFromZero) / 2.0;
 		if (_editSlotTemperatures[slotIndex].Equals (parsed))
 			{

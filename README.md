@@ -152,7 +152,7 @@ Free to use and modify. You may not sell the Software as a standalone product or
 
 ## Automated tests
 
-The opt-in [Android UI project](WiserHeatCrestronDriver.AndroidTests/README.md) compares the real Hot Water and Away controls with fresh processor state, inspects the schedule/day/time choices of explicitly bound room thermostats, and restores the Home screen. It uses TestAdapter 1.10.0 and DevTools 1.6.0, and runs only when selected by a private processor workflow. Room bindings belong in the private UI settings file; the tests never choose a thermostat automatically or save an edited schedule. A separate private `AllowNameBinding` option temporarily renames the gateway to associate its app tile with the installed instance, then restores the name. Heating and Away commands are never sent. These checks do not complete the Crestron submission test plan.
+The opt-in [Android UI project](WiserHeatCrestronDriver.AndroidTests/README.md) compares the real Hot Water and Away controls with fresh processor state, inspects the schedule/day/time choices of explicitly bound room thermostats, and restores the Home screen. It uses TestAdapter 1.11.0 and DevTools 1.6.0, and runs only when selected by a private processor workflow. Room bindings belong in the private UI settings file; the tests never choose a thermostat automatically or save an edited schedule. A separate private `AllowNameBinding` option temporarily renames the gateway to associate its app tile with the installed instance, then restores the name. Heating and Away commands are never sent. These checks do not complete the Crestron submission test plan.
 
 The separately selected [Android control project](WiserHeatCrestronDriver.AndroidControlTests/README.md) adds an Auto/Manual/Auto room-mode cycle, editor Cancel checks and an explicitly configured Save Day/Save All case. Existing manual and scheduled targets may differ; both are captured and restored. These controls can briefly change heating demand and require private room bindings. The mode cycle and Cancel case have passed development hardware validation; see the [validation status](submission/ValidationStatus.md) for the exact scope and remaining save/submission work. Both Android projects skip during ordinary desktop runs without an active processor workflow.
 
@@ -170,6 +170,8 @@ Build the processor project in Debug in Visual Studio to build and deploy using 
 ### Command state refresh
 
 After a state-changing command completes, the driver reads fresh hub state before publishing the result. Hot-water and Away buttons therefore show the observed state before they become available again; boost, schedule and setpoint controls also refresh immediately. Routine polling remains throttled.
+
+SDK command regressions also verify schedule-editor temperature limits, non-finite input, half-degree rounding, Cancel restoration and continued hub refresh after an ignored command. The current source ignores temperatures outside the advertised 5-35 degree range before starting an edit. This correction is validated in a development candidate and is not part of the existing v1.3.7 release; see [current validation](submission/ValidationStatus.md).
 
 ### Expanded driver behavior tests
 
