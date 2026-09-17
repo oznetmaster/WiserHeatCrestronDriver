@@ -16,7 +16,7 @@ namespace WiserHeatCrestronDriver.ControlProbe.Tests;
 public sealed class ScheduleEditorRenderingTests
 	{
 	private const string APP = "com.crestron.phoenix.app";
-	private static XElement Node (string id = "", string text = "", string bounds = "[0,0][100,100]") => new ("node",
+	private static XElement Node (string id = "", string text = "", string bounds = "[1,1][99,100]") => new ("node",
 		new XAttribute ("package", APP), new XAttribute ("enabled", "true"), new XAttribute ("resource-id", id.Length == 0 ? "" : APP + ":id/" + id),
 		new XAttribute ("text", text), new XAttribute ("bounds", bounds));
 	private static (XElement Xml, JsonObject Editor) Page (int count)
@@ -121,6 +121,26 @@ public sealed class ScheduleEditorRenderingTests
 		var target = clipOnlyAction ? label.Parent!.Elements ().Single (node => (string?)node.Attribute ("resource-id") == APP + ":id/customdeviceraiselowerwithtext_plus") : label.Parent!;
 		target.SetAttributeValue ("bounds", "[0,900][100,1100]");
 		Assert.That (Check (page, false).Select (row => row.Kind), Is.EqualTo (new[] { "Time" }));
+		Assert.Throws<InvalidDataException> (() => Check (page));
+		}
+	[TestCase ("row", true)]
+	[TestCase ("row", false)]
+	[TestCase ("customdeviceraiselowerwithtext_label", true)]
+	[TestCase ("customdeviceraiselowerwithtext_label", false)]
+	[TestCase ("customdeviceraiselowerwithtext_value", true)]
+	[TestCase ("customdeviceraiselowerwithtext_value", false)]
+	[TestCase ("customdeviceraiselowerwithtext_minus", true)]
+	[TestCase ("customdeviceraiselowerwithtext_minus", false)]
+	[TestCase ("customdeviceraiselowerwithtext_plus", true)]
+	[TestCase ("customdeviceraiselowerwithtext_plus", false)]
+	public void BoundsClampedToViewportCannotProveFullVisibility (string component, bool top)
+		{
+		var page = Page (1);
+		var row = page.Xml.Descendants ("node").Single (node => (string?)node.Attribute ("text") == "SETPOINT 1").Parent!;
+		var target = component == "row" ? row : row.Elements ().Single (node => (string?)node.Attribute ("resource-id") == APP + ":id/" + component);
+		// Android clips accessibility bounds at the viewport edge, hiding the original extent.
+		target.SetAttributeValue ("bounds", top ? "[1,0][99,29]" : "[1,971][99,1000]");
+		Assert.That (Check (page, false).Select (value => value.Kind), Is.EqualTo (new[] { "Time" }));
 		Assert.Throws<InvalidDataException> (() => Check (page));
 		}
 	}

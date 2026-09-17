@@ -36,7 +36,9 @@ public static class ScheduleEditorRendering
 		{
 		var row = Bounds (node);
 		var view = Bounds (viewport);
-		return row.Left >= view.Left && row.Right <= view.Right && row.Top >= view.Top && row.Bottom <= view.Bottom;
+		// Android clamps partially clipped controls to the viewport bounds. An edge-touching
+		// control has no evidence of its full vertical extent, so observe it in another viewport.
+		return row.Left >= view.Left && row.Right <= view.Right && row.Top > view.Top && row.Bottom < view.Bottom;
 		}
 
 	/// <summary>Every complete observed row must match its own labelled slot. Partial rows cannot prove coverage.</summary>

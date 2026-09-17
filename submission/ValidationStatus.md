@@ -2,6 +2,8 @@
 
 Wiser is the first end-to-end submission pilot. No Crestron submission has been sent, no signed acceptance form has been generated, and no certification is claimed. This driver has not previously been accepted on the portal. Its submission profile uses Neil Colvin as the developer and the repository/issue tracker for public support, with an empty public email field. Private correspondence and signing assets remain outside the repository.
 
+Android can clamp a partly hidden row or child control to the viewport boundary. The visibility reader now conservatively excludes controls touching the top or bottom edge; those controls must be observed away from the edge in another viewport before they count as fully visible. Ten regression cases reproduced the old false-positive behavior and pass with this correction. The complete control-probe suite passed. This changes test evidence, not the installed driver.
+
 ## Current development evidence - 17 September 2026
 
 Additional synthetic SDK and Mono processor checks passed for all ten schedule editor positions, per-slot notifications and Cancel restoration, and all supported day-entry counts. The temporary test host and its uploaded package were removed and the processor reservation released. The installed driver was not updated, no processor was rebooted, and no live hub control was used. These checks establish model/dispatcher behavior, not rendered Android coverage.
