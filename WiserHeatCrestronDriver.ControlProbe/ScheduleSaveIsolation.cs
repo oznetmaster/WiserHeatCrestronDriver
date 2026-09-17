@@ -20,7 +20,7 @@ public interface IScheduleSaveIsolationSession
 	}
 
 /// <summary>Run both real UI saves against one owned schedule, then restore its assignment and remove it.</summary>
-public static class ScheduleSaveIsolation
+public static partial class ScheduleSaveIsolation
 	{
 	/// <summary>Explicitly exercise a room's existing, exclusively assigned schedule and restore its complete contents.</summary>
 	public static async Task<ScheduleSaveIsolationResult> RunExistingAsync (IScheduleSaveIsolationSession session, int roomId,

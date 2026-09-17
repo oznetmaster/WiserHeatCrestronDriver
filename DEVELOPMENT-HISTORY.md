@@ -11,6 +11,12 @@ See the [product changelog](CHANGELOG.md) for shipped changes. This document pre
 
 <!-- development-history -->
 
+## Schedule conflict validation - 2026-09-17 (no driver release)
+
+- Added separately selected Save Day and Save All conflict cases, backed by independent hub observations, original-state restoration and failure-path regression tests.
+- Both actual UI cases passed on the preserved Debug candidate. Screenshots revealed a truncated conflict warning, so readable feedback remains an open submission item.
+- The complete control-probe suite passed; all Android cases stay offline without an explicit workflow context. See [validation status](submission/ValidationStatus.md) for the exact evidence and limits.
+
 ## Editor recovery validation - 2026-09-17 (no driver release)
 
 - Add explicitly selected day/time interruption cases with independent restoration assertions. Both passed on the development processor; an interrupted operation stays failed even when its recovery assertion succeeds.
@@ -106,3 +112,11 @@ Published processor test package on GitHub. This is a test-package release only;
 - Add 29 NUnit driver unit tests and a processor lifecycle suite in the existing solution.
 
 - Add a standalone Utility processor test package with private Debug deployment settings.
+
+## Earlier Android save/Cancel validation notes
+
+These dated candidate records were moved from the control-test setup guide. They retain their original scope and do not describe the current final acceptance status.
+
+The explicitly selected existing-schedule case passed against Debug candidate `1.3.007.0013`: both UI saves matched independent hub contents, all original days and guarded room settings were restored, the editor and Home were restored, inventory was preserved and reservations were released. This was one selected save case, not a repeat of all six Android cases. Its frozen producer used the private 1.9.0 adapter candidate; the project was then separately built from the released public NuGet package and verified to skip all hardware cases without a workflow. The earlier read-only setup failure remains retained evidence. Temporary-schedule creation/deletion is covered offline but has not passed on this hub. Final Release-candidate validation remains outstanding.
+
+The first complete Debug attempt and a focused repeat failed after selecting another day, then verified restoration and released reservations. SDK regressions subsequently reproduced missing day/time/temperature change notifications, and the driver correction passes those checks. The subsequent complete workflow against Debug candidate `1.3.007.0013` passed all five Android cases, including this case, and independently confirmed unchanged persistent schedules/room assignments, editor and Home restoration. The temporary test instance was removed and reservations released. The package archive was preserved because it existed before the run. These results do not establish live Save behavior or final Release-candidate acceptance.

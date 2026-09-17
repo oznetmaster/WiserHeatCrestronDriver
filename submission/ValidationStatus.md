@@ -1,5 +1,11 @@
 # Wiser submission pilot status
 
+## Schedule conflict validation - 17 September 2026
+
+Both `ScheduleConflictRefusesStaleSaveAndRestoresOriginal` cases passed on exact Debug `1.3.007.0028` (SHA-256 `9146679AA8337293F508D3E7E635266CDFAFC6CC1C00244C5DC8708C6CAF5F80`) using the normal Android control project and public TestAdapter 1.11.0. Each made a pending UI edit, independently changed the exclusively assigned hub schedule, and tapped Save Day or Save All once. Actual hub snapshots confirmed that the newer schedule survived; every pending editor value and visibility flag was preserved. Cancel/reopen loaded the current hub data. The full original schedules, guarded room settings, editor, Home, inventory and emulator dimensions were restored, the temporary child was removed, and both reservations were released. The complete control-probe suite passed, including the new failure/recovery cases.
+
+Visual inspection found that the conflict warning is ellipsized before its recovery instruction finishes. The functional conflict tests therefore do not establish readable feedback; that UI defect remains open. This run covers observed stale edits on an existing exclusive schedule, not arbitrary simultaneous writers, temporary schedule creation, final Release acceptance or endurance.
+
 Wiser is the first end-to-end submission pilot. No Crestron submission has been sent, no signed acceptance form has been generated, and no certification is claimed. This driver has not previously been accepted on the portal. Its submission profile uses Neil Colvin as the developer and the repository/issue tracker for public support, with an empty public email field. Private correspondence and signing assets remain outside the repository.
 
 Android can clamp a partly hidden row or child control to the viewport boundary. The visibility reader now conservatively excludes controls touching the top or bottom edge; those controls must be observed away from the edge in another viewport before they count as fully visible. Ten regression cases reproduced the old false-positive behavior and pass with this correction. The complete control-probe suite passed. This changes test evidence, not the installed driver.
