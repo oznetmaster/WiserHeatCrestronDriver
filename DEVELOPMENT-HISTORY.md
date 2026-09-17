@@ -11,6 +11,13 @@ See the [product changelog](CHANGELOG.md) for shipped changes. This document pre
 
 <!-- development-history -->
 
+## Schedule-layout validation - 2026-09-18 (no driver release)
+
+- Added an explicitly selected Android fixture to prepare declared schedule sizes, inspect every labelled time/setpoint row through scrolling, and restore complete original state. Offline tests cover failed writes, interrupted inspection and unrelated changes that prevent safe restoration.
+- The real hub accepted and the UI rendered every documented one-to-eight-entry layout, including growth and reduction back to one entry. Independent state, editor/Home restoration and temporary-child cleanup passed on the exact development package. An earlier ten-entry request was rejected and remains a separate failed run.
+- See [validation status](submission/ValidationStatus.md) for candidate, display and acceptance limits. This test-only work does not change the public driver version.
+
+
 ## Conflict warning correction - 2026-09-17 (pending driver release)
 
 - Shortened the schedule-conflict warning after actual portrait screenshots showed the recovery instruction cut off. The warning now reads "Schedule changed. Cancel and reopen."

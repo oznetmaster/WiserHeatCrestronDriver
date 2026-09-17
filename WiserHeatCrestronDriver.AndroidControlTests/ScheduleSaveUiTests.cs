@@ -79,7 +79,7 @@ public sealed partial class GatewayUiTests
 		}
 
 	private sealed partial class ScheduleSaveSession (GatewayUiTests fixture, HubSettings hub, HttpClient http,
-		ControlRoomBinding control, RoomBinding binding, DeviceInfo original, string check) : IScheduleConflictSession
+		ControlRoomBinding control, RoomBinding binding, DeviceInfo original, string check) : IScheduleConflictSession, IScheduleLayoutSession
 		{
 		private readonly ScheduleActivity _initial = Activity (original);
 		private readonly JsonElement _originalEditor = ScheduleEditorObservation.Editor (original.PropertyValues);

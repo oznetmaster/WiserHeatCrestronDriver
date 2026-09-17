@@ -1,5 +1,18 @@
 # Wiser submission pilot status
 
+## Supported schedule layouts - 18 September 2026
+
+The normal Android control fixture passed the declared sequence of one, eight, two, seven, three, six, four, five and one entries on exact Debug `1.3.007.0029` using public TestAdapter 1.11.0. Every supported time and setpoint row was observed with the correct values, including scrolling where needed. The final one-entry layout removed all surplus rows. Independent hub snapshots confirmed each requested layout and unchanged unrelated schedules and guarded room settings. Original schedules, room settings, editor, Home and inventory were restored; the temporary child was removed and reservations released.
+
+The evidence audit checked every layout, hidden surplus model slots, original-state snapshots, frozen producer and exact active package. Visual review covered both eight-entry viewports and the final one-entry view. The full control-probe suite and ordinary context-free Android discovery also passed. This is development evidence for one existing exclusive schedule and one display profile, not final Release acceptance, endurance or certification. The separate ten-entry rejection below remains a failed run.
+
+## Hub schedule capacity - 18 September 2026
+
+The first layout run observed a one-entry schedule, then the hub rejected the ten-entry request with HTTP 400 (`Time: array overflow: Time`). The run remained failed; independent final snapshots confirmed complete original schedule and guarded room-setting restoration, Home, original inventory, temporary-child removal and released reservations.
+
+[Drayton documents a maximum of eight events per day](https://wiser.draytoncontrols.co.uk/pages/wiser-app). The driver's ten modeled editor slots do not establish ten-entry hub support. Physical acceptance therefore needs every supported one-to-eight-entry layout, including growth/shrinkage and hidden surplus controls; synthetic coverage remains relevant to the defensive extra slots. The subsequent supported-layout run above is separate from the retained failed attempt and has its own live evidence. Neither a model test nor the capacity documentation alone is a passing live test.
+
+
 ## Conflict warning correction - 17 September 2026
 
 Debug `1.3.007.0029` shortens the clipped warning to "Schedule changed. Cancel and reopen." The complete gated update passed local, Mono processor, read-only live and installed-state checks. A separate run repeated both real stale Save Day/Save All cases against its exact active payload using public TestAdapter 1.11.0. Independent hub observations, pending editor preservation, complete original-state restoration, temporary-child cleanup and reservation release passed. Both after-save screenshots show the complete warning at the tested 1080x2400 viewport; the earlier Debug28 truncation is resolved for that profile.
