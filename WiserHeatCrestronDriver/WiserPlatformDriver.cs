@@ -103,6 +103,10 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		private set => SetAndNotify ("platformStatus", value, ref field);
 		} = "Not configured";
 
+	// A new root entity has a new lifetime even when its package and processor boot are unchanged.
+	[EntityProperty (Id = "driverLifetimeId", FriendlyName = "Driver Instance Lifetime ID", Type = DriverEntityValueType.String)]
+	public string DriverLifetimeId { get; } = Guid.NewGuid ().ToString ("N");
+
 	// Monitoring evidence only: cached state reads and failed/stale refreshes must not renew it.
 	[EntityProperty (Id = "lastHubRefreshUtc", FriendlyName = "Last Successful Hub Refresh UTC", Type = DriverEntityValueType.String)]
 	public string LastHubRefreshUtc

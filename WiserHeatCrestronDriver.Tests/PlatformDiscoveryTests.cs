@@ -50,6 +50,24 @@ public sealed class PlatformDiscoveryTests
 		Set ("_lastScheduleRefreshUtc", DateTimeOffset.UtcNow);
 		}
 	[Test]
+	public async Task LifetimeIdentitySurvivesRefreshAndIsPublishedByDispatcher ()
+		{
+		string lifetime = _driver.DriverLifetimeId;
+		Assert.That (Guid.TryParseExact (lifetime, "N", out _), Is.True);
+		Assert.That (await _driver.RefreshSystemStateAsync (true), Is.True);
+		using var dispatcher = CreateDispatcher ();
+		Assert.That (_driver.DriverLifetimeId, Is.EqualTo (lifetime));
+		Assert.That (dispatcher.GetState (DriverController.RootControllerId).PropertyValues["driverLifetimeId"].GetValue<string> (), Is.EqualTo (lifetime));
+		}
+
+	[Test]
+	public void NewRootEntityHasDifferentLifetimeIdentity ()
+		{
+		using var replacement = new WiserPlatformDriver (new DriverControllerCreationArgs ("wiser-platform-test", TestSupport.DataDirectory, _logger.AppLogger, null), TestSupport.Resources (_logger));
+		Assert.That (replacement.DriverLifetimeId, Is.Not.EqualTo (_driver.DriverLifetimeId));
+		}
+
+	[Test]
 	public async Task SuccessfulFreshReadPublishesTimestampButCachedReadDoesNotRenewIt ()
 		{
 		Assert.That (_driver.LastHubRefreshUtc, Is.Empty);
