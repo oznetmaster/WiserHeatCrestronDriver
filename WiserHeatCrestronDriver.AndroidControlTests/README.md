@@ -1,6 +1,6 @@
 # Wiser Android control tests
 
-This separately selected NUnit project includes the existing Android inspections, a room schedule-control cycle and an editor Cancel case. The mode cycle uses the real Home app to disable schedule control, observes Manual mode directly from the Wiser hub, then enables schedule control through the app and verifies Auto mode and restoration. If the hub replaces the saved manual temperature during the mode change, the test restores that captured value through the hub's temperature command before returning to Auto. The editor case changes pending selections and cancels them; it never saves a schedule.
+This separately selected NUnit project includes the existing Android inspections, a room schedule-control cycle, an editor Cancel case and an explicitly configured Save Day/Save All case. The mode cycle uses the real Home app to disable schedule control, observes Manual mode directly from the Wiser hub, then enables schedule control through the app and verifies Auto mode and restoration. If the hub replaces the saved manual temperature during the mode change, the test restores that captured value through the hub's temperature command before returning to Auto. The Cancel case never saves; the save case requires its own room selection and full schedule restoration.
 
 The original `WiserHeatCrestronDriver.AndroidTests` project remains read-only apart from its optional restored name challenge. Selecting that project never includes these control cases. Neither project connects to Android or a processor during ordinary desktop test runs; all fixtures skip without the workflow context.
 
@@ -13,11 +13,14 @@ Use the existing private processor workflow, with `AndroidTests.Project` pointin
   "ControlHubSettingsPath": "ABSOLUTE_PRIVATE_PATH_TO_LIVE_TEST_SETTINGS_JSON",
   "ControlRooms": [
     { "DeviceId": 1234, "HubRoomName": "Test Room" }
+  ],
+  "ScheduleSaveRooms": [
+    { "DeviceId": 1234, "HubRoomName": "Test Room" }
   ]
 }
 ```
 
-These fields augment the existing processor credentials, `Rooms` bindings and optional `AllowNameBinding` setting; they do not replace them. Each control device must have exactly one matching `Rooms` binding. `HubRoomName` is the exact physical room name returned by Wiser, which can differ from its assigned Crestron Home room. The hub settings file uses the existing library's `hubHost` and `secret` fields; other live-test settings are ignored. Credentials, paths and actual room bindings stay outside the repository.
+These fields augment the existing processor credentials, `Rooms` bindings and optional `AllowNameBinding` setting; they do not replace them. Each control device must have exactly one matching `Rooms` binding. `HubRoomName` is the exact physical room name returned by Wiser, which can differ from its assigned Crestron Home room. The hub settings file uses the existing library's `hubHost` and `secret` fields; other live-test settings are ignored. Credentials, paths and actual room bindings stay outside the repository. Configure both arrays when running the entire control project: omitting `ScheduleSaveRooms` skips the save case and cannot satisfy a gate requiring all discovered cases to pass. An intentionally filtered development run must report its narrower selected coverage.
 
 The fixture independently matches the hub host/room ID with the installed child's `controlDeviceId`, parent gateway, version, name and location. It refuses ambiguous or changed identities. It requires an idle driver, an assigned schedule in Auto mode and no boost/override. An existing manual setpoint must be between 5°C and 30°C. The manual target may be lower, equal or higher than the current scheduled target. Both are captured; the test handles hubs that retain the manual target and hubs that initialize it from the active target. Equal targets need no temperature-restoration command. By default, an absent or null manual target is reported as unsupported before any control: the hub can create that value, but no verified operation removes it to restore the original absence. This is not a passing control test.
 
@@ -37,6 +40,20 @@ Cancellation has a separate bounded restoration deadline. An uncertain restorati
 
 ## Validation status
 
+### Schedule Save Day and Save All case
+
+`ScheduleSaveDayAndAllRestoreOriginalSchedules` requires a separate `ScheduleSaveRooms` array in the private UI settings. An empty array skips this case; a submission plan that requires save behavior must select it and reject a skipped result. Each entry identifies the installed `DeviceId` and physical `HubRoomName`, with the same matching `Rooms` binding and private `ControlHubSettingsPath` used by the other control cases.
+
+By default, the test creates a uniquely named, unassigned schedule, copies the selected room's seven days, assigns only that room, operates both save controls, restores the original assignment and removes only its own schedule. Original schedules and other rooms must remain unchanged, including other users of the original shared schedule. A failed creation never permits deleting an existing household schedule to make space.
+
+Where a hub cannot create another schedule, an entry can explicitly set `"UseExistingExclusiveSchedule": true`. This uses the selected room's current schedule only if no other room shares it. It captures all seven original days before input, operates Save Day and Save All, then restores the complete original contents without changing assignments or deleting any schedule. There is no automatic fallback to this mode after a rejected creation.
+
+Both modes make a real half-degree change through the uniquely labelled first temperature row. Save Day must affect only the selected day; Save All must copy that day's complete entries to all seven days. Fresh independent hub reads, completed driver command counts, reopened editor values and Home restoration must agree. Flushed private intents precede each input and compensation. Lost replies are never automatically replayed and remain failures even if restoration succeeds. Unexpected edits, reassignment or unrelated room changes prevent automatic overwrites and retain recovery evidence and reservations.
+
+Offline checks cover both modes, shared-schedule refusal, ignored writes, uncertain replies, cancellation, unrelated changes and missing restoration evidence. Development attempts to create an additional schedule were rejected by the hub, then independently confirmed unchanged state. No existing schedule was removed to make space.
+
+The explicitly selected existing-schedule case passed against Debug candidate `1.3.007.0013`: both UI saves matched independent hub contents, all original days and guarded room settings were restored, the editor and Home were restored, inventory was preserved and reservations were released. This was one selected save case, not a repeat of all six Android cases. Its frozen producer used the private 1.9.0 adapter candidate; the project was then separately built from the released public NuGet package and verified to skip all hardware cases without a workflow. The earlier read-only setup failure remains retained evidence. Temporary-schedule creation/deletion is covered offline but has not passed on this hub. Final Release-candidate validation remains outstanding.
+
 ### Schedule editor Cancel case
 
 `ScheduleEditorSelectionsCancelWithoutChangingHub` uses the same explicit `ControlRooms` and private hub settings. It independently matches the assigned schedule and initial editor contents, captures all persistent schedules and room assignments, chooses another day and restores the selected day, changes the first time selection, then uses Cancel. Reopening must show the hub's original data. Success requires unchanged schedules and assignments, restored editor values and Home. It does not establish Save Day/Save All UI behavior, every conditional slot or physical heating response.
@@ -47,7 +64,7 @@ The first complete Debug attempt and a focused repeat failed after selecting ano
 
 ### Room mode-control case
 
-Offline regressions cover successful UI control/restoration, lost input responses, cancellation, journal failures, changed physical identity, driver restart, concurrent commands and unsafe initial setpoints. The project builds against published TestAdapter 1.8.1, DevTools 1.5.0 and WiserHeatAPIv2 1.1.0.6, and every fixture skips without a hardware context.
+Offline regressions cover successful UI control/restoration, lost input responses, cancellation, journal failures, changed physical identity, driver restart, concurrent commands and unsafe initial setpoints. The project references TestAdapter 1.9.0, DevTools 1.5.0 and WiserHeatAPIv2 1.1.0.6, and every fixture skips without a hardware context. Adapter 1.9.0 supplies the labelled-row selector used by the save case.
 
 The corrected live UI control case passed against Debug driver `1.3.007.0011`. It used both UI mode controls, independently verified the hub, restored the different saved manual target and the scheduled occupancy readings, returned the app to Home, preserved the device inventory and released its reservations. This was a focused control-case run; the separate read-only workflow had already passed its inspections.
 
