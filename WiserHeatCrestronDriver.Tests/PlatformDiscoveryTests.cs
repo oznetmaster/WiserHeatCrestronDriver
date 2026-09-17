@@ -25,7 +25,7 @@ using WiserHeatApiV2;
 namespace WiserHeatCrestronDriver.Tests;
 
 [TestFixture, Category ("Processor")]
-public sealed class PlatformDiscoveryTests
+public sealed partial class PlatformDiscoveryTests
 	{
 	private DriverLogger _logger;
 	private WiserPlatformDriver _driver;

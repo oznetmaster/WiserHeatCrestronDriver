@@ -77,6 +77,7 @@ public sealed partial class GatewayUiTests
 					await pages.OpenPageAsync (Text ("Open"), "Schedule", CrestronHomePages.Resource ("customdevices_toolbarClose"), token);
 					await pages.OpenPageAsync (Text ("Edit"), "Edit Schedule", Text ("Cancel"), token);
 					string[] titles = [binding.PageTitle, "Schedule", "Edit Schedule"];
+					await CaptureEditorValuesAsync (check, "controls-initial", titles, binding, Record, token);
 					string dayLabel = _dayLabels.Single (label => label.Trim () == originalDay);
 					string changedDay = await ChooseEditorOptionAsync (check + ".day", titles, "DAY", _dayLabels, dayLabel, null,
 						value => { alternateDay = value.Trim (); return Record ("day-intent", new { Original = originalDay, Chosen = value }); }, token);
@@ -92,6 +93,7 @@ public sealed partial class GatewayUiTests
 						value => Record ("time-intent", new { Original = originalTime, Chosen = value }), token);
 					await WaitForEditorAsync (binding, "editSlot1Time", changedTime, token);
 					await Record ("time-observed", ScheduleEditorObservation.Editor ((await ReadRoomAsync (binding, token)).PropertyValues));
+					await CaptureEditorValuesAsync (check, "controls-edited", titles, binding, Record, token);
 					await Record ("cancel-intent", new { Expected = originalEditor });
 					await pages.ClosePageAsync (token);
 					var cancelled = await WaitForEditorAsync (binding, "editSlot1Time", originalTime, token);
@@ -142,6 +144,23 @@ public sealed partial class GatewayUiTests
 					}
 				}
 			}
+		}
+
+	private async Task CaptureEditorValuesAsync (string check, string phase, string[] titles, RoomBinding binding,
+		Func<string, object, Task> record, CancellationToken token)
+		{
+		var editor = ScheduleEditorObservation.Editor ((await ReadRoomAsync (binding, token)).PropertyValues);
+		IReadOnlyList<ScheduleEditorRenderedValue>? controls = null;
+		await _session!.CaptureAsync (check + "." + phase, hierarchy =>
+			{
+			AndroidWorkflowSession.VerifyContext (_session.Context);
+			var front = CrestronHomeExtensionPages.RequirePage (hierarchy, titles);
+			controls = ScheduleEditorRendering.RequireValues (front.MaskedXml, editor, requireComplete: false);
+			Assert.That (controls, Is.Not.Empty, "The editor must expose at least one complete control row.");
+			}, token);
+		int expected = Enumerable.Range (1, 10).Count (slot => editor.GetProperty ("editSlot" + slot.ToString (CultureInfo.InvariantCulture) + "Visible").GetBoolean ()) * 2;
+		await record (phase, new { Editor = editor, Controls = controls, AllCurrentControlsObserved = controls!.Count == expected,
+			Scope = "Fully visible rows on this editor page; clipped or off-screen controls do not establish coverage." });
 		}
 
 	private async Task<DeviceInfo> WaitForEditorAsync (RoomBinding binding, string property, string expected, CancellationToken token)

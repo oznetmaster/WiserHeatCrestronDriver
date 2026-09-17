@@ -60,6 +60,8 @@ The explicitly selected existing-schedule case passed against Debug candidate `1
 
 ### Schedule editor Cancel case
 
+The current source also checks rendered time and setpoint values before editing and after changing the pending time. Repeated value and plus/minus identifiers are read within their own labelled row. Disabled/missing actions, unexpected visible slots, duplicate rows and mismatched values fail. Partial or off-screen rows never count as complete coverage; private records list the observed controls and whether all current controls were visible. The reader has synthetic regressions and an offline check against retained real hierarchy/property evidence. This enhanced reader has not yet been revalidated by a new live Android run. It does not establish every possible slot layout or every temperature action.
+
 `ScheduleEditorSelectionsCancelWithoutChangingHub` uses the same explicit `ControlRooms` and private hub settings. It independently matches the assigned schedule and initial editor contents, captures all persistent schedules and room assignments, chooses another day and restores the selected day, changes the first time selection, then uses Cancel. Reopening must show the hub's original data. Success requires unchanged schedules and assignments, restored editor values and Home. It does not establish Save Day/Save All UI behavior, every conditional slot or physical heating response.
 
 The case records intents and observations in its private `.editor-cancel.records` directory. If UI validation fails, it may restore the selected day and issue one distinct Cancel through the verified installed driver; that compensation cannot turn the failure into a pass. Commands are not automatically repeated. A short-lived configuration session is reused during each property-observation period. Only an initial login timeout permits one fresh connection attempt, with the original observation deadline retained; authentication rejection and other errors propagate.
@@ -68,7 +70,7 @@ The first complete Debug attempt and a focused repeat failed after selecting ano
 
 ### Room mode-control case
 
-Offline regressions cover successful UI control/restoration, lost input responses, cancellation, journal failures, changed physical identity, driver restart, concurrent commands and unsafe initial setpoints. The project references TestAdapter 1.9.0, DevTools 1.5.0 and WiserHeatAPIv2 1.1.0.6, and every fixture skips without a hardware context. Adapter 1.9.0 supplies the labelled-row selector used by the save case.
+Offline regressions cover successful UI control/restoration, lost input responses, cancellation, journal failures, changed physical identity, driver restart, concurrent commands and unsafe initial setpoints. The project references TestAdapter 1.10.0, DevTools 1.6.0 and WiserHeatAPIv2 1.1.0.6, and every fixture skips without a hardware context. Adapter 1.9.0 supplies the labelled-row selector used by the save case.
 
 The corrected live UI control case passed against Debug driver `1.3.007.0011`. It used both UI mode controls, independently verified the hub, restored the different saved manual target and the scheduled occupancy readings, returned the app to Home, preserved the device inventory and released its reservations. This was a focused control-case run; the separate read-only workflow had already passed its inspections.
 
