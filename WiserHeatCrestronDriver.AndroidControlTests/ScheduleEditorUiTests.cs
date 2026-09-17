@@ -19,7 +19,28 @@ namespace WiserHeatCrestronDriver.AndroidTests;
 public sealed partial class GatewayUiTests
 	{
 	[Test, Category ("LiveControl")]
-	public async Task ScheduleEditorSelectionsCancelWithoutChangingHub ()
+	public Task ScheduleEditorSelectionsCancelWithoutChangingHub () => ExerciseEditorSelectionsAsync (null);
+
+	private sealed class EditorTestInterruptionException (string phase) : Exception ("Deliberate editor validation interruption: " + phase)
+		{
+		public string Phase { get; } = phase;
+		}
+
+	[TestCase ("day"), TestCase ("time"), Category ("LiveControl")]
+	public void ScheduleEditorInterruptionRestoresOriginalState (string phase)
+		{
+		Assert.That (_settings!.ControlRooms.Length, Is.EqualTo (1), "Each interruption case requires one explicitly bound room.");
+		var failure = Assert.ThrowsAsync<EditorTestInterruptionException> (() => ExerciseEditorSelectionsAsync (phase));
+		Assert.That (failure!.Phase, Is.EqualTo (phase));
+		Assert.That (_roomStatePreserved && _navigation!.HomeRestored, Is.True);
+		AndroidWorkflowSession.VerifyContext (_session!.Context);
+		using var record = new FileStream (Path.Combine (_session.Context.EvidenceDirectory, "editor-interruption-" + phase + "-expected.json"), FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+		JsonSerializer.Serialize (record, new { _session.Context.RunId, _session.Context.PackageSha256, ExpectedInterruption = phase, RestorationConfirmed = true,
+			Scope = "Recovery after a deliberate interruption; the interrupted operation is not reported as successful." });
+		record.Flush (true);
+		}
+
+	private async Task ExerciseEditorSelectionsAsync (string? interruption)
 		{
 		Assert.That (_nameRestored && _roomStatePreserved, Is.True, "An earlier restoration needs reconciliation.");
 		if (_settings!.ControlRooms.Length == 0 || _settings.ControlRooms.Select (room => room.DeviceId).Distinct ().Count () != _settings.ControlRooms.Length ||
@@ -56,7 +77,7 @@ public sealed partial class GatewayUiTests
 			var originalEditor = ScheduleEditorObservation.Editor (before.PropertyValues);
 			ScheduleEditorObservation.RequireMatchesHub (originalEditor, schedules, scheduleId);
 			string originalDay = originalEditor.GetProperty ("editSelectedDay").GetString ()!;
-			string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + ".editor-cancel";
+			string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + (interruption == null ? ".editor-cancel" : ".editor-interruption-" + interruption);
 			string evidence = Path.Combine (_session!.Context.EvidenceDirectory, check + ".records");
 			Directory.CreateDirectory (evidence);
 			async Task Record (string phase, object value)
@@ -84,6 +105,11 @@ public sealed partial class GatewayUiTests
 					var changed = await WaitForEditorAsync (binding, "editSelectedDay", changedDay.Trim (), token);
 					ScheduleEditorObservation.RequireMatchesHub (ScheduleEditorObservation.Editor (changed.PropertyValues), schedules, scheduleId);
 					await Record ("changed-day", ScheduleEditorObservation.Editor (changed.PropertyValues));
+					if (interruption == "day")
+						{
+						await Record ("expected-interruption-intent", new { Phase = interruption, Current = ScheduleEditorObservation.Editor (changed.PropertyValues) });
+						throw new EditorTestInterruptionException (interruption);
+						}
 					await ChooseEditorOptionAsync (check + ".day-restore", titles, "DAY", _dayLabels, changedDay, dayLabel,
 						value => Record ("day-restore-intent", new { Chosen = value }), token);
 					await WaitForEditorAsync (binding, "editSelectedDay", originalDay, token);
@@ -93,6 +119,11 @@ public sealed partial class GatewayUiTests
 						value => Record ("time-intent", new { Original = originalTime, Chosen = value }), token);
 					await WaitForEditorAsync (binding, "editSlot1Time", changedTime, token);
 					await Record ("time-observed", ScheduleEditorObservation.Editor ((await ReadRoomAsync (binding, token)).PropertyValues));
+					if (interruption == "time")
+						{
+						await Record ("expected-interruption-intent", new { Phase = interruption, ChangedTime = changedTime });
+						throw new EditorTestInterruptionException (interruption);
+						}
 					await CaptureEditorValuesAsync (check, "controls-edited", titles, binding, Record, token);
 					await AdjustVisibleEditorSetpointsAsync (check, titles, binding, Record, token);
 					await Record ("cancel-intent", new { Expected = originalEditor });
@@ -125,11 +156,17 @@ public sealed partial class GatewayUiTests
 						if (currentDay != originalDay)
 							{
 							await Record ("recovery-day-intent", new { Original = originalDay });
-							await client.ExecuteDeviceCommandAsync (binding.DeviceId, "setEditSelectedDay", new { value = originalDay }, cleanup.Token);
+							await client.ExecuteDeviceCommandAsync (binding.DeviceId, "extension:setPropertyValue", new { property = "editSelectedDay", value = originalDay }, cleanup.Token);
+							await WaitForEditorAsync (binding, "editSelectedDay", originalDay, cleanup.Token);
 							}
 						await Record ("recovery-cancel-intent", new { Original = originalEditor });
-						await client.ExecuteDeviceCommandAsync (binding.DeviceId, "cancelEditSchedule", cancellationToken: cleanup.Token);
-						after = await ReadRoomAsync (binding, cleanup.Token);
+						await client.ExecuteDeviceCommandAsync (binding.DeviceId, "extension:doCommand", new { commandName = "cancelEditSchedule", args = Array.Empty<string> () }, cleanup.Token);
+						while (true)
+							{
+							after = await ReadRoomAsync (client, binding, cleanup.Token);
+							if (JsonElement.DeepEquals (originalEditor, ScheduleEditorObservation.Editor (after.PropertyValues))) break;
+							await Task.Delay (250, cleanup.Token);
+							}
 						}
 					var finalSchedules = await ReadHub ("schedules", cleanup.Token);
 					var finalRooms = ScheduleEditorObservation.RoomAssignments (await ReadHub ("domain", cleanup.Token));

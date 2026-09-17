@@ -58,6 +58,14 @@ The default temporary-schedule mode could not create another schedule on this hu
 
 The subsequent complete workflow against Debug candidate `1.3.007.0014` passed 219 local tests, 73 processor tests, three processor live tests, the actual-driver update and deployed-driver checks. All six Android cases passed using the released TestAdapter 1.9.0, including Auto/Manual/Auto, editor Cancel and both Save operations. Exact control-state, schedule and editor/Home restoration were confirmed. The temporary test instance was removed and reservations released; its pre-existing package archive was preserved. The candidate SHA-256 is `7D106F6DAB7756B629D0E99AF24E2B818C7461F6BFADEBF51820E2F8C4012966`. This candidate additionally fixes an offline-reproduced stopped-room readiness defect after successful reconnection, preserving controller identity. It does not establish the cause or resolution of the separate initial-commissioning timeout.
 
+## Schedule-save recovery validation
+
+The corrected Save Day/Save All fixture subsequently passed on the exact Debug `1.3.007.0028` payload with the public TestAdapter 1.11.0. Both real UI saves matched independent hub assertions on one existing, exclusively assigned schedule. Full original schedules and guarded room settings, editor day/values, Home, inventory and emulator dimensions were restored; the temporary child was removed and reservations released. The run exercised the configuration day-write and Cancel recovery. The saved page was visually inspected for readable labels, values and action scope. This does not cover temporary schedule creation, save conflicts, mode-recovery compensation or final candidate acceptance.
+
+## Deliberate editor interruption validation
+
+Two deliberate editor interruption cases passed on the exact Debug `1.3.007.0028` payload with the public TestAdapter 1.11.0. The changed-day case required the observed configuration day-write and Cancel fallback; the pending-time case restored through UI cleanup without that fallback. Both independently verified original editor values, hub schedules and room settings, Home, inventory, temporary-child removal, emulator dimensions and released reservations. The interrupted operations remain failed in their journals; separate expected-interruption assertions passed only after recovery was confirmed. This does not prove arbitrary network/process failure recovery or final Release acceptance.
+
 ## Documents and package
 
 A private illustrated help draft was rendered and inspected with the official template. Neil approved the illustrated help draft and figures. The help source still needs its final candidate version. Dependency notices were matched to the actual development merge inputs; final help and notice inclusion by ManifestUtil must be verified in the exact Release package.

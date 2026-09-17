@@ -180,7 +180,7 @@ public sealed partial class GatewayUiTests
 					AndroidWorkflowSession.VerifyContext (Session.Context);
 					var front = CrestronHomeExtensionPages.RequirePage (hierarchy, Titles);
 					if (front.RequireUnique (selector) != hierarchy.RequireUnique (selector) ||
-						front.RequireUnique (valueSelector).Text != (operation.OriginalTemperature / 10m).ToString ("0.0", CultureInfo.InvariantCulture) + "Â°")
+						front.RequireUnique (valueSelector).Text != (operation.OriginalTemperature / 10m).ToString ("0.0", CultureInfo.InvariantCulture) + "\u00B0")
 						throw new InvalidOperationException ("The selected temperature row does not show the expected original target.");
 					}
 				await Session.CaptureAsync (check + "." + phase + ".before-adjust", GuardTemperature, cancellation);
@@ -191,7 +191,7 @@ public sealed partial class GatewayUiTests
 					{
 					AndroidWorkflowSession.VerifyContext (Session.Context);
 					var front = CrestronHomeExtensionPages.RequirePage (hierarchy, Titles);
-					if (front.RequireUnique (valueSelector).Text != (operation.Temperature / 10m).ToString ("0.0", CultureInfo.InvariantCulture) + "Â°" ||
+					if (front.RequireUnique (valueSelector).Text != (operation.Temperature / 10m).ToString ("0.0", CultureInfo.InvariantCulture) + "\u00B0" ||
 						front.RequireUnique (Text (operation.AllDays ? "Save All" : "Save Day")) != hierarchy.RequireUnique (Text (operation.AllDays ? "Save All" : "Save Day")))
 						throw new InvalidOperationException ("The edited temperature or intended save control is not available.");
 					}
@@ -223,10 +223,11 @@ public sealed partial class GatewayUiTests
 			if (observed.PropertyValues["editSelectedDay"].GetString () != day)
 				{
 				await RecordAsync (phase + "-day", new { Day = day });
-				await client.ExecuteDeviceCommandAsync (binding.DeviceId, "setEditSelectedDay", new { value = day }, token);
+				await client.ExecuteDeviceCommandAsync (binding.DeviceId, "extension:setPropertyValue", new { property = "editSelectedDay", value = day }, token);
+				await ObserveDriverAsync (id, d => d.PropertyValues["editSelectedDay"].GetString () == day, token);
 				}
 			await RecordAsync (phase + "-cancel", new { ScheduleId = id });
-			await client.ExecuteDeviceCommandAsync (binding.DeviceId, "cancelEditSchedule", cancellationToken: token);
+			await client.ExecuteDeviceCommandAsync (binding.DeviceId, "extension:doCommand", new { commandName = "cancelEditSchedule", args = Array.Empty<string> () }, token);
 			bool originalAssignment = Id (id) == original.PropertyValues["selectedScheduleId"].GetString ();
 			var restored = await ObserveDriverAsync (id, d => d.PropertyValues["editSelectedDay"].GetString () == day && string.IsNullOrEmpty (d.PropertyValues["editScheduleError"].GetString ()) &&
 				(!originalAssignment || JsonElement.DeepEquals (_originalEditor, ScheduleEditorObservation.Editor (d.PropertyValues))), token);

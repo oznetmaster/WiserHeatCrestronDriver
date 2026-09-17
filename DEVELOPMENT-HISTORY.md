@@ -11,6 +11,15 @@ See the [product changelog](CHANGELOG.md) for shipped changes. This document pre
 
 <!-- development-history -->
 
+## Editor recovery validation - 2026-09-17 (no driver release)
+
+- Add explicitly selected day/time interruption cases with independent restoration assertions. Both passed on the development processor; an interrupted operation stays failed even when its recovery assertion succeeds.
+- Use the verified extension property/command routes for editor and mode recovery, with observed state confirmation. Correct the save fixture's corrupted degree-symbol expectation. These changes affect test producers only.
+- The corrected Save Day/Save All case passed on the exact development package with independent hub checks, complete schedule/editor restoration and temporary-child cleanup. No final candidate or conflict coverage is claimed.
+- All ten Android cases correctly stay offline without a workflow context. See [validation status](submission/ValidationStatus.md) for the exact hardware scope and outstanding acceptance work.
+
+
+
 ## Submission candidate development - 2026-09-17 (not included in 1.3.7)
 
 These are incremental development records, not a released driver version. Earlier open investigations describe their recorded point in time; see [current validation status](submission/ValidationStatus.md) for resolved issues and remaining work.

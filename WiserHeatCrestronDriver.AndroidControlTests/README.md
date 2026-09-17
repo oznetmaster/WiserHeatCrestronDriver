@@ -40,6 +40,12 @@ Normal restoration then uses the opposite UI control. If the first input or its 
 
 Cancellation has a separate bounded restoration deadline. An uncertain restoration is reported to the workflow, which retains the processor reservation for reconciliation. A successful Android Back/Home action alone never confirms physical restoration. Inspect the private `.control.records` journal before recovering an interrupted run; do not blindly replay commands.
 
+### Deliberate editor interruptions
+
+`ScheduleEditorInterruptionRestoresOriginalState` has separate day and time cases and requires exactly one explicitly bound `ControlRooms` entry. It interrupts after observing the selected day or a pending time change, then verifies original editor values, independent hub schedules and room settings, and Home restoration. It never saves a schedule. The day case exercises configuration recovery when UI cleanup leaves a changed day; the time case can recover through UI cleanup alone.
+
+The deliberately interrupted operation remains recorded as failed. A separate expected-interruption result passes only when the exact sentinel exception is observed and restoration is independently confirmed. Unexpected errors or failed cleanup fail the test. These cases prove two specific recovery paths, not arbitrary connection loss or process termination. Configuration recovery writes the day through `extension:setPropertyValue` and sends Cancel through `extension:doCommand`; command acknowledgement alone is insufficient, so final state is observed.
+
 ### Pending temperature boundaries and off-screen inputs
 
 `ScheduleEditorCurrentRowsRespectTemperatureLimitsAndCancel` uses the same private room bindings and scrolling policy. It exercises every currently displayed setpoint, revealing off-screen rows as needed. For each row it prepares a pending endpoint through the configuration interface, inspects the actual action state, taps inward by half a degree and taps back to the endpoint. A disabled outward action is accepted only at its exact limit; an enabled outward action receives one tap and must leave the pending value at that limit. Every observed change must affect only that row.

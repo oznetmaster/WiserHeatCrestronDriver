@@ -160,7 +160,7 @@ public sealed partial class GatewayUiTests
 					Host = fixture._settings!.Host,
 					CertificateSha256 = fixture._settings.CertificateSha256
 					}, new NetworkCredential (fixture._settings.UserName, fixture._settings.Password), token);
-				await client.ExecuteDeviceCommandAsync (binding.DeviceId, "enableSchedule", cancellationToken: token);
+				await client.ExecuteDeviceCommandAsync (binding.DeviceId, "extension:doCommand", new { commandName = "enableSchedule", args = Array.Empty<string> () }, token);
 				return;
 				}
 			string action = enabled ? "Enable" : "Disable";
