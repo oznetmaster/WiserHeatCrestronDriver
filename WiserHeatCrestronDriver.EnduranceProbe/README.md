@@ -4,6 +4,8 @@ This is the Wiser-specific read-only producer used by the DevTools endurance col
 
 The producer targets .NET 10 and restores CrestronHomeDevTools 1.7.0 from NuGet. Its projects are included in the Visual Studio solution, and its offline tests run in CI with discovery-versus-execution verification. A scheduled-worker installer, final submission policy and completed 24-hour candidate run are not supplied by this source checkpoint. Ordinary driver tests do not start this producer or contact a hub.
 
+The required driver diagnostics are in the current source candidate and are **not included in the published driver 1.3.7 package**. Select a candidate built with those diagnostics; a missing diagnostic fails rather than inferring readiness from an older release.
+
 ## What each observation proves
 
 The producer verifies the existing processor reservation before and after every remote read. It resumes ownership supplied by the monitor; it never acquires a new reservation or releases the monitor's reservation itself.
