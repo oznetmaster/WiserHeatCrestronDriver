@@ -11,6 +11,12 @@ See the [product changelog](CHANGELOG.md) for shipped changes. This document pre
 
 <!-- development-history -->
 
+## Mode-change recovery validation - 2026-09-18 (no driver release)
+
+- Added a separately enabled Android case that deliberately interrupts after Manual is independently observed, then requires exactly one configuration compensation back to Auto. The interrupted operation stays failed in its evidence; the recovery case passes only after verified restoration.
+- The real development-processor run passed with the original manual target, complete persistent schedules and guarded room settings restored. Home, temporary-child cleanup and reservation release were verified. See [validation status](submission/ValidationStatus.md) for the exact candidate and limits; this is not crash, outage or endurance proof.
+
+
 ## Schedule-layout validation - 2026-09-18 (no driver release)
 
 - Added an explicitly selected Android fixture to prepare declared schedule sizes, inspect every labelled time/setpoint row through scrolling, and restore complete original state. Offline tests cover failed writes, interrupted inspection and unrelated changes that prevent safe restoration.

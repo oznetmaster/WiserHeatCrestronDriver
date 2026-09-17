@@ -1,5 +1,11 @@
 # Coverage source review
 
+## Deliberate mode interruption and recovery - 18 September 2026
+
+`InterruptedManualModeTestRestoresAutoThroughConfiguration` passed on exact Debug `1.3.007.0029` with public TestAdapter 1.11.0. The fixture used the real Disable UI control, independently observed Manual on the hub and Home, then deliberately interrupted the observation phase. The existing configuration recovery sent one distinct `enableSchedule` command through `extension:doCommand`. The saved manual target was restored before Auto; the interrupted operation remained recorded as failed while its recovery was verified.
+
+The audit confirmed exactly two completed driver commands in the same lifetime, matching independent room identity, restored original manual target, all persistent schedules and guarded room settings, Home, original inventory, temporary-child removal and released reservations. No absent-target initialization was permitted or needed in this run. The normal fixture compiles without warnings and skips without a workflow context. This is bounded development proof of compensation after an observed mode change, not arbitrary crash/outage recovery, final Release acceptance or endurance.
+
 ## Supported schedule layouts - 18 September 2026
 
 The normal Android control fixture passed the declared sequence of one, eight, two, seven, three, six, four, five and one entries on exact Debug `1.3.007.0029` using public TestAdapter 1.11.0. Every supported time and setpoint row was observed with the correct values, including scrolling where needed. The final one-entry layout removed all surplus rows. Independent hub snapshots confirmed each requested layout and unchanged unrelated schedules and guarded room settings. Original schedules, room settings, editor, Home and inventory were restored; the temporary child was removed and reservations released.
