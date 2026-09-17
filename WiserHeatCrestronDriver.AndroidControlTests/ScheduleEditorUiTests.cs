@@ -41,7 +41,7 @@ public sealed partial class GatewayUiTests
 		foreach (var control in _settings.ControlRooms)
 			{
 			var binding = _settings.Rooms.Single (room => room.DeviceId == control.DeviceId);
-			using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (10));
+			using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (18));
 			var before = await ReadRoomAsync (binding, timeout.Token);
 			var domain = await ReadHub ("domain", timeout.Token);
 			var physical = domain.GetProperty ("Room").EnumerateArray ().Single (room => room.GetProperty ("Name").GetString () == control.HubRoomName);
@@ -94,6 +94,7 @@ public sealed partial class GatewayUiTests
 					await WaitForEditorAsync (binding, "editSlot1Time", changedTime, token);
 					await Record ("time-observed", ScheduleEditorObservation.Editor ((await ReadRoomAsync (binding, token)).PropertyValues));
 					await CaptureEditorValuesAsync (check, "controls-edited", titles, binding, Record, token);
+					await AdjustVisibleEditorSetpointsAsync (check, titles, binding, Record, token);
 					await Record ("cancel-intent", new { Expected = originalEditor });
 					await pages.ClosePageAsync (token);
 					var cancelled = await WaitForEditorAsync (binding, "editSlot1Time", originalTime, token);
@@ -144,6 +145,63 @@ public sealed partial class GatewayUiTests
 					}
 				}
 			}
+		}
+
+	private async Task AdjustVisibleEditorSetpointsAsync (string check, string[] titles, RoomBinding binding,
+		Func<string, object, Task> record, CancellationToken token)
+		{
+		var initial = ScheduleEditorObservation.Editor ((await ReadRoomAsync (binding, token)).PropertyValues);
+		int[] slots = [];
+		await _session!.CaptureAsync (check + ".setpoints-before", hierarchy =>
+			{
+			AndroidWorkflowSession.VerifyContext (_session.Context);
+			var front = CrestronHomeExtensionPages.RequirePage (hierarchy, titles);
+			slots = ScheduleEditorRendering.RequireValues (front.MaskedXml, initial, requireComplete: false)
+				.Where (value => value.Kind == "Temperature").Select (value => value.Slot).Order ().ToArray ();
+			Assert.That (slots, Is.Not.Empty, "At least one completely visible setpoint row is required.");
+			}, token);
+		foreach (int slot in slots)
+			{
+			string phase = "setpoint-" + slot.ToString (CultureInfo.InvariantCulture);
+			string property = "editSlot" + slot.ToString (CultureInfo.InvariantCulture) + "Temperature";
+			var before = ScheduleEditorObservation.Editor ((await ReadRoomAsync (binding, token)).PropertyValues);
+			decimal original = before.GetProperty (property).GetDecimal ();
+			// These are the editor's published range and step, not the room's manual target.
+			if (original < 5m || original > 35m || original % 0.5m != 0m)
+				throw new InvalidDataException ("The pending setpoint is outside the editor's supported range or step.");
+			bool increase = original == 5m || original < 35m && slot % 2 == 1;
+			decimal expectedTemperature = original + (increase ? 0.5m : -0.5m);
+			var expectedValues = JsonSerializer.Deserialize<Dictionary<string, JsonElement>> (before.GetRawText ())!;
+			expectedValues[property] = JsonSerializer.SerializeToElement (expectedTemperature);
+			var expected = JsonSerializer.SerializeToElement (expectedValues);
+			var selector = CrestronHomePages.Resource (increase ? "customdeviceraiselowerwithtext_plus" : "customdeviceraiselowerwithtext_minus")
+				with { SiblingText = "SETPOINT " + slot.ToString (CultureInfo.InvariantCulture) };
+			void Guard (AndroidHierarchy hierarchy)
+				{
+				AndroidWorkflowSession.VerifyContext (_session.Context);
+				var front = CrestronHomeExtensionPages.RequirePage (hierarchy, titles);
+				var values = ScheduleEditorRendering.RequireValues (front.MaskedXml, before, requireComplete: false);
+				if (!values.Any (value => value.Slot == slot && value.Kind == "Temperature") || front.RequireUnique (selector) != hierarchy.RequireUnique (selector))
+					throw new InvalidDataException ("The chosen setpoint action is not wholly visible and unique on the front editor page.");
+				}
+			await record (phase + "-intent", new { Slot = slot, Original = original, Expected = expectedTemperature, Action = increase ? "Plus" : "Minus", Before = before });
+			// Exactly one input. Failed or uncertain actions are never automatically repeated.
+			await _session.Device.TapAsync (selector, Guard, token);
+			using var deadline = CancellationTokenSource.CreateLinkedTokenSource (token);
+			deadline.CancelAfter (TimeSpan.FromSeconds (60));
+			await using var client = await OpenEditorObservationConnectionAsync (deadline.Token);
+			JsonElement observed;
+			while (true)
+				{
+				observed = ScheduleEditorObservation.Editor ((await ReadRoomAsync (client, binding, deadline.Token)).PropertyValues);
+				if (observed.GetProperty (property).GetDecimal () == expectedTemperature) break;
+				await Task.Delay (250, deadline.Token);
+				}
+			Assert.That (JsonElement.DeepEquals (observed, expected), Is.True, "A setpoint button must change only its own pending slot.");
+			await record (phase + "-observed", observed);
+			await CaptureEditorValuesAsync (check, phase + "-rendered", titles, binding, record, token);
+			}
+		await record ("setpoints-coverage", new { Slots = slots, Scope = "Only initially complete visible setpoint rows; other rows require separate coverage. Pending changes are discarded by Cancel." });
 		}
 
 	private async Task CaptureEditorValuesAsync (string check, string phase, string[] titles, RoomBinding binding,
