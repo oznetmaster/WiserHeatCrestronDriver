@@ -142,7 +142,7 @@ When changing entity shape, UI definitions, or child-device property surfaces, C
 
 ## License
 
-MIT + Commons Clause Â© 2026 Neil Colvin â€” see [LICENSE](LICENSE).
+MIT + Commons Clause. Copyright (c) 2026 Neil Colvin - see [LICENSE](LICENSE).
 
 Free to use and modify. You may not sell the Software as a standalone product or sublicense it. Commercial system integration and commissioning work is permitted, provided the Software itself is not sold as a standalone product.
 
@@ -152,7 +152,7 @@ Free to use and modify. You may not sell the Software as a standalone product or
 
 ## Automated tests
 
-The opt-in [Android UI project](WiserHeatCrestronDriver.AndroidTests/README.md) compares the real Hot Water and Away controls with fresh processor state, inspects the schedule/day/time choices of explicitly bound room thermostats, and restores the Home screen. It uses TestAdapter 1.8.0 and DevTools 1.5.0, and runs only when selected by a private processor workflow. Room bindings belong in the private UI settings file; the tests never choose a thermostat automatically or save an edited schedule. A separate private `AllowNameBinding` option temporarily renames the gateway to associate its app tile with the installed instance, then restores the name. Heating and Away commands are never sent. These checks do not complete the Crestron submission test plan.
+The opt-in [Android UI project](WiserHeatCrestronDriver.AndroidTests/README.md) compares the real Hot Water and Away controls with fresh processor state, inspects the schedule/day/time choices of explicitly bound room thermostats, and restores the Home screen. It uses TestAdapter 1.10.0 and DevTools 1.6.0, and runs only when selected by a private processor workflow. Room bindings belong in the private UI settings file; the tests never choose a thermostat automatically or save an edited schedule. A separate private `AllowNameBinding` option temporarily renames the gateway to associate its app tile with the installed instance, then restores the name. Heating and Away commands are never sent. These checks do not complete the Crestron submission test plan.
 
 The separately selected [Android control project](WiserHeatCrestronDriver.AndroidControlTests/README.md) adds an Auto/Manual/Auto room-mode cycle, editor Cancel checks and an explicitly configured Save Day/Save All case. Existing manual and scheduled targets may differ; both are captured and restored. These controls can briefly change heating demand and require private room bindings. The mode cycle and Cancel case have passed development hardware validation; see the [validation status](submission/ValidationStatus.md) for the exact scope and remaining save/submission work. Both Android projects skip during ordinary desktop runs without an active processor workflow.
 

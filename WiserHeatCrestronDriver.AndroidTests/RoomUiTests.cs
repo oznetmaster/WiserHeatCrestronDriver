@@ -15,7 +15,10 @@ namespace WiserHeatCrestronDriver.AndroidTests;
 
 public sealed partial class GatewayUiTests
 	{
-	private sealed record RoomBinding (int DeviceId, string RoomName, string PageTitle);
+	private sealed record RoomBinding (int DeviceId, string RoomName, string PageTitle)
+		{
+		public string? ManagedAlias { get; init; }
+		}
 	private bool _roomStatePreserved = true;
 	private static readonly string[] _roomStateKeys = ["targetTemperature", "boostStateLabel", "selectedScheduleId", "selectedScheduleName", "scheduleStatusLabel"];
 	private static readonly string[] _dayLabels = ["    Sunday    ", "    Monday    ", "   Tuesday    ", "Wednesday", "   Thursday   ", "    Friday    ", "   Saturday   "];

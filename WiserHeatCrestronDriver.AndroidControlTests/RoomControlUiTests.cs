@@ -21,7 +21,18 @@ namespace WiserHeatCrestronDriver.AndroidTests;
 
 public sealed partial class GatewayUiTests
 	{
-	private sealed record ControlRoomBinding (int DeviceId, string HubRoomName, bool AllowManualTargetInitialization = false);
+	private sealed record ControlRoomBinding (int DeviceId, string HubRoomName, bool AllowManualTargetInitialization = false)
+		{
+		public string? ManagedAlias { get; init; }
+		}
+	partial void ResolveControlBindings (AndroidRunContext context)
+		{
+		_settings = _settings! with
+			{
+			ControlRooms = (_settings.ControlRooms ?? throw new InvalidDataException ("Control room settings are missing.")).Select (room =>
+				room with { DeviceId = ResolveManagedRoomId (context, room.DeviceId, room.ManagedAlias) }).ToArray ()
+			};
+		}
 	private sealed partial record Settings
 		{
 		public string? ControlHubSettingsPath

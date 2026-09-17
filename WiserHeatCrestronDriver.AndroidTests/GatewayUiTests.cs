@@ -34,6 +34,17 @@ public sealed partial class GatewayUiTests
 			get; init;
 			}
 		}
+	partial void ResolveControlBindings (AndroidRunContext context);
+	partial void ResolveScheduleSaveBindings (AndroidRunContext context);
+
+	private static int ResolveManagedRoomId (AndroidRunContext context, int deviceId, string? alias)
+		{
+		if (alias == null)
+			return deviceId > 0 ? deviceId : throw new InvalidDataException ("Provide an existing room DeviceId or a managed-child alias.");
+		if (deviceId != 0) throw new InvalidDataException ("Choose either a room DeviceId or a managed-child alias, not both.");
+		return context.RequireManagedDevice (alias).DeviceId;
+		}
+
 	private static readonly string[] StateKeys = ["hotWaterVisible", "hotWaterStateLabel", "hotWaterActionLabel", "hotWaterActionEnabled", "awayModeVisible", "awayModeStateLabel", "awayModeActionLabel", "awayModeActionEnabled"];
 
 	[OneTimeSetUp]
@@ -54,6 +65,13 @@ public sealed partial class GatewayUiTests
 		var context = AndroidWorkflowSession.Read<AndroidRunContext> (Environment.GetEnvironmentVariable (AndroidWorkflowSession.CONTEXT_VARIABLE)!);
 		if (settings.Host != context.ProcessorAddress || !Guid.TryParse (context.DriverGuid, out var guid) || guid != Guid.Parse ("8f153bae-6a59-44b5-90bc-c73f635a4d90"))
 			throw new InvalidDataException ("The workflow is not bound to this Wiser gateway/processor.");
+		_settings = settings with
+			{
+			Rooms = (settings.Rooms ?? throw new InvalidDataException ("Room settings are missing.")).Select (room =>
+				room with { DeviceId = ResolveManagedRoomId (context, room.DeviceId, room.ManagedAlias) }).ToArray ()
+			};
+		ResolveControlBindings (context);
+		ResolveScheduleSaveBindings (context);
 		using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (3));
 		_session = await AndroidWorkflowSession.OpenFromEnvironmentAsync (timeout.Token);
 		_navigation = new (_session);

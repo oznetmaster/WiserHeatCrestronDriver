@@ -10,7 +10,7 @@ The separately selected [Android control project](../WiserHeatCrestronDriver.And
 
 ## UI automation dependency
 
-The project uses the Android assembly included in `CrestronHomeNUnit.TestAdapter` 1.8.1 and the name-challenge API in `CrestronHomeDevTools` 1.5.0. It is included in the driver solution. The adapter supports portrait screens where the saved local-port field needs scrolling. Version 1.8.1 also searches for offscreen room tiles and recognizes compact room headings; missing tiles fail inspection and trigger observed Home restoration. No second source checkout is required. Hosted CI builds the project and verifies that all cases skip without a hardware context.
+The project uses the Android assembly included in `CrestronHomeNUnit.TestAdapter` 1.10.0 and `CrestronHomeDevTools` 1.6.0. It is included in the driver solution. The adapter supports portrait screens where the saved local-port field needs scrolling. Version 1.8.1 also searches for offscreen room tiles and recognizes compact room headings; missing tiles fail inspection and trigger observed Home restoration. No second source checkout is required. Hosted CI builds the project and verifies that all cases skip without a hardware context.
 
 ## Private settings and invocation
 
@@ -40,6 +40,36 @@ To enable instance association on a development processor, set `AllowNameBinding
 Add this project as `androidTests.project` in the existing private [processor workflow](../WiserHeatCrestronDriver.WorkflowTests/README.md), with `androidTests.profilePath` pointing to your private Android profile. Keep the actual-driver target and required local/processor suites in that plan. Run the workflow through Test Explorer or the CLI; do not add this project to `localTests`, because it belongs after the actual-driver update. Export the private settings environment variable in the worker process before starting that workflow. The coordinator suppresses Android context during discovery and supplies it only during execution.
 
 Keep credentials, contexts, test reports and captures outside the repository and public release assets. The tests save only selected gateway/room UI properties, restoration records, screenshots and masked UI hierarchies in the private evidence directory.
+
+## Temporary workflow-created thermostats
+
+Adapter 1.10.0 can commission a temporary thermostat during the normal Android stage and supply its observed ID to this fixture. Add a target under `androidTests` in the private workflow plan:
+
+```json
+"managedChildren": [
+  {
+    "alias": "room",
+    "managedDeviceId": "room_9",
+    "name": "CI Wiser Test Room",
+    "model": "Room Thermostat",
+    "locationId": 5678
+  }
+]
+```
+
+Replace `room_9` with the selected child advertised by your gateway and `5678` with an existing Crestron Home room ID. The parent is the actual gateway installed or updated by the workflow. These example identifiers do not select a device on your system.
+
+In the private UI settings, bind that exact alias instead of guessing the new child's ID:
+
+```json
+"Rooms": [
+  { "DeviceId": 0, "ManagedAlias": "room", "RoomName": "Test Room", "PageTitle": "Test Room" }
+]
+```
+
+`RoomName` still names the assigned Home room, while `PageTitle` is the thermostat page heading. Existing positive `DeviceId` bindings remain supported without `ManagedAlias`. Supplying both a positive ID and an alias fails; a missing alias never falls back to another thermostat.
+
+The workflow records commissioning and actual bindings, runs the selected fixture, and removes only its own created child after restoration is confirmed. Unknown restoration or cleanup retains recovery records and reservations. A failed test stays failed even if restoration and cleanup succeed. Manually installed fixed-ID children are not automatically removed.
 
 ## What these results prove
 

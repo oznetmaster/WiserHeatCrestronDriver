@@ -2,7 +2,19 @@
 
 Wiser is the first end-to-end submission pilot. No Crestron submission has been sent, no signed acceptance form has been generated, and no certification is claimed. This driver has not previously been accepted on the portal. Its submission profile uses Neil Colvin as the developer and the repository/issue tracker for public support, with an empty public email field. Private correspondence and signing assets remain outside the repository.
 
-## Development evidence
+## Current development evidence - 17 September 2026
+
+The commissioning issue described in the historical runs below is resolved: automation must enter the new child's initial configuration step even if it reports configured and has no prompts. The corrected public DevTools operation passed independent commandless comparisons and Wiser lifecycle checks. This was an automation omission, not a verified SDK/Home defect.
+
+The normal combined workflow then passed on Debug `1.3.007.0023` with the packaged TestAdapter 1.10.0 candidate and released DevTools 1.6.0. It completed local, processor, read-only hub and installed-driver checks, plus a source-pinned producer selecting only the editor Cancel case. The workflow created its temporary thermostat and supplied the actual child ID through an explicit alias. Hub/editor/Home restoration, child and test-instance removal, original inventory preservation and reservation release were independently confirmed. Uploaded test-package bytes were removed; cached catalogue metadata may remain until a planned reboot. See [coverage review](CoverageReview.md) for the package hash and limitations.
+
+The authorized no-saved-manual-target case has also passed on a prior Debug candidate. Auto mode and the original schedule were restored. The hub retained an inactive initialized manual temperature, as permitted; evidence explicitly records operating-state restoration with `ExactRestorationConfirmed: false`. The default policy still refuses initialization without that per-room choice. This historical result must be repeated against the final candidate if included in its acceptance claims.
+
+Shared tooling's full local release build and isolated package acceptance passed. These results do not establish a final submission candidate, full acceptance, endurance or certification.
+
+## Historical development evidence
+
+The following records retain what was known at each run. References to unresolved commissioning or an unrun case describe that earlier point in time; current findings are above.
 
 Current source validation (17 September): a development candidate removes the read-triggered withdrawal and re-registration of room controllers. Desktop and processor regressions verify that reading an existing room preserves its registration, while discovery and removal still update the controller list. Against Debug candidate `1.3.007.0010`, all three Android inspection cases passed using released TestAdapter 1.8.1, including the Office and Upstairs Hall pages and complete selectors. Their checked state and Home restoration were confirmed. This run passed 122 desktop tests, 58 processor tests and three live hub tests, but its outer workflow failed during post-UI verification and cleanup. An independently verified recovery removed its owned test instance and released the reservations; the original workflow remains failed.
 
@@ -16,7 +28,7 @@ An earlier complete Debug workflow passed desktop and processor tests, live hub 
 
 The gateway and room tests live in [AndroidTests](../WiserHeatCrestronDriver.AndroidTests/README.md). Those page names, labels and expected control behavior are Wiser-specific. Navigation helpers do not supply these assertions automatically. These Debug results are not evidence for an exact final Release candidate or for physical controls that were not operated.
 
-The separate [Android control project](../WiserHeatCrestronDriver.AndroidControlTests/README.md) has passed a focused Auto/Manual/Auto UI cycle against Debug candidate `1.3.007.0011`, with independent hub observations, restoration of a saved manual target different from the scheduled target, Home/inventory checks and reservation release. Earlier failed runs exposed incorrect test assumptions about the hub's initialized manual target and derived occupancy readings; their failures and verified recoveries remain in the private evidence. Offline regressions cover those behaviors, equal/preserved targets, absent/null targets, uncertain input delivery, cancellation, journal failures and identity/activity changes. A room with no saved manual target still requires an explicit choice to accept a newly initialized inactive target. The per-room `AllowManualTargetInitialization` option now implements that choice, with separate operating-state and exact-restoration results and offline failure-path checks. No physical no-saved-target case has passed; the default remains refusal before input.
+The separate [Android control project](../WiserHeatCrestronDriver.AndroidControlTests/README.md) has passed a focused Auto/Manual/Auto UI cycle against Debug candidate `1.3.007.0011`, with independent hub observations, restoration of a saved manual target different from the scheduled target, Home/inventory checks and reservation release. Earlier failed runs exposed incorrect test assumptions about the hub's initialized manual target and derived occupancy readings; their failures and verified recoveries remain in the private evidence. Offline regressions cover those behaviors, equal/preserved targets, absent/null targets, uncertain input delivery, cancellation, journal failures and identity/activity changes. A room with no saved manual target still requires an explicit choice to accept a newly initialized inactive target. The per-room `AllowManualTargetInitialization` option now implements that choice, with separate operating-state and exact-restoration results and offline failure-path checks. At that stage the physical no-saved-target case had not run; it subsequently passed under the explicitly permitted operating-state policy described above.
 
 The next Debug workflow, using candidate `1.3.007.0012`, passed local and processor checks, the driver update and four existing Android cases, but failed in the new editor-selection/Cancel case. Its test instance was removed and its UI restoration and released reservations were verified. A focused editor repeat also failed and restored state. These failed runs remain retained evidence. SDK event regressions then confirmed missing editor-selection notifications; the correction and read-back verification for saves pass desktop regression checks. No Save command was sent during those live editor attempts.
 
@@ -30,13 +42,13 @@ The subsequent complete workflow against Debug candidate `1.3.007.0014` passed 2
 
 ## Documents and package
 
-A private illustrated help draft was rendered and inspected with the official template. Publication of household screenshots remains subject to approval. The help source still needs its final candidate version and approved figures. Dependency notices were matched to the actual development merge inputs; final help and notice inclusion by ManifestUtil must be verified in the exact Release package.
+A private illustrated help draft was rendered and inspected with the official template. Neil approved the illustrated help draft and figures. The help source still needs its final candidate version. Dependency notices were matched to the actual development merge inputs; final help and notice inclusion by ManifestUtil must be verified in the exact Release package.
 
 The blank Extension self-test draft was rendered and inspected. Its checkboxes contain no passing attestations. The coverage blueprint is still a draft and needs reviewed source pins, executable producer bindings and complete candidate-specific observations before it can populate the form.
 
 ## Remaining acceptance work
 
-- Resolve initial-commissioning readiness and validate the remaining commands, selector actions, conditional editor slots, save conflicts, physical feedback, timing and state restoration; validate the opt-in initialization policy on an explicitly authorized room without a saved manual target.
+- Bind the resolved commissioning path and verified manual-initialization policy to the final candidate, and validate the remaining commands, selector actions, conditional editor slots, save conflicts, physical feedback, timing and state restoration.
 - Complete visual/icon checks and Configure/Setup coverage. Text assertions alone do not verify rendered layout.
 - Establish independent room/device bindings and resolve the formal multiple-instance requirement for a platform driver; two room children do not automatically count as two platform instances.
 - Provide controlled outage testing and at least 24 hours of periodic functional observations, including recovery and interruption handling.

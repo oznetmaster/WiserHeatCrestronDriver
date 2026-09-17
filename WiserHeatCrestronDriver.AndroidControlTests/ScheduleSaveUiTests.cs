@@ -22,7 +22,18 @@ public sealed partial class GatewayUiTests
 		{
 		public ScheduleSaveRoomBinding[] ScheduleSaveRooms { get; init; } = [];
 		}
-	private sealed record ScheduleSaveRoomBinding (int DeviceId, string HubRoomName, bool UseExistingExclusiveSchedule = false);
+	private sealed record ScheduleSaveRoomBinding (int DeviceId, string HubRoomName, bool UseExistingExclusiveSchedule = false)
+		{
+		public string? ManagedAlias { get; init; }
+		}
+	partial void ResolveScheduleSaveBindings (AndroidRunContext context)
+		{
+		_settings = _settings! with
+			{
+			ScheduleSaveRooms = (_settings.ScheduleSaveRooms ?? throw new InvalidDataException ("Schedule-save room settings are missing.")).Select (room =>
+				room with { DeviceId = ResolveManagedRoomId (context, room.DeviceId, room.ManagedAlias) }).ToArray ()
+			};
+		}
 
 	[Test, Category ("LiveControl"), Category ("LiveScheduleSave")]
 	public async Task ScheduleSaveDayAndAllRestoreOriginalSchedules ()
@@ -169,7 +180,7 @@ public sealed partial class GatewayUiTests
 					AndroidWorkflowSession.VerifyContext (Session.Context);
 					var front = CrestronHomeExtensionPages.RequirePage (hierarchy, Titles);
 					if (front.RequireUnique (selector) != hierarchy.RequireUnique (selector) ||
-						front.RequireUnique (valueSelector).Text != (operation.OriginalTemperature / 10m).ToString ("0.0", CultureInfo.InvariantCulture) + "°")
+						front.RequireUnique (valueSelector).Text != (operation.OriginalTemperature / 10m).ToString ("0.0", CultureInfo.InvariantCulture) + "Â°")
 						throw new InvalidOperationException ("The selected temperature row does not show the expected original target.");
 					}
 				await Session.CaptureAsync (check + "." + phase + ".before-adjust", GuardTemperature, cancellation);
@@ -180,7 +191,7 @@ public sealed partial class GatewayUiTests
 					{
 					AndroidWorkflowSession.VerifyContext (Session.Context);
 					var front = CrestronHomeExtensionPages.RequirePage (hierarchy, Titles);
-					if (front.RequireUnique (valueSelector).Text != (operation.Temperature / 10m).ToString ("0.0", CultureInfo.InvariantCulture) + "°" ||
+					if (front.RequireUnique (valueSelector).Text != (operation.Temperature / 10m).ToString ("0.0", CultureInfo.InvariantCulture) + "Â°" ||
 						front.RequireUnique (Text (operation.AllDays ? "Save All" : "Save Day")) != hierarchy.RequireUnique (Text (operation.AllDays ? "Save All" : "Save Day")))
 						throw new InvalidOperationException ("The edited temperature or intended save control is not available.");
 					}
