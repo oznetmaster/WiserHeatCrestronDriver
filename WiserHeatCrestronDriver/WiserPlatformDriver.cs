@@ -103,6 +103,14 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		private set => SetAndNotify ("platformStatus", value, ref field);
 		} = "Not configured";
 
+	// Monitoring evidence only: cached state reads and failed/stale refreshes must not renew it.
+	[EntityProperty (Id = "lastHubRefreshUtc", FriendlyName = "Last Successful Hub Refresh UTC", Type = DriverEntityValueType.String)]
+	public string LastHubRefreshUtc
+		{
+		get;
+		private set => SetAndNotify ("lastHubRefreshUtc", value, ref field);
+		} = string.Empty;
+
 	[EntityProperty (Id = "platformLastError", FriendlyName = "Platform Last Error", Type = DriverEntityValueType.String)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public string PlatformLastError
@@ -958,7 +966,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 						}
 
 					managed[controllerId] = new PlatformManagedDevice (
-						DeviceUxCategory.Thermostat,
+						DeviceUxCategory.Hvac,
 						string.IsNullOrWhiteSpace (room.Name) ? $"Room {room.Id}" : room.Name,
 						"Drayton Wiser",
 						"Room Thermostat",
@@ -1012,6 +1020,8 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				UpdateStatus ("Connected - no rooms discovered", string.Empty);
 			else
 				UpdateStatus ("Connected - rooms discovered: " + ManagedDevices.Count, string.Empty);
+			if (readHub)
+				LastHubRefreshUtc = DateTimeOffset.UtcNow.ToString ("O", CultureInfo.InvariantCulture);
 			}
 		return true;
 		}

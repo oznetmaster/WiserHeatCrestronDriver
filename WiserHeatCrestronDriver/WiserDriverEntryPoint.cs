@@ -30,4 +30,5 @@ public sealed class EntryPoint : DriverAssemblyEntryPoint
 		// their wrappers. Registration follows actual discovery changes only.
 		return new DispatchingDeviceController (rootEntity, args, null);
 		}
+
 	}

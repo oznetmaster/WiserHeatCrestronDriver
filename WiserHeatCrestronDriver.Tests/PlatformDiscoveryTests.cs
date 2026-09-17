@@ -49,6 +49,45 @@ public sealed class PlatformDiscoveryTests
 		Set ("_api", _api);
 		Set ("_lastScheduleRefreshUtc", DateTimeOffset.UtcNow);
 		}
+	[Test]
+	public async Task SuccessfulFreshReadPublishesTimestampButCachedReadDoesNotRenewIt ()
+		{
+		Assert.That (_driver.LastHubRefreshUtc, Is.Empty);
+		var started = DateTimeOffset.UtcNow;
+		Assert.That (await _driver.RefreshSystemStateAsync (true), Is.True);
+		string stamp = _driver.LastHubRefreshUtc;
+		var observed = DateTimeOffset.ParseExact (stamp, "O", System.Globalization.CultureInfo.InvariantCulture);
+		Assert.That (observed, Is.GreaterThanOrEqualTo (started).And.LessThanOrEqualTo (DateTimeOffset.UtcNow));
+		Assert.That (observed.Offset, Is.EqualTo (TimeSpan.Zero));
+		Assert.That (await _driver.RefreshSystemStateAsync (), Is.True);
+		Assert.That (_driver.LastHubRefreshUtc, Is.EqualTo (stamp));
+		}
+
+	[Test]
+	public async Task FailedFreshReadDoesNotRenewSuccessfulTimestamp ()
+		{
+		Assert.That (await _driver.RefreshSystemStateAsync (true), Is.True);
+		string stamp = _driver.LastHubRefreshUtc;
+		_transport.FailScheduleRead = true;
+		Assert.That (await _driver.RefreshSystemStateAsync (true), Is.False);
+		Assert.That (_driver.LastHubRefreshUtc, Is.EqualTo (stamp));
+		}
+
+	[Test]
+	public async Task ReplacedConnectionGenerationCannotPublishFreshTimestamp ()
+		{
+		Assert.That (await _driver.RefreshSystemStateAsync (true), Is.True);
+		string stamp = _driver.LastHubRefreshUtc;
+		_transport.HoldNextDomain = true;
+		var pending = _driver.RefreshSystemStateAsync (true);
+		await TestSupport.Complete (_transport.Entered.Task);
+		Set ("_connectionGeneration", Field<long> ("_connectionGeneration") + 1);
+		_transport.Release.TrySetResult (true);
+		await TestSupport.Complete (pending);
+		Assert.That (await pending, Is.False);
+		Assert.That (_driver.LastHubRefreshUtc, Is.EqualTo (stamp));
+		}
+
 	[TearDown]
 	public void TearDown ()
 		{
@@ -89,6 +128,60 @@ public sealed class PlatformDiscoveryTests
 		}
 	private DriverController CreateDispatcher () => EntryPoint.CreateController (_driver,
 		new DriverControllerCreationArgs ("wiser-platform-test", TestSupport.DataDirectory, _logger.AppLogger, null));
+	[Test]
+	public async Task Rooms_AdvertiseDocumentedHvacCategory ()
+		{
+		await Refresh ("[{\"id\":4,\"Name\":\"Test room\"}]");
+		Assert.Multiple (() =>
+			{
+			Assert.That (_driver.ManagedDevices["room_4"].UxCategory, Is.EqualTo (DeviceUxCategory.Hvac),
+				"Crestron's DeviceUxCategory contract categorizes thermostats as Hvac.");
+			Assert.That (Entities["room_4"].UxCategory, Is.EqualTo (DeviceUxCategory.Hvac));
+			});
+		}
+	[TestCase (false)]
+	[TestCase (true)]
+	public async Task FirstRoomSnapshot_IsReadyWhetherDiscoveredBeforeOrAfterDispatcher (bool discoveredBeforeDispatcher)
+		{
+		const string rooms = "[{\"id\":4,\"Name\":\"Test room\",\"CurrentSetPoint\":205}]";
+		if (discoveredBeforeDispatcher)
+			await Refresh (rooms);
+		using var dispatcher = CreateDispatcher ();
+		if (!discoveredBeforeDispatcher)
+			await Refresh (rooms);
+		var first = dispatcher.GetState ("room_4");
+		var second = dispatcher.GetState ("room_4");
+		Assert.Multiple (() =>
+			{
+			foreach (var state in new[] { first, second })
+				{
+				Assert.That (state.PropertyValues["readyIndicator:isReady"].GetValue<bool> (), Is.True);
+				Assert.That (state.PropertyValues["onlineIndicator:isOnline"].GetValue<bool> (), Is.True);
+				Assert.That (state.PropertyValues["targetTemperature"].GetValue<double> (), Is.EqualTo (20.5));
+				}
+			Assert.That (dispatcher.GetStatus ("room_4"), Is.EqualTo (DriverControllerStatus.Running));
+			});
+		}
+
+	[Test]
+	public async Task StoppedAndRecoveredRoomSnapshots_PreservePriorObservedAvailability ()
+		{
+		await Refresh ("[{\"id\":4,\"Name\":\"Test room\"}]");
+		using var dispatcher = CreateDispatcher ();
+		Entities["room_4"].StopPolling ();
+		var stopped = dispatcher.GetState ("room_4");
+		await Refresh ("[{\"id\":4,\"Name\":\"Test room\"}]");
+		var recovered = dispatcher.GetState ("room_4");
+		Assert.Multiple (() =>
+			{
+			foreach (string property in new[] { "readyIndicator:isReady", "onlineIndicator:isOnline" })
+				{
+				Assert.That (stopped.PropertyValues[property].GetValue<bool> (), Is.False);
+				Assert.That (recovered.PropertyValues[property].GetValue<bool> (), Is.True);
+				}
+			});
+		}
+
 	[Test]
 	public async Task LateDiscoveredRoom_AnnouncesItsExtensionWithoutWithdrawingExistingRooms ()
 		{

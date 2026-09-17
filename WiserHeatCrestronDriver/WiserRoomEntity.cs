@@ -128,7 +128,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		NotifyEditStateChanged ();
 		}
 
-	public DeviceUxCategory UxCategory => DeviceUxCategory.Thermostat;
+	public DeviceUxCategory UxCategory => DeviceUxCategory.Hvac;
 
 	[EntityProperty (Id = "onlineIndicator:isOnline", Type = DriverEntityValueType.Boolean)]
 	public bool OnlineIndicatorIsOnline
@@ -727,7 +727,6 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	[EntityProperty (Id = "editSlot10Error", FriendlyName = "Edit Slot 10 Error", Type = DriverEntityValueType.String)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public string EditSlot10Error => _editSlotErrors[9] ?? string.Empty;
-
 
 	[EntityCommand (Id = "boost", FriendlyName = "Boost")]
 	[EntityCommandMetadata (Programmable = true)]
