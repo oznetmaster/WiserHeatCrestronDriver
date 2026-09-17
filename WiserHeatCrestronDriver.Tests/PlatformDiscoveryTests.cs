@@ -56,7 +56,8 @@ public sealed class PlatformDiscoveryTests
 		var started = DateTimeOffset.UtcNow;
 		Assert.That (await _driver.RefreshSystemStateAsync (true), Is.True);
 		string stamp = _driver.LastHubRefreshUtc;
-		var observed = DateTimeOffset.ParseExact (stamp, "O", System.Globalization.CultureInfo.InvariantCulture);
+		Assert.That (stamp, Does.StartWith ("utc:"));
+		var observed = DateTimeOffset.ParseExact (stamp.Substring (4), "O", System.Globalization.CultureInfo.InvariantCulture);
 		Assert.That (observed, Is.GreaterThanOrEqualTo (started).And.LessThanOrEqualTo (DateTimeOffset.UtcNow));
 		Assert.That (observed.Offset, Is.EqualTo (TimeSpan.Zero));
 		Assert.That (await _driver.RefreshSystemStateAsync (), Is.True);

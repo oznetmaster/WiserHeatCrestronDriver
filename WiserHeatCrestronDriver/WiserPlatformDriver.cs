@@ -1021,7 +1021,8 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			else
 				UpdateStatus ("Connected - rooms discovered: " + ManagedDevices.Count, string.Empty);
 			if (readHub)
-				LastHubRefreshUtc = DateTimeOffset.UtcNow.ToString ("O", CultureInfo.InvariantCulture);
+				// A tag prevents Home's date-string conversion from discarding UTC and precision.
+				LastHubRefreshUtc = "utc:" + DateTimeOffset.UtcNow.ToString ("O", CultureInfo.InvariantCulture);
 			}
 		return true;
 		}
