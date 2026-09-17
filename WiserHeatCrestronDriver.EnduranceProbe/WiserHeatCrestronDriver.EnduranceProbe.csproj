@@ -1,0 +1,15 @@
+<!-- Copyright (c) 2026 Neil Colvin. MIT with Commons Clause; see LICENSE. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable><TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(DevToolsSourceProject)' == ''">
+    <PackageReference Include="CrestronHomeDevTools" Version="1.7.0" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(DevToolsSourceProject)' != ''">
+    <ProjectReference Include="$(DevToolsSourceProject)" />
+  </ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="WiserHeatCrestronDriver.EnduranceProbe.Tests" /></ItemGroup>
+</Project>
