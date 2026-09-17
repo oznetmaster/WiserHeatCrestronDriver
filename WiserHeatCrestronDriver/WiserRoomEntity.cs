@@ -846,6 +846,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		{
 		LogBreadcrumb ($"StartPolling entered; roomId={_room.Id}, frameworkReady={_frameworkReady}, online={OnlineIndicatorIsOnline}");
 		Interlocked.Exchange (ref _debugLoggingEnabled, 1);
+		ReadyIndicatorIsReady = true;
 
 		if (Interlocked.CompareExchange (ref _frameworkReady, 1, 0) != 0)
 			{

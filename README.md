@@ -175,7 +175,7 @@ Cover room discovery, stable child identity, renamed/removed rooms, cleared sett
 
 Saved schedules can be reopened and saved again; integer lists and arrays are copied independently before editing; the root entity can be created and disposed repeatedly.
 
-The current package contains **29 offline tests**, **18 SDK entity/lifecycle tests** and **3 optional live hub tests**. The processor package remains **net472 only**, appears under **Utility** in Configure, and can run independently through its own tile or the Windows NUnit runner. The offline and lifecycle fixtures use synthetic data. The separate live suite authenticates with the selected hub, discovers rooms, refreshes telemetry and reconnects; it sends no room-control commands.
+The package contains offline tests, SDK entity/lifecycle tests and optional live hub tests. Discover the built package in the runner to see its current test inventory. The processor package remains **net472 only**, appears under **Utility** in Configure, and can run independently through its own tile or the Windows NUnit runner. The offline and lifecycle fixtures use synthetic data. The separate live suite authenticates with the selected hub, discovers rooms, refreshes telemetry and reconnects; it sends no room-control commands.
 
 `WiserHeatCrestronDriver.Lifecycle.Tests` runs the entity checks against the real desktop SDK on .NET 10. It compiles the relevant driver sources and shares fixture sources with the net472 processor tests. Building this project does not deploy a driver. A locally supplied `Newtonsoft.Json.Compact.dll` is needed by the SDK's manifest reader; it is supplied by the processor at runtime and must not be added to source control or bundled with the processor test package.
 

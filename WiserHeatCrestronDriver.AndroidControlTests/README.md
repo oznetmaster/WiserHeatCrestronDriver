@@ -40,6 +40,8 @@ Cancellation has a separate bounded restoration deadline. An uncertain restorati
 
 ## Validation status
 
+Debug candidate `1.3.007.0014` has now passed the complete workflow using released TestAdapter 1.9.0: all six Android cases executed, including both schedule saves, with exact original control/schedule/editor state and Home restored. The workflow removed its temporary test instance and released the reservations; it preserved a package archive that predated the run. This supersedes the earlier focused-only Save validation below, while preserving those historical failures and results. Temporary-schedule creation and final immutable Release acceptance remain outstanding.
+
 ### Schedule Save Day and Save All case
 
 `ScheduleSaveDayAndAllRestoreOriginalSchedules` requires a separate `ScheduleSaveRooms` array in the private UI settings. An empty array skips this case; a submission plan that requires save behavior must select it and reject a skipped result. Each entry identifies the installed `DeviceId` and physical `HubRoomName`, with the same matching `Rooms` binding and private `ControlHubSettingsPath` used by the other control cases.

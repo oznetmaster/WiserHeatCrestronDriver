@@ -473,6 +473,57 @@ public sealed class PlatformDiscoveryTests
 		return (WiserAPI)constructor.Invoke (new object[] { "hub.invalid", "synthetic-secret", WiserUnits.Metric, transport });
 		}
 	private Task Connect () => (Task)typeof (WiserPlatformDriver).GetMethod ("ConnectAndDiscoverAsync", Private).Invoke (_driver, null);
+	[Test]
+	public async Task RestartingExistingRoom_RestoresReadyAndOnlineIndicators ()
+		{
+		await Refresh ("[{\"id\":4,\"Name\":\"Test room\"}]");
+		var room = Entities["room_4"];
+		room.StopPolling ();
+		Assert.That (room.ReadyIndicatorIsReady, Is.False);
+		Assert.That (room.OnlineIndicatorIsOnline, Is.False);
+		room.StartPolling ();
+		Assert.That (room.ReadyIndicatorIsReady, Is.True);
+		Assert.That (room.OnlineIndicatorIsOnline, Is.True);
+		}
+
+	[Test]
+	public async Task SuccessfulReconnect_RestoresExistingRoomReadinessWithoutReplacingController ()
+		{
+		await Refresh ("[{\"id\":4,\"Name\":\"Test room\",\"CurrentSetPoint\":205}]");
+		var room = Entities["room_4"];
+		using var dispatcher = CreateDispatcher ();
+		int registrationChanges = 0;
+		dispatcher.ControllerIdsChanged += (_, _) => Interlocked.Increment (ref registrationChanges);
+		_driver.ApiFactory = (_, _, _) => throw new InvalidOperationException ("Injected connection failure.");
+		await TestSupport.Complete (Connect ());
+		Assert.That (_driver.ReadyIndicatorIsReady, Is.False);
+		Assert.That (room.ReadyIndicatorIsReady, Is.False);
+		Assert.That (room.OnlineIndicatorIsOnline, Is.False);
+		using var recovery = new SnapshotTransport { Rooms = "[{\"id\":4,\"Name\":\"Test room\",\"CurrentSetPoint\":215}]" };
+		_driver.ApiFactory = (_, _, _) => CreateApi (recovery);
+		await TestSupport.Complete (Connect ());
+		Assert.Multiple (() =>
+			{
+			Assert.That (_driver.ReadyIndicatorIsReady, Is.True);
+			Assert.That (Entities["room_4"], Is.SameAs (room));
+			Assert.That (room.ReadyIndicatorIsReady, Is.True, "A recovered gateway must not leave its existing room permanently not ready.");
+			Assert.That (room.OnlineIndicatorIsOnline, Is.True);
+			Assert.That (room.TargetTemperature, Is.EqualTo (21.5));
+			Assert.That (registrationChanges, Is.Zero, "Recover state without withdrawing an installed controller.");
+			});
+		}
+
+	[Test]
+	public async Task FailedRefresh_DoesNotRestoreStoppedRoomAvailability ()
+		{
+		await Refresh ("[{\"id\":4,\"Name\":\"Test room\"}]");
+		var room = Entities["room_4"];
+		room.StopPolling ();
+		_transport.FailScheduleRead = true;
+		Assert.That (await _driver.RefreshSystemStateAsync (true), Is.False);
+		Assert.That (room.ReadyIndicatorIsReady, Is.False);
+		Assert.That (room.OnlineIndicatorIsOnline, Is.False);
+		}
 	[TestCase (false)]
 	[TestCase (true)]
 	public async Task LateConnectionCannotRepublishAfterClearOrDispose (bool dispose)

@@ -10,6 +10,8 @@ A successor run against Debug candidate `1.3.007.0011` completed the entire work
 
 A separate temporary-room check first timed out waiting for readiness. A diagnostic repeat commissioned and inspected the new room successfully, then removed only that child and verified the original inventory and guarded hub settings. The first failure remains retained evidence, so one successful repeat does not establish reliable initial commissioning.
 
+A timed diagnostic against candidate `1.3.007.0014` reproduced this separately from the successful full workflow: the new managed room reported Loaded, but both readiness and online indicators remained false throughout the two-minute observation. Its owned child was removed, original inventory and guarded hub settings were verified unchanged, and reservations were released. Initial commissioning therefore remains unresolved; the existing-room reconnect correction is not claimed as its solution.
+
 An earlier complete Debug workflow passed desktop and processor tests, live hub reads, the actual-driver update, installed health checks and all discovered Android inspection cases using released TestAdapter 1.8.0 and DevTools 1.5.0. It checked the gateway options, room thermostat, Schedule and Edit Schedule pages, complete schedule/day/time selector contents and selected values. Editing was cancelled. Temporary name binding, Home restoration, checked device-state preservation and released reservations were verified. Temporary test-instance storage was removed; a cached catalogue entry can remain until a planned reboot.
 
 The gateway and room tests live in [AndroidTests](../WiserHeatCrestronDriver.AndroidTests/README.md). Those page names, labels and expected control behavior are Wiser-specific. Navigation helpers do not supply these assertions automatically. These Debug results are not evidence for an exact final Release candidate or for physical controls that were not operated.
@@ -24,6 +26,8 @@ The subsequent focused Save Day/Save All test passed against the same Debug cand
 
 The default temporary-schedule mode could not create another schedule on this hub. The rejected attempts left existing state unchanged and were independently reconciled; their failures remain retained. A later existing-schedule attempt stopped during read-only Android setup and also verified unchanged state before the successful run. No existing schedule was deleted. Creating/copying/reassigning/deleting an isolated schedule is covered offline, with physical validation still pending. These results establish development behavior, not final Release acceptance or every remaining editor/control requirement.
 
+The subsequent complete workflow against Debug candidate `1.3.007.0014` passed 219 local tests, 73 processor tests, three processor live tests, the actual-driver update and deployed-driver checks. All six Android cases passed using the released TestAdapter 1.9.0, including Auto/Manual/Auto, editor Cancel and both Save operations. Exact control-state, schedule and editor/Home restoration were confirmed. The temporary test instance was removed and reservations released; its pre-existing package archive was preserved. The candidate SHA-256 is `7D106F6DAB7756B629D0E99AF24E2B818C7461F6BFADEBF51820E2F8C4012966`. This candidate additionally fixes an offline-reproduced stopped-room readiness defect after successful reconnection, preserving controller identity. It does not establish the cause or resolution of the separate initial-commissioning timeout.
+
 ## Documents and package
 
 A private illustrated help draft was rendered and inspected with the official template. Publication of household screenshots remains subject to approval. The help source still needs its final candidate version and approved figures. Dependency notices were matched to the actual development merge inputs; final help and notice inclusion by ManifestUtil must be verified in the exact Release package.
@@ -32,7 +36,7 @@ The blank Extension self-test draft was rendered and inspected. Its checkboxes c
 
 ## Remaining acceptance work
 
-- Validate the remaining commands, selector actions, conditional editor slots, Save All behavior, physical feedback, timing and state restoration; validate the opt-in initialization policy on an explicitly authorized room without a saved manual target.
+- Resolve initial-commissioning readiness and validate the remaining commands, selector actions, conditional editor slots, save conflicts, physical feedback, timing and state restoration; validate the opt-in initialization policy on an explicitly authorized room without a saved manual target.
 - Complete visual/icon checks and Configure/Setup coverage. Text assertions alone do not verify rendered layout.
 - Establish independent room/device bindings and resolve the formal multiple-instance requirement for a platform driver; two room children do not automatically count as two platform instances.
 - Provide controlled outage testing and at least 24 hours of periodic functional observations, including recovery and interruption handling.

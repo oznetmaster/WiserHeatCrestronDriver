@@ -951,6 +951,10 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 					else
 						{
 						entity.UpdateFromRoom (room, _temperatureUnits);
+						// A failed connection stops existing children without removing their
+						// controllers. A successful discovery must restore their availability.
+						if (!entity.ReadyIndicatorIsReady || !entity.OnlineIndicatorIsOnline)
+							entity.StartPolling ();
 						}
 
 					managed[controllerId] = new PlatformManagedDevice (
