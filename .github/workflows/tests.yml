@@ -40,6 +40,9 @@ jobs:
         run: |
           dotnet test WiserHeatCrestronDriver.ControlProbe.Tests/WiserHeatCrestronDriver.ControlProbe.Tests.csproj -c Release --logger "trx;LogFileName=control-probe.trx" --results-directory TestResults/ControlProbe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Validate read-only endurance producer
+        run: |
+          ./tools/Test-DiscoveredCoverage.ps1 -Stage Desktop -Project WiserHeatCrestronDriver.EnduranceProbe.Tests/WiserHeatCrestronDriver.EnduranceProbe.Tests.csproj -Framework net10.0 -OfflineOnly -ResultsDirectory TestResults
       - name: Verify Android tests remain offline without a workflow
         env:
           CRESTRON_HOME_ANDROID_CONTEXT: ''

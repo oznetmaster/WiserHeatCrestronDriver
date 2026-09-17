@@ -8,6 +8,7 @@ param(
     [string]$Configuration = 'Release',
     [string]$ResultsDirectory = 'TestResults',
     [switch]$AllowProcessorSkips,
+    [switch]$OfflineOnly,
     [string]$SdkRoot,
     [string]$PackageAssembly,
     [string]$SourceInventory
@@ -21,6 +22,18 @@ function Assert-SameTests($Expected, $Actual, [string]$Context) {
     if (!$left.Count -or $left.Count -ne $right.Count) { throw "$Context has empty or missing test results." }
     for ($index = 0; $index -lt $left.Count; $index++) {
         if ($left[$index] -cne $right[$index]) { throw "$Context test identities differ: $($left[$index]) / $($right[$index])" }
+    }
+}
+function Assert-InventoryScope($Inventory, [bool]$OfflineOnly) {
+    if ($OfflineOnly) {
+        if (!$Inventory.Count -or @($Inventory | Where-Object { $_.Live -or $_.Processor }).Count) {
+            throw 'An offline project must discover only a nonempty set of ordinary unit tests.'
+        }
+        return
+    }
+    foreach ($category in @('unit','processor','live')) {
+        $selected = @($Inventory | Where-Object { if ($category -eq 'live') { $_.Live } elseif ($category -eq 'processor') { $_.Processor -and !$_.Live } else { !$_.Processor -and !$_.Live } })
+        if (!$selected.Count) { throw "Expected a nonempty $category suite." }
     }
 }
 function Read-TestTree([string]$Path, [switch]$AdapterDump) {
@@ -51,6 +64,7 @@ function Assert-TestOutcome($Case, [bool]$AllowSkip) {
 }
 
 if ($MyInvocation.InvocationName -eq '.') { return }
+if ($OfflineOnly -and ($Stage -ne 'Desktop' -or $AllowProcessorSkips)) { throw 'Offline-only coverage cannot allow processor skips or validate a processor package.' }
 $results = [IO.Path]::GetFullPath($ResultsDirectory)
 [IO.Directory]::CreateDirectory($results) | Out-Null
 if ($Stage -eq 'Desktop') {
@@ -67,10 +81,7 @@ if ($Stage -eq 'Desktop') {
     if ($dump.LastWriteTimeUtc -lt $started) { throw 'Discovery output is stale.' }
     Copy-Item $dump.FullName "$evidence/discovery.dump"
     $inventory = @(Read-TestTree "$evidence/discovery.dump" -AdapterDump)
-    foreach ($category in @('unit','processor','live')) {
-        $selected = @($inventory | Where-Object { if ($category -eq 'live') { $_.Live } elseif ($category -eq 'processor') { $_.Processor -and !$_.Live } else { !$_.Processor -and !$_.Live } })
-        if (!$selected.Count) { throw "Expected a nonempty $category suite." }
-    }
+    Assert-InventoryScope $inventory $OfflineOnly.IsPresent
     dotnet test $projectPath -c $Configuration --no-build --filter 'TestCategory!=Live' --logger 'trx;LogFileName=tests.trx' --results-directory $evidence
     if ($LASTEXITCODE) { throw 'Desktop execution failed.' }
     [xml]$trx = Get-Content "$evidence/tests.trx" -Raw

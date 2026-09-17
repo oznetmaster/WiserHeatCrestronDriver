@@ -2,7 +2,7 @@
 
 This is the Wiser-specific read-only producer used by the DevTools endurance collector. It checks the running driver against the independently queried Wiser hub. It does not operate heating, hot water, Away mode or schedules.
 
-The producer is currently being validated from source. Its DevTools dependency includes additions after 1.6.0; the source override is required until that dependency is published. A scheduled-worker installer, final submission policy and completed 24-hour candidate run are not supplied by this source checkpoint. Ordinary driver builds and tests do not require this producer.
+The producer targets .NET 10 and restores CrestronHomeDevTools 1.7.0 from NuGet. Its projects are included in the Visual Studio solution, and its offline tests run in CI with discovery-versus-execution verification. A scheduled-worker installer, final submission policy and completed 24-hour candidate run are not supplied by this source checkpoint. Ordinary driver tests do not start this producer or contact a hub.
 
 ## What each observation proves
 
@@ -35,7 +35,14 @@ DevTools starts the executable without a window, writes one `SubmissionEndurance
 
 The monitor holds its shared processor reservation between scheduled worker invocations. Each due invocation runs one probe; the collector preserves its evidence, identities and outcome. It rejects excessive gaps, interrupted probes and changed identities, and exports a standard observation only after the approved interval passes. Failed runs remain failed after cleanup. Uncertain acquisition, pending probes and unknown release outcomes require reconciliation.
 
-For local source validation, build the producer and its tests with `DevToolsSourceProject` set to the corresponding `CrestronHomeDevTools.csproj`. Publish self-contained for the monitoring computer's runtime identifier. This source override is a development option; public consumers should use the released package once available.
+Build and test from Visual Studio or the repository root:
+
+```powershell
+dotnet test WiserHeatCrestronDriver.EnduranceProbe.Tests -c Release
+dotnet publish WiserHeatCrestronDriver.EnduranceProbe -c Release -r win-x64 --self-contained true -o artifacts/endurance-producer
+```
+
+Publish for the monitoring computer's runtime identifier and retain the complete output directory. The project is not a NuGet package. Use a private copy when adding reviewed bindings and candidate bytes; do not publish that bound copy. `DevToolsSourceProject` remains an optional local development override for testing shared-library source changes; normal builds use the released dependency.
 
 Short development checks use explicitly separate development policy/template files. Their receipts are not official forms and cannot establish submission endurance. Formal use still requires the final immutable release candidate, approved official requirement mapping, coordination with other users of the same physical hub, supervised scheduling and alerts, interruption/restart validation, and the full candidate-specific duration. UI/control/restoration tests remain separate requirements.
 

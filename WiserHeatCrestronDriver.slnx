@@ -4,6 +4,8 @@
   <Project Path="WiserHeatCrestronDriver.ConfigurationProbe/WiserHeatCrestronDriver.ConfigurationProbe.csproj" />
   <Project Path="WiserHeatCrestronDriver.ControlProbe/WiserHeatCrestronDriver.ControlProbe.csproj" />
   <Project Path="WiserHeatCrestronDriver.ControlProbe.Tests/WiserHeatCrestronDriver.ControlProbe.Tests.csproj" />
+  <Project Path="WiserHeatCrestronDriver.EnduranceProbe/WiserHeatCrestronDriver.EnduranceProbe.csproj" />
+  <Project Path="WiserHeatCrestronDriver.EnduranceProbe.Tests/WiserHeatCrestronDriver.EnduranceProbe.Tests.csproj" />
   <Project Path="WiserHeatCrestronDriver.WorkflowTests/WiserHeatCrestronDriver.WorkflowTests.csproj" />
   <Project Path="WiserHeatCrestronDriver/WiserHeatCrestronDriver.csproj" />
   <Project Path="WiserHeatCrestronDriver.Tests/WiserHeatCrestronDriver.Tests.csproj" />

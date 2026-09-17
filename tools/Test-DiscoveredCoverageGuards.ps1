@@ -40,4 +40,18 @@ try {
     [IO.File]::WriteAllText($temporary,'<test-run />')
     Reject { Read-TestTree $temporary }
 } finally { Remove-Item -LiteralPath $temporary -ErrorAction SilentlyContinue }
+$unit = [pscustomobject]@{Name='Unit.Case';Live=$false;Processor=$false}
+$processor = [pscustomobject]@{Name='Processor.Case';Live=$false;Processor=$true}
+$live = [pscustomobject]@{Name='Live.Case';Live=$true;Processor=$true}
+Assert-InventoryScope @($unit) $true
+$checks++
+Assert-InventoryScope @($unit,$processor,$live) $false
+$checks++
+Reject { Assert-InventoryScope @() $true }
+Reject { Assert-InventoryScope @($unit,$processor) $true }
+Reject { Assert-InventoryScope @($unit,$live) $true }
+Reject { Assert-InventoryScope @($unit) $false }
+Reject { Assert-InventoryScope @($processor,$live) $false }
+Reject { Assert-InventoryScope @($unit,$processor) $false }
+Reject { Assert-InventoryScope @($unit,$live) $false }
 Write-Host "$checks discovery coverage guard checks passed."
