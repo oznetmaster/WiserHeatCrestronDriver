@@ -11,6 +11,11 @@ See the [product changelog](CHANGELOG.md) for shipped changes. This document pre
 
 <!-- development-history -->
 
+## Conflict warning correction - 2026-09-17 (pending driver release)
+
+- Shortened the schedule-conflict warning after actual portrait screenshots showed the recovery instruction cut off. The warning now reads "Schedule changed. Cancel and reopen."
+- The gated development update and both stale-save UI cases passed with independent hub/state restoration and test cleanup. Both captured save paths display the full instruction at the tested viewport. See [validation status](submission/ValidationStatus.md) for the exact candidate and scope.
+
 ## Schedule conflict validation - 2026-09-17 (no driver release)
 
 - Added separately selected Save Day and Save All conflict cases, backed by independent hub observations, original-state restoration and failure-path regression tests.

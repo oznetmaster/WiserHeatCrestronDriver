@@ -56,7 +56,7 @@ public sealed partial class GatewayUiTests
 		{
 		public async Task ExerciseConflictAsync (ScheduleConflictCase operation, Func<CancellationToken, Task> changeHub, CancellationToken token)
 			{
-			const string error = "Schedule changed on the hub. Cancel and reopen the editor before saving.";
+			const string error = "Schedule changed. Cancel and reopen.";
 			var before = await ObserveDriverAsync (operation.ScheduleId, null, token);
 			await fixture._navigation!.InspectRoomExtensionPagesAsync (check, binding.RoomName, original.Name!, binding.PageTitle, async (pages, cancellation) =>
 				{

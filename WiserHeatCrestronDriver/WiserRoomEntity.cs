@@ -1142,7 +1142,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		if (assigned == null || assigned.Id != _editScheduleId || !ScheduleDaysMatch (_editScheduleData, assigned.ScheduleData))
 			_editScheduleChanged = true;
 		if (_editScheduleChanged)
-			SetEditError ("Schedule changed on the hub. Cancel and reopen the editor before saving.", notify: _frameworkReady != 0);
+			SetEditError ("Schedule changed. Cancel and reopen.", notify: _frameworkReady != 0);
 		else if (assigned != null)
 			EditScheduleImpact = BuildEditScheduleImpact (assigned);
 		}
@@ -1221,7 +1221,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		bool saved = await _platform.SaveHeatingScheduleAsync (_room.Id, _editScheduleId, scheduleData, _editScheduleData).ConfigureAwait (false);
 		if (!saved)
 			{
-			SetEditError (_editScheduleChanged ? "Schedule changed on the hub. Cancel and reopen the editor before saving." : "Unable to save schedule changes", notify: true);
+			SetEditError (_editScheduleChanged ? "Schedule changed. Cancel and reopen." : "Unable to save schedule changes", notify: true);
 			return false;
 			}
 

@@ -1,5 +1,12 @@
 # Coverage source review
 
+## Conflict warning correction - 17 September 2026
+
+Debug `1.3.007.0029` shortens the clipped warning to "Schedule changed. Cancel and reopen." The complete gated update passed local, Mono processor, read-only live and installed-state checks. A separate run repeated both real stale Save Day/Save All cases against its exact active payload using public TestAdapter 1.11.0. Independent hub observations, pending editor preservation, complete original-state restoration, temporary-child cleanup and reservation release passed. Both after-save screenshots show the complete warning at the tested 1080x2400 viewport; the earlier Debug28 truncation is resolved for that profile.
+
+Package SHA-256: `873D8754409AABC4990C2757E6C872A23F76829023545A4883613B278EFEF705`. This is development evidence for an existing exclusive schedule and the tested display profile. Other conditional layouts, display profiles and final-candidate acceptance remain separate. The public driver release remains v1.3.7; this correction is not yet part of a tagged driver release.
+
+
 ## Schedule conflict validation - 17 September 2026
 
 Both `ScheduleConflictRefusesStaleSaveAndRestoresOriginal` cases passed on exact Debug `1.3.007.0028` (SHA-256 `9146679AA8337293F508D3E7E635266CDFAFC6CC1C00244C5DC8708C6CAF5F80`) using the normal Android control project and public TestAdapter 1.11.0. Each made a pending UI edit, independently changed the exclusively assigned hub schedule, and tapped Save Day or Save All once. Actual hub snapshots confirmed that the newer schedule survived; every pending editor value and visibility flag was preserved. Cancel/reopen loaded the current hub data. The full original schedules, guarded room settings, editor, Home, inventory and emulator dimensions were restored, the temporary child was removed, and both reservations were released. The complete control-probe suite passed, including the new failure/recovery cases.
