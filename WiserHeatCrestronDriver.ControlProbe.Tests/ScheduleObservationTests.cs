@@ -62,11 +62,30 @@ public sealed class ScheduleObservationTests
 		=> Assert.Throws<InvalidDataException> (() => ScheduleObservation.ValidateCapture (Changed ("Mode", "\"Manual\"")));
 	[Test]
 	public void AbsentManualSetpoint_IsRejectedBeforeHubCanCreateIt ()
-		=> Assert.Throws<InvalidDataException> (() => ScheduleObservation.ValidateCapture (Read (Original.Replace ("\"ManualSetPoint\":220,", ""))));
+		=> Assert.Throws<NotSupportedException> (() => ScheduleObservation.ValidateCapture (Read (Original.Replace ("\"ManualSetPoint\":220,", ""))));
 	[TestCase (301)]
 	[TestCase (0)]
 	public void ManualSetpointOutsideHeatingRange_IsRejected (int value)
 		=> Assert.Throws<InvalidDataException> (() => ScheduleObservation.ValidateCapture (Changed ("ManualSetPoint", value.ToString (System.Globalization.CultureInfo.InvariantCulture))));
+	[TestCase ("ScheduleId", "0")]
+	[TestCase ("Mode", "\"Manual\"")]
+	[TestCase ("SetpointOrigin", "\"FromBoost\"")]
+	[TestCase ("CurrentSetPoint", "400")]
+	public void InitializationOption_PreservesCaptureGuards (string name, string json)
+		{
+		var room = JsonNode.Parse (Changed (name, json).GetRawText ())!.AsObject ();
+		room.Remove ("ManualSetPoint");
+		Assert.Throws<InvalidDataException> (() => ScheduleObservation.ValidateCapture (JsonSerializer.SerializeToElement (room), true));
+		}
+	[Test]
+	public void InitializationOption_RequiresUnchangedAbsenceBeforeControl ()
+		{
+		var start = JsonNode.Parse (Original)!.AsObject ();
+		start.Remove ("ManualSetPoint");
+		var original = JsonSerializer.SerializeToElement (start);
+		Assert.That (ScheduleObservation.Read (original, original, true), Is.True);
+		Assert.Throws<InvalidDataException> (() => ScheduleObservation.Read (original, Read (Original), true));
+		}
 	[TestCase (170, 220)]
 	[TestCase (220, 170)]
 	[TestCase (220, 220)]
@@ -83,5 +102,52 @@ public sealed class ScheduleObservationTests
 		start["CurrentSetPoint"] = manual;
 		Assert.That (ScheduleObservation.Read (original, Read (start.ToJsonString ())), Is.False);
 		Assert.That (ScheduleObservation.Read (original, original), Is.True);
+		}
+
+	[TestCase (170, 220)]
+	[TestCase (220, 170)]
+	public void HubInitializingManualFromCurrent_IsAcceptedOnlyDuringTransition (int current, int manual)
+		{
+		var start = JsonNode.Parse (Original)!;
+		start["CurrentSetPoint"] = current;
+		start["ScheduledSetPoint"] = current;
+		start["ManualSetPoint"] = manual;
+		var original = JsonSerializer.SerializeToElement (start);
+		start["Mode"] = "Manual";
+		start["SetpointOrigin"] = "FromManualMode";
+		start["ManualSetPoint"] = current;
+		var changed = JsonSerializer.SerializeToElement (start);
+		Assert.That (ScheduleObservation.ReadTransition (original, changed), Is.False);
+		Assert.Throws<InvalidDataException> (() => ScheduleObservation.Read (original, changed));
+		start["ManualSetPoint"] = 250;
+		start["CurrentSetPoint"] = 250;
+		Assert.Throws<InvalidDataException> (() => ScheduleObservation.ReadTransition (original, JsonSerializer.SerializeToElement (start)));
+		}
+
+	[TestCase (170)]
+	[TestCase (220)]
+	[TestCase (250)]
+	public void ManualOccupancyReadings_FollowTargetOffsetButMustReturnInAuto (int manual)
+		{
+		var start = JsonNode.Parse (Original)!;
+		start["ManualSetPoint"] = manual;
+		var original = JsonSerializer.SerializeToElement (start);
+		start["Mode"] = "Manual";
+		start["SetpointOrigin"] = "FromManualMode";
+		start["CurrentSetPoint"] = manual;
+		start["OccupiedHeatingSetPoint"] = manual;
+		start["UnoccupiedHeatingSetPoint"] = manual - 20;
+		Assert.That (ScheduleObservation.Read (original, JsonSerializer.SerializeToElement (start)), Is.False);
+		start["UnoccupiedHeatingSetPoint"] = manual - 10;
+		Assert.Throws<InvalidDataException> (() => ScheduleObservation.Read (original, JsonSerializer.SerializeToElement (start)));
+		start["UnoccupiedHeatingSetPoint"] = manual - 20;
+		start["Mode"] = "Auto";
+		start["SetpointOrigin"] = "FromSchedule";
+		start["CurrentSetPoint"] = 220;
+		if (manual != 220)
+			Assert.Throws<InvalidDataException> (() => ScheduleObservation.Read (original, JsonSerializer.SerializeToElement (start)));
+		start["OccupiedHeatingSetPoint"] = 220;
+		start["UnoccupiedHeatingSetPoint"] = 200;
+		Assert.That (ScheduleObservation.Read (original, JsonSerializer.SerializeToElement (start)), Is.True);
 		}
 	}

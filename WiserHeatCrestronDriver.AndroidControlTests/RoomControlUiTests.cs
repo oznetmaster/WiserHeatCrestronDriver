@@ -3,6 +3,8 @@
 
 using System.Globalization;
 using System.Net;
+using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 
 using CrestronHomeDevTools;
@@ -19,7 +21,7 @@ namespace WiserHeatCrestronDriver.AndroidTests;
 
 public sealed partial class GatewayUiTests
 	{
-	private sealed record ControlRoomBinding (int DeviceId, string HubRoomName);
+	private sealed record ControlRoomBinding (int DeviceId, string HubRoomName, bool AllowManualTargetInitialization = false);
 	private sealed partial record Settings
 		{
 		public string? ControlHubSettingsPath
@@ -46,6 +48,8 @@ public sealed partial class GatewayUiTests
 			throw new InvalidDataException ("Private hub settings are incomplete.");
 		string host = settings.HubHost.Trim ().ToLowerInvariant ();
 		using var hub = new WiserRestController (new WiserConnection (host, settings.Secret));
+		using var http = new HttpClient (new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds (15) };
+		http.DefaultRequestHeaders.Add ("SECRET", settings.Secret);
 		foreach (var control in controls)
 			{
 			var binding = _settings.Rooms.Single (room => room.DeviceId == control.DeviceId);
@@ -55,8 +59,8 @@ public sealed partial class GatewayUiTests
 			await _navigation!.InspectRoomExtensionPagesAsync (check, binding.RoomName, original.Name!, binding.PageTitle, async (pages, token) =>
 			{
 				await pages.OpenPageAsync (Text ("Open"), "Schedule", CrestronHomePages.Resource ("customdevices_toolbarClose"), token);
-				var cycle = new RoomControlSession (this, hub, host, binding, control, original, check);
-				var result = await ScheduleControlCycle.RunAsync (cycle, TimeSpan.FromSeconds (45), token);
+				var cycle = new RoomControlSession (this, hub, http, host, binding, control, original, check);
+				var result = await ScheduleControlCycle.RunAsync (cycle, TimeSpan.FromSeconds (45), token, control.AllowManualTargetInitialization);
 				_roomStatePreserved = result.RestorationConfirmed;
 				await cycle.SaveResultAsync (result);
 				Assert.That (result.Passed, Is.True, result.Detail);
@@ -65,12 +69,13 @@ public sealed partial class GatewayUiTests
 			}
 		}
 
-	private sealed class RoomControlSession (GatewayUiTests fixture, WiserRestController hub,
+	private sealed class RoomControlSession (GatewayUiTests fixture, WiserRestController hub, HttpClient http,
 		 string host, RoomBinding binding, ControlRoomBinding control, DeviceInfo original, string check) : IScheduleControlSession
 		{
 		private AndroidWorkflowSession Session => fixture._session ?? throw new InvalidOperationException ("Android workflow is not active.");
 		private string DirectoryPath => Path.Combine (Session.Context.EvidenceDirectory, check + ".records");
 		private string[] Titles => [binding.PageTitle, "Schedule"];
+		private ScheduleControlSnapshot? _captured;
 
 		private static ScheduleActivity Activity (DeviceInfo device) =>
 			 JsonSerializer.Deserialize<ScheduleActivity> (device.PropertyValues["controlStatus"].GetString ()!)
@@ -117,6 +122,8 @@ public sealed partial class GatewayUiTests
 				Snapshot = snapshot
 				});
 			file.Flush (flushToDisk: true);
+			if (phase == "original")
+				_captured = snapshot;
 			}
 
 		public async Task SaveResultAsync (ScheduleControlResult result)
@@ -179,6 +186,26 @@ public sealed partial class GatewayUiTests
 				catch (InvalidOperationException) { await Task.Delay (250, deadline.Token); }
 				}
 			await Session.CaptureAsync (check + (enabled ? ".enabled" : ".disabled"), Verify, token);
+			}
+
+		public async Task SetManualTargetAsync (int target, CancellationToken token)
+			{
+			AndroidWorkflowSession.VerifyContext (Session.Context);
+			var state = await ReadAsync (token);
+			if (_captured == null || state.PhysicalIdentity != _captured.PhysicalIdentity ||
+				 state.Activity.Epoch != _captured.Activity.Epoch || state.Activity.Completed != _captured.Activity.Completed + 1 ||
+				 ScheduleObservation.ReadTransition (_captured.Room, state.Room) || state.HomeEnabled ||
+				 state.Activity.Pending != 0 || target != _captured.Room.GetProperty ("ManualSetPoint").GetInt32 ())
+				throw new InvalidDataException ("Restoring the stored target requires an idle room in Manual mode.");
+			// ManualSetPoint is read-only on the hub. Its supported temperature command
+			// restores the saved target while still Manual, before the UI returns to Auto.
+			using var request = new HttpRequestMessage (HttpMethod.Patch, "http://" + host + "/data/v2/domain/Room/" + state.Room.GetProperty ("id").GetInt32 ().ToString (CultureInfo.InvariantCulture))
+				{
+				Content = new StringContent (JsonSerializer.Serialize (new { RequestOverride = new { Type = "Manual", SetPoint = target } }), Encoding.UTF8, "application/json")
+				};
+			// No library HTTP retries: an uncertain mutation must be observed, never replayed.
+			using var response = await http.SendAsync (request, token);
+			response.EnsureSuccessStatusCode ();
 			}
 		}
 	}

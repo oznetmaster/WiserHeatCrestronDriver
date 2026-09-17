@@ -44,6 +44,8 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	private IDictionary<string, object> _editScheduleData = new Dictionary<string, object> (StringComparer.OrdinalIgnoreCase);
 	private int _editScheduleId;
 	private string _editScheduleName = string.Empty;
+	private bool _editingSchedule;
+	private bool _editScheduleChanged;
 	private int _roomActionInProgress;
 	private readonly CommandActivity _controlActivity = new ();
 
@@ -778,6 +780,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	public void OpenEditSchedule ()
 		{
 		LogInfo ($"OpenEditSchedule invoked; selectedScheduleId='{SelectedScheduleId ?? string.Empty}'");
+		_editingSchedule = true;
 		LoadEditScheduleState (notify: true);
 		}
 
@@ -800,6 +803,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	public void CancelEditSchedule ()
 		{
 		LogInfo ("CancelEditSchedule invoked");
+		_editingSchedule = false;
 		LoadEditScheduleState (notify: true);
 		}
 
@@ -826,7 +830,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		RefreshScheduleValues (notify: _frameworkReady != 0);
 		CurrentTemperatureLabel = $"{CurrentTemperature:0.0}°";
 		TileIcon = BuildTileIcon (_room);
-		LoadEditScheduleState (notify: _frameworkReady != 0);
+		RefreshEditorFromHub ();
 		}
 
 	public void SetOnline (bool online)
@@ -1094,6 +1098,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	private void LoadEditScheduleState (bool notify)
 		{
 		WiserHeatingSchedule? assignedSchedule = ResolveAssignedSchedule (_room);
+		_editScheduleChanged = false;
 		_editDaySlots.Clear ();
 		_editScheduleData = new Dictionary<string, object> (StringComparer.OrdinalIgnoreCase);
 		_editScheduleId = assignedSchedule?.Id ?? 0;
@@ -1126,8 +1131,55 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			NotifyEditStateChanged ();
 		}
 
+	private void RefreshEditorFromHub ()
+		{
+		if (!_editingSchedule)
+			{
+			LoadEditScheduleState (notify: _frameworkReady != 0);
+			return;
+			}
+		WiserHeatingSchedule? assigned = ResolveAssignedSchedule (_room);
+		if (assigned == null || assigned.Id != _editScheduleId || !ScheduleDaysMatch (_editScheduleData, assigned.ScheduleData))
+			_editScheduleChanged = true;
+		if (_editScheduleChanged)
+			SetEditError ("Schedule changed on the hub. Cancel and reopen the editor before saving.", notify: _frameworkReady != 0);
+		else if (assigned != null)
+			EditScheduleImpact = BuildEditScheduleImpact (assigned);
+		}
+
+	internal static bool ScheduleDaysMatch (IDictionary<string, object> expected, IDictionary<string, object> current) =>
+		_editableScheduleDays.All (day =>
+			{
+			bool before = expected.TryGetValue (day, out object original);
+			bool now = current.TryGetValue (day, out object value);
+			return before == now && (!before || ScheduleValuesMatch (original, value));
+			});
+
+	private static bool ScheduleValuesMatch (object? expected, object? current)
+		{
+		// JSON readers can materialize the submitted Int32 values as Int64.
+		// Compare numeric values without treating strings or booleans as numbers.
+		if (IsScheduleNumber (expected) && IsScheduleNumber (current))
+			{
+			try { return Convert.ToDecimal (expected, CultureInfo.InvariantCulture) == Convert.ToDecimal (current, CultureInfo.InvariantCulture); }
+			catch (OverflowException) { return false; }
+			}
+		if (expected is IDictionary<string, object> left && current is IDictionary<string, object> right)
+			return left.Count == right.Count && left.All (item => right.TryGetValue (item.Key, out object value) && ScheduleValuesMatch (item.Value, value));
+		if (expected is System.Collections.IEnumerable before && current is System.Collections.IEnumerable after && expected is not string && current is not string)
+			{
+			object[] first = before.Cast<object> ().ToArray ();
+			object[] second = after.Cast<object> ().ToArray ();
+			return first.Length == second.Length && first.Zip (second, ScheduleValuesMatch).All (equal => equal);
+			}
+		return Equals (expected, current);
+		}
+
+	private static bool IsScheduleNumber (object? value) => value is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal;
+
 	private void SetEditSlotTimeProperty (int slotIndex, string propertyId, string value)
 		{
+		_editingSchedule = true;
 		string timeValue = value ?? string.Empty;
 		LogInfo ($"UI requested {propertyId}='{timeValue}'");
 		UpdateEditSlotTime (slotIndex, timeValue);
@@ -1135,6 +1187,9 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 	private async Task<bool> SaveEditedScheduleAsync (bool applyToAllDays)
 		{
+		RefreshEditorFromHub ();
+		if (_editScheduleChanged)
+			return false;
 		if (_editScheduleId == 0)
 			{
 			SetEditError ("No schedule assigned", notify: true);
@@ -1163,10 +1218,10 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			}
 
 		SetEditError (string.Empty, notify: true);
-		bool saved = await _platform.SaveHeatingScheduleAsync (_editScheduleId, scheduleData).ConfigureAwait (false);
+		bool saved = await _platform.SaveHeatingScheduleAsync (_room.Id, _editScheduleId, scheduleData, _editScheduleData).ConfigureAwait (false);
 		if (!saved)
 			{
-			SetEditError ("Unable to save schedule changes", notify: true);
+			SetEditError (_editScheduleChanged ? "Schedule changed on the hub. Cancel and reopen the editor before saving." : "Unable to save schedule changes", notify: true);
 			return false;
 			}
 
@@ -1176,6 +1231,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 	private void SetEditSelectedDayFromUi (string day)
 		{
+		_editingSchedule = true;
 		LogInfo ($"UI requested editSelectedDay='{day ?? string.Empty}'");
 		if (string.IsNullOrWhiteSpace (day))
 			{
@@ -1199,11 +1255,13 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		EditScheduleError = string.Empty;
 		LoadSelectedEditDay (normalizedDay);
 		EditScheduleSummary = BuildEditScheduleSummary ();
+		NotifyEditStateChanged ();
 		LogInfo ($"UI editSelectedDay accepted; normalized='{normalizedDay}'");
 		}
 
 	private void SetEditSlotTemperatureProperty (int slotIndex, string propertyId, double value)
 		{
+		_editingSchedule = true;
 		LogInfo ($"UI requested {propertyId}={value.ToString (CultureInfo.InvariantCulture)}");
 		UpdateEditSlotTemperature (slotIndex, value.ToString (CultureInfo.InvariantCulture));
 		}
@@ -1246,6 +1304,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 		slot.Time = normalizedTime;
 		_editSlotTimes[slotIndex] = slot.Time;
+		NotifyPropertyChanged (GetEditSlotTimePropertyId (slotIndex), new DriverEntityValue (slot.Time));
 		string slotErrorPropertyId = GetEditSlotErrorPropertyId (slotIndex);
 		string previousSlotError = _editSlotErrors[slotIndex] ?? string.Empty;
 		_editSlotErrors[slotIndex] = string.Empty;
@@ -1278,6 +1337,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 		slot.Temperature = parsed;
 		_editSlotTemperatures[slotIndex] = parsed;
+		NotifyPropertyChanged (GetEditSlotTemperaturePropertyId (slotIndex), new DriverEntityValue (parsed));
 		string slotErrorPropertyId = GetEditSlotErrorPropertyId (slotIndex);
 		string previousSlotError = _editSlotErrors[slotIndex] ?? string.Empty;
 		_editSlotErrors[slotIndex] = string.Empty;

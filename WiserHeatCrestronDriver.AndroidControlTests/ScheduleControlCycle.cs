@@ -7,24 +7,31 @@ namespace WiserHeatCrestronDriver.ControlProbe;
 
 public sealed record ScheduleActivity (string Epoch, long Completed, int Pending);
 public sealed record ScheduleControlSnapshot (string PhysicalIdentity, ScheduleActivity Activity, JsonElement Room, bool HomeEnabled);
-public sealed record ScheduleControlResult (bool Passed, bool RestorationConfirmed, string Detail);
+public sealed record ScheduleControlResult (bool Passed, bool RestorationConfirmed, string Detail)
+	{
+	public bool ManualTargetInitialized { get; init; }
+	public bool ExactRestorationConfirmed => RestorationConfirmed && !ManualTargetInitialized;
+	}
 
 public interface IScheduleControlSession
 	{
 	Task<ScheduleControlSnapshot> ReadAsync (CancellationToken token);
 	Task RecordAsync (string phase, ScheduleControlSnapshot snapshot);
 	Task SetAsync (bool enabled, bool recovery, CancellationToken token);
+	Task SetManualTargetAsync (int target, CancellationToken token);
 	}
 
 /// <summary>One observed mode change and one restoration, with no command replay after uncertainty.</summary>
 public static class ScheduleControlCycle
 	{
-	public static async Task<ScheduleControlResult> RunAsync (IScheduleControlSession session, TimeSpan timeout, CancellationToken token)
+	public static async Task<ScheduleControlResult> RunAsync (IScheduleControlSession session, TimeSpan timeout, CancellationToken token,
+		 bool allowManualTargetInitialization = false)
 		{
 		if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromMinutes (5))
 			throw new ArgumentOutOfRangeException (nameof (timeout));
 		ScheduleControlSnapshot? original = null;
 		bool attempted = false, passed = false, restored = true;
+		bool initialized = false;
 		string phase = "preflight";
 		string detail = "Preflight did not complete; no control was submitted.";
 		using var deadline = CancellationTokenSource.CreateLinkedTokenSource (token);
@@ -32,14 +39,16 @@ public static class ScheduleControlCycle
 		try
 			{
 			original = await session.ReadAsync (deadline.Token);
-			ScheduleObservation.ValidateCapture (original.Room);
+			ScheduleObservation.ValidateCapture (original.Room, allowManualTargetInitialization);
 			RequireIdle (original.Activity);
 			if (string.IsNullOrWhiteSpace (original.PhysicalIdentity) || !original.HomeEnabled)
 				throw new InvalidDataException ("The hub and Home must agree on the scheduled starting state.");
 			await session.RecordAsync ("original", original);
+			if (ScheduleObservation.ManualTarget (original.Room) == null)
+				await session.RecordAsync ("manual-initialization-accepted", original);
 			var stable = await session.ReadAsync (deadline.Token);
 			RequireStable (stable, original, 0);
-			if (!ScheduleObservation.Read (original.Room, stable.Room) || !stable.HomeEnabled)
+			if (!ScheduleObservation.Read (original.Room, stable.Room, allowManualTargetInitialization) || !stable.HomeEnabled)
 				throw new InvalidDataException ("Starting state changed before the test.");
 			await session.RecordAsync ("disable-intent", stable);
 			deadline.Token.ThrowIfCancellationRequested ();
@@ -47,9 +56,13 @@ public static class ScheduleControlCycle
 			restored = false;
 			phase = "disable input or observation";
 			await session.SetAsync (false, false, deadline.Token);
-			var manual = await WaitForStateAsync (session, original, 1, false, deadline.Token);
+			var manual = await WaitForStateAsync (session, original, 1, false, deadline.Token, allowManualTargetInitialization, transition: true);
 			await session.RecordAsync ("manual-observed", manual);
 			passed = true;
+			}
+		catch (NotSupportedException) when (!attempted)
+			{
+			detail = "No saved manual target: this hub has no verified way to remove the value created by switching modes. No control was sent.";
 			}
 		catch
 			{
@@ -65,14 +78,34 @@ public static class ScheduleControlCycle
 					{
 					// Wait for exactly one completed command even when an input response was lost.
 					// No response/unchanged state is not proof that the input was never delivered.
-					var manual = await WaitForStateAsync (session, original, 1, false, cleanup.Token);
+					var manual = await WaitForStateAsync (session, original, 1, false, cleanup.Token, allowManualTargetInitialization, transition: true);
+					int? target = ScheduleObservation.ManualTarget (original.Room);
+					if (target.HasValue && ScheduleObservation.ManualTarget (manual.Room) != target)
+						{
+						await session.RecordAsync ("manual-target-restore-intent", manual);
+						try
+							{
+							await session.SetManualTargetAsync (target.Value, cleanup.Token);
+							}
+						catch
+							{
+							// Observe a possibly delivered write, but never replay it.
+							passed = false;
+							detail = "The manual-target write response was uncertain; restoration was independently observed. The test remains failed.";
+							}
+						manual = await WaitForStateAsync (session, original, 1, false, cleanup.Token, allowManualTargetInitialization);
+						await session.RecordAsync ("manual-target-restored", manual);
+						}
 					await session.RecordAsync ("restore-intent", manual);
 					await session.SetAsync (true, recovery: !passed, cleanup.Token);
-					var after = await WaitForStateAsync (session, original, 2, true, cleanup.Token);
+					var after = await WaitForStateAsync (session, original, 2, true, cleanup.Token, allowManualTargetInitialization);
 					await session.RecordAsync ("restored", after);
+					initialized = !target.HasValue && ScheduleObservation.ManualTarget (after.Room).HasValue;
 					restored = true;
 					if (passed)
-						detail = "The UI changed schedule mode; independent hub and Home observations confirm restoration.";
+						detail = initialized
+							 ? "Auto mode and the original schedule settings are restored. The hub retained an inactive initialized manual target, as explicitly permitted; exact original-state restoration is not claimed."
+							 : "The UI changed schedule mode; independent hub and Home observations confirm restoration.";
 					}
 				catch
 					{
@@ -87,7 +120,7 @@ public static class ScheduleControlCycle
 					}
 				}
 			}
-		return new (passed && restored, restored, detail);
+		return new (passed && restored, restored, detail) { ManualTargetInitialized = initialized };
 		}
 
 	private static void RequireIdle (ScheduleActivity activity)
@@ -105,7 +138,8 @@ public static class ScheduleControlCycle
 		}
 
 	private static async Task<ScheduleControlSnapshot> WaitForStateAsync (IScheduleControlSession session,
-		 ScheduleControlSnapshot original, int completed, bool enabled, CancellationToken token)
+		 ScheduleControlSnapshot original, int completed, bool enabled, CancellationToken token,
+		 bool allowManualTargetInitialization, bool transition = false)
 		{
 		int matches = 0;
 		while (true)
@@ -117,7 +151,10 @@ public static class ScheduleControlCycle
 				 state.Activity.Pending < 0 || state.Activity.Completed < original.Activity.Completed || state.Activity.Completed > expected)
 				throw new InvalidDataException ("Driver restarted, identity changed or concurrent commands prevent attribution.");
 			bool ready = state.Activity.Pending == 0 && state.Activity.Completed == expected;
-			matches = ready && ScheduleObservation.Read (original.Room, state.Room) == enabled && state.HomeEnabled == enabled ? matches + 1 : 0;
+			int? target = ScheduleObservation.ManualTarget (original.Room);
+			bool targetRestored = !target.HasValue || ScheduleObservation.ManualTarget (state.Room) == target;
+			matches = ready && ScheduleObservation.ReadTransition (original.Room, state.Room, allowManualTargetInitialization) == enabled &&
+				 (transition || targetRestored) && state.HomeEnabled == enabled ? matches + 1 : 0;
 			if (matches == 2)
 				return state;
 			await Task.Delay (250, token);

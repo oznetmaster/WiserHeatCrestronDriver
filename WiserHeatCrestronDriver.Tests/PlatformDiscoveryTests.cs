@@ -67,6 +67,74 @@ public sealed class PlatformDiscoveryTests
 		await TestSupport.Complete (_driver.RefreshSystemStateAsync (true));
 		}
 	[Test]
+	public async Task RoomStateRead_DoesNotWithdrawExistingController ()
+		{
+		await Refresh ("[{\"id\":4,\"Name\":\"First room\"}]");
+		using var dispatcher = CreateDispatcher ();
+		var withdrawn = new TaskCompletionSource<bool> (TaskCreationOptions.RunContinuationsAsynchronously);
+		var readded = new TaskCompletionSource<bool> (TaskCreationOptions.RunContinuationsAsynchronously);
+		dispatcher.ControllerIdsChanged += (_, _) =>
+			{
+			if (!dispatcher.ControllerIds.Contains ("room_4"))
+				withdrawn.TrySetResult (true);
+			else if (withdrawn.Task.IsCompleted)
+				readded.TrySetResult (true);
+			};
+		Assert.That (dispatcher.GetState ("room_4").PropertyValues.Keys, Does.Contain ("extension:uiDefinition"));
+		await Task.WhenAny (withdrawn.Task, Task.Delay (500));
+		if (withdrawn.Task.IsCompleted)
+			await TestSupport.Complete (readded.Task);
+		Assert.That (withdrawn.Task.IsCompleted, Is.False,
+			"A read must not tell Home that an installed room controller has disappeared.");
+		}
+	private DriverController CreateDispatcher () => EntryPoint.CreateController (_driver,
+		new DriverControllerCreationArgs ("wiser-platform-test", TestSupport.DataDirectory, _logger.AppLogger, null));
+	[Test]
+	public async Task LateDiscoveredRoom_AnnouncesItsExtensionWithoutWithdrawingExistingRooms ()
+		{
+		await Refresh ("[{\"id\":4,\"Name\":\"First room\"}]");
+		var originalRoom = Entities["room_4"];
+		using var dispatcher = CreateDispatcher ();
+		var announced = new TaskCompletionSource<bool> (TaskCreationOptions.RunContinuationsAsynchronously);
+		int uiAnnouncements = 0;
+		var registrations = new System.Collections.Concurrent.ConcurrentQueue<bool> ();
+		dispatcher.ControllerIdsChanged += (_, _) => registrations.Enqueue (dispatcher.ControllerIds.Contains ("room_4"));
+		dispatcher.ValuesChanged += (_, args) =>
+			{
+			if (args.ControllerId == "room_5" && args.Update.Changes.ContainsKey ("extension:uiDefinition"))
+				{
+				Interlocked.Increment (ref uiAnnouncements);
+				announced.TrySetResult (true);
+				}
+			};
+		await Refresh ("[{\"id\":4,\"Name\":\"First room\"},{\"id\":5,\"Name\":\"Second room\"}]");
+		await TestSupport.Complete (announced.Task);
+		Entities["room_5"].StartPolling ();
+		Assert.Multiple (() =>
+			{
+				Assert.That (Entities["room_4"], Is.SameAs (originalRoom));
+				Assert.That (registrations, Is.Not.Empty.And.All.True);
+				Assert.That (dispatcher.ControllerIds, Does.Contain ("room_4").And.Contain ("room_5"));
+				Assert.That (dispatcher.GetState ("room_5").PropertyValues.Keys, Does.Contain ("extension:uiDefinition"));
+				Assert.That (_driver.ManagedDevices.Keys, Is.EquivalentTo (new[] { "room_4", "room_5" }));
+				Assert.That (uiAnnouncements, Is.EqualTo (1), "Ordinary repeated polling must not repeat the registration announcement.");
+			});
+		}
+	[Test]
+	public async Task RoomDispatcher_TranslationsAndRemovalPreserveOtherRooms ()
+		{
+		await Refresh ("[{\"id\":4,\"Name\":\"First room\"},{\"id\":5,\"Name\":\"Second room\"}]");
+		using var dispatcher = CreateDispatcher ();
+		Assert.That (dispatcher.SupportedCultures, Does.Contain ("en-US"));
+		Assert.That (dispatcher.GetLanguageTranslations ("en-US"), Is.Not.Empty);
+		await Refresh ("[{\"id\":5,\"Name\":\"Second room\"}]");
+		Assert.That (dispatcher.GetState ("room_4").PropertyValues, Is.Empty,
+			"A genuinely removed room must not be served from stale state.");
+		Assert.That (dispatcher.ControllerIds, Does.Not.Contain ("room_4").And.Contain ("room_5"));
+		Assert.That (dispatcher.GetState ("room_5").PropertyValues.Keys, Does.Contain ("extension:uiDefinition"));
+		Assert.That (_driver.ManagedDevices.Keys, Is.EquivalentTo (new[] { "room_5" }));
+		}
+	[Test]
 	public async Task SchedulePicker_DefinitionContainsCurrentHubOptions ()
 		{
 		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Office schedule\"}]";
@@ -111,6 +179,143 @@ public sealed class PlatformDiscoveryTests
 		Assert.That (room.ScheduleSelectorEnabled, Is.False);
 		Assert.That (changes, Is.EqualTo (2));
 		}
+	[TestCase ("day")]
+	[TestCase ("time")]
+	[TestCase ("temperature")]
+	public async Task ScheduleEditor_SelectionPublishesChangedValuesWithoutHubPoll (string selection)
+		{
+		const string rooms = "[{\"id\":4,\"Name\":\"Office\",\"ScheduleId\":7}]";
+		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Test schedule\",\"Monday\":{\"Time\":[600,2200],\"DegreesC\":[210,170]},\"Tuesday\":{\"Time\":[900],\"DegreesC\":[190]}}]";
+		await _api.ReadHubDataAsync ();
+		await Refresh (rooms);
+		var room = Entities["room_4"];
+		using var dispatcher = CreateDispatcher ();
+		room.StartPolling ();
+		room.OpenEditSchedule ();
+		room.SetEditSelectedDay ("Monday");
+		var observed = new System.Collections.Concurrent.ConcurrentDictionary<string, DriverEntityValue> ();
+		var published = new TaskCompletionSource<bool> (TaskCreationOptions.RunContinuationsAsynchronously);
+		dispatcher.ValuesChanged += (_, args) =>
+			{
+			if (args.ControllerId != "room_4")
+				return;
+			foreach (var change in args.Update.Changes)
+				if (change.Value.Value.HasValue)
+					observed[change.Key] = change.Value.Value.Value;
+			bool Match<T> (string key, T expected) => observed.TryGetValue (key, out var value) && Equals (value.GetValue<T> (), expected);
+			bool complete = selection == "time" ? Match ("editSlot1Time", "07:00") : selection == "temperature" ? Match ("editSlot1Temperature", 22d) :
+				Match ("editSelectedDay", "Tuesday") && Match ("editSlot1Time", "09:00") && Match ("editSlot1Temperature", 19d) && Match ("editSlot2Visible", false);
+			if (complete)
+				published.TrySetResult (true);
+			};
+		if (selection == "day")
+			room.SetEditSelectedDay ("Tuesday");
+		else if (selection == "time")
+			room.SetEditSlot1Time ("07:00");
+		else
+			room.SetEditSlot1Temperature (22);
+		await TestSupport.Complete (published.Task);
+		Assert.That (_transport.ScheduleWrites, Is.Zero, "Editor selections must publish without saving the schedule.");
+		}
+
+	[Test]
+	public async Task ScheduleEditor_UnchangedHubPollPreservesUnsavedEditsUntilCancel ()
+		{
+		const string rooms = "[{\"id\":4,\"Name\":\"Office\",\"ScheduleId\":7}]";
+		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Test schedule\",\"Monday\":{\"Time\":[600,2200],\"DegreesC\":[210,170]}}]";
+		await _api.ReadHubDataAsync ();
+		await Refresh (rooms);
+		var room = Entities["room_4"];
+		room.OpenEditSchedule ();
+		room.SetEditSelectedDay ("Monday");
+		room.SetEditSlot1Time ("07:00");
+		room.SetEditSlot1Temperature (22);
+		await Refresh (rooms);
+		Assert.That (room.EditSlot1Time, Is.EqualTo ("07:00"), "Polling must not discard an in-progress edit.");
+		Assert.That (room.EditSlot1Temperature, Is.EqualTo (22));
+		room.CancelEditSchedule ();
+		Assert.That (room.EditSlot1Time, Is.EqualTo ("06:00"));
+		Assert.That (room.EditSlot1Temperature, Is.EqualTo (21));
+		}
+
+	[TestCase (false)]
+	[TestCase (true)]
+	public async Task ScheduleEditor_ChangedScheduleCannotBeSavedFromStaleBuffer (bool pollBeforeSave)
+		{
+		const string rooms = "[{\"id\":4,\"Name\":\"Office\",\"ScheduleId\":7}]";
+		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Test schedule\",\"Monday\":{\"Time\":[600],\"DegreesC\":[210]}}]";
+		await _api.ReadHubDataAsync ();
+		await Refresh (rooms);
+		var room = Entities["room_4"];
+		room.OpenEditSchedule ();
+		room.SetEditSelectedDay ("Monday");
+		room.SetEditSlot1Time ("07:00");
+		_transport.HeatingSchedules = _transport.HeatingSchedules.Replace ("[600]", "[800]");
+		if (pollBeforeSave)
+			await Refresh (rooms);
+		room.SaveEditScheduleDay ();
+		await TestSupport.Complete (WaitForCompletion (room));
+		Assert.That (_transport.ScheduleWrites, Is.Zero, "A stale editor must not overwrite the hub.");
+		Assert.That (room.EditScheduleError, Does.Contain ("Schedule changed"));
+		Assert.That (room.EditSlot1Time, Is.EqualTo ("07:00"), "Keep the pending edit visible with the conflict message until Cancel.");
+		room.CancelEditSchedule ();
+		Assert.That (room.EditSlot1Time, Is.EqualTo ("08:00"));
+		Assert.That (room.EditScheduleError, Is.Empty);
+		}
+
+	[Test]
+	public async Task ScheduleEditor_ReassignedRoomCannotWritePreviousSchedule ()
+		{
+		const string rooms = "[{\"id\":4,\"Name\":\"Office\",\"ScheduleId\":7}]";
+		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"First\",\"Monday\":{\"Time\":[600],\"DegreesC\":[210]}},{\"id\":9,\"Name\":\"Second\",\"Monday\":{\"Time\":[900],\"DegreesC\":[190]}}]";
+		await _api.ReadHubDataAsync ();
+		await Refresh (rooms);
+		var room = Entities["room_4"];
+		room.OpenEditSchedule ();
+		room.SetEditSelectedDay ("Monday");
+		room.SetEditSlot1Time ("07:00");
+		_transport.Rooms = rooms.Replace ("\"ScheduleId\":7", "\"ScheduleId\":9");
+		room.SaveEditScheduleAllDays ();
+		await TestSupport.Complete (WaitForCompletion (room));
+		Assert.That (_transport.ScheduleWrites, Is.Zero);
+		Assert.That (room.EditScheduleError, Does.Contain ("Schedule changed"));
+		room.CancelEditSchedule ();
+		Assert.That (room.EditSlot1Time, Is.EqualTo ("09:00"));
+		}
+
+	[TestCase (false)]
+	[TestCase (true)]
+	public async Task ScheduleEditor_SaveWritesOnlyTheRequestedDaysAndReloadsObservedData (bool allDays)
+		{
+		const string rooms = "[{\"id\":4,\"Name\":\"Office\",\"ScheduleId\":7}]";
+		string days = string.Join (",", Enum.GetNames (typeof (DayOfWeek)).Select (day => "\"" + day + "\":{\"Time\":[600],\"DegreesC\":[210]}"));
+		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Test schedule\"," + days + "}]";
+		_transport.AllowScheduleWrites = true;
+		await _api.ReadHubDataAsync ();
+		await Refresh (rooms);
+		var room = Entities["room_4"];
+		room.OpenEditSchedule ();
+		room.SetEditSelectedDay ("Monday");
+		room.SetEditSlot1Time ("07:00");
+		room.SetEditSlot1Temperature (22);
+		await Refresh (rooms);
+		if (allDays)
+			room.SaveEditScheduleAllDays ();
+		else
+			room.SaveEditScheduleDay ();
+		await TestSupport.Complete (WaitForCompletion (room));
+		Assert.That (_transport.ScheduleWrites, Is.EqualTo (1));
+		Assert.That (room.EditScheduleError, Is.Empty);
+		foreach (string day in Enum.GetNames (typeof (DayOfWeek)))
+			{
+			string expected = allDays || day == "Monday" ? "{\"Time\":[700],\"DegreesC\":[220]}" : "{\"Time\":[600],\"DegreesC\":[210]}";
+			Assert.That (_transport.LastScheduleWrite, Does.Contain ("\"" + day + "\":" + expected));
+			}
+		room.CancelEditSchedule ();
+		Assert.That (room.EditSlot1Time, Is.EqualTo ("07:00"));
+		Assert.That (room.EditSlot1Temperature, Is.EqualTo (22));
+		}
+
 	[TestCase (false)]
 	[TestCase (true)]
 	public async Task HotWaterCommand_RefreshesObservedStateBeforeReenablingButton (bool initiallyOn)
@@ -128,6 +333,28 @@ public sealed class PlatformDiscoveryTests
 		Assert.That (_transport.DomainReads, Is.GreaterThan (readsBeforeCommand), "A successful command must bypass the periodic snapshot throttle.");
 		Assert.That (_driver.HotWaterIsOn, Is.EqualTo (!initiallyOn), "The UI must reflect the hub's observed state when the command completes.");
 		Assert.That (Field<int> ("_hotWaterCommandInProgress"), Is.Zero);
+		}
+	[TestCase ("read-before")]
+	[TestCase ("read-after")]
+	[TestCase ("ignored-write")]
+	public async Task ScheduleEditor_UnconfirmedSaveKeepsPendingEditsAndReportsFailure (string failure)
+		{
+		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Test schedule\",\"Monday\":{\"Time\":[600],\"DegreesC\":[210]}}]";
+		_transport.AllowScheduleWrites = true;
+		await _api.ReadHubDataAsync ();
+		await Refresh ("[{\"id\":4,\"Name\":\"Office\",\"ScheduleId\":7}]");
+		var room = Entities["room_4"];
+		room.OpenEditSchedule ();
+		room.SetEditSelectedDay ("Monday");
+		room.SetEditSlot1Time ("07:00");
+		_transport.FailScheduleRead = failure == "read-before";
+		_transport.FailScheduleReadAfterWrite = failure == "read-after";
+		_transport.IgnoreScheduleWrite = failure == "ignored-write";
+		room.SaveEditScheduleDay ();
+		await TestSupport.Complete (WaitForCompletion (room));
+		Assert.That (room.EditScheduleError, Is.Not.Empty, "An HTTP acknowledgement alone does not establish a saved schedule.");
+		Assert.That (room.EditSlot1Time, Is.EqualTo ("07:00"), "Keep the pending edit visible when its save cannot be confirmed.");
+		Assert.That (_transport.ScheduleWrites, Is.EqualTo (failure == "read-before" ? 0 : 1), "Never automatically repeat an uncertain schedule write.");
 		}
 	[TestCase ("boost")]
 	[TestCase ("cancel boost")]
@@ -349,6 +576,7 @@ public sealed class PlatformDiscoveryTests
 		{
 		for (int i = 0; i < 200 && !room.ControlStatus.Contains ("\"Completed\":1,\"Pending\":0"); i++)
 			await Task.Delay (10);
+		Assert.That (room.ControlStatus, Does.Contain ("\"Completed\":1,\"Pending\":0"), "The command did not complete; do not inspect intermediate state as its result.");
 		}
 	private sealed class SnapshotTransport : HttpMessageHandler
 		{
@@ -362,11 +590,26 @@ public sealed class PlatformDiscoveryTests
 		internal int AwayCommands;
 		internal int HotWaterCommands;
 		internal int DomainReads;
+		internal int ScheduleWrites;
+		internal bool AllowScheduleWrites;
+		internal bool IgnoreScheduleWrite;
+		internal bool FailScheduleRead;
+		internal bool FailScheduleReadAfterWrite;
+		internal string LastScheduleWrite;
 		internal bool HoldNextDomain;
 		internal readonly TaskCompletionSource<bool> Entered = new (TaskCreationOptions.RunContinuationsAsynchronously);
 		internal readonly TaskCompletionSource<bool> Release = new (TaskCreationOptions.RunContinuationsAsynchronously);
 		protected override async Task<HttpResponseMessage> SendAsync (HttpRequestMessage request, CancellationToken cancellationToken)
 			{
+			if (request.Method.Method == "PATCH" && request.RequestUri.AbsolutePath.EndsWith ("/schedules/Heating/7"))
+				{
+				ScheduleWrites++;
+				Assert.That (AllowScheduleWrites, Is.True, "This scenario must not write a schedule.");
+				LastScheduleWrite = await request.Content.ReadAsStringAsync ();
+				if (!IgnoreScheduleWrite)
+					HeatingSchedules = "[{\"id\":7,\"Name\":\"Test schedule\"," + LastScheduleWrite.Substring (1) + "]";
+				return new HttpResponseMessage (HttpStatusCode.NoContent);
+				}
 			if (request.Method.Method == "PATCH" && request.RequestUri.AbsolutePath.EndsWith ("/domain/HotWater/1") && HotWaterState != null)
 				{
 				string body = await request.Content.ReadAsStringAsync ();
@@ -390,6 +633,8 @@ public sealed class PlatformDiscoveryTests
 				}
 			Assert.That (request.Method, Is.EqualTo (HttpMethod.Get), "Discovery must not operate a physical device.");
 			string path = request.RequestUri.AbsolutePath;
+			if (path.EndsWith ("/schedules/") && (FailScheduleRead || (FailScheduleReadAfterWrite && ScheduleWrites != 0)))
+				return new HttpResponseMessage (HttpStatusCode.BadRequest) { Content = new StringContent ("{}") };
 			if (path.EndsWith ("/domain/"))
 				DomainReads++;
 			if (path.EndsWith ("/domain/") && HoldNextDomain)

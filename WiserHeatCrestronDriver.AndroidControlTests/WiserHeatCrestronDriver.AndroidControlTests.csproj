@@ -19,5 +19,6 @@
     <Compile Include="../WiserHeatCrestronDriver.AndroidTests/GatewayUiTests.cs" Link="GatewayUiTests.cs" />
     <Compile Include="../WiserHeatCrestronDriver.AndroidTests/RoomUiTests.cs" Link="RoomUiTests.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleObservation.cs" Link="ScheduleObservation.cs" />
+    <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleEditorObservation.cs" Link="ScheduleEditorObservation.cs" />
   </ItemGroup>
 </Project>

@@ -112,6 +112,11 @@ public sealed partial class GatewayUiTests
 			CertificateSha256 = _settings.CertificateSha256
 			},
 			new NetworkCredential (_settings.UserName, _settings.Password), token);
+		return await ReadRoomAsync (client, binding, token);
+		}
+
+	private async Task<DeviceInfo> ReadRoomAsync (ConfigurationClient client, RoomBinding binding, CancellationToken token)
+		{
 		var gateway = await client.GetDeviceAsync (_session!.Context.InstalledDriverId, token) ?? throw new InvalidDataException ("The workflow gateway is missing.");
 		if (gateway.Model != "Wiser Heat Gateway" || gateway.PropertyValues["cp.driverInformation:version"].GetString () != _session.Context.DriverVersion ||
 			gateway.PropertyValues["cp.driverConfiguration:driverLoadingStatus"].GetString () != "Loaded" || !gateway.PropertyValues["onlineIndicator:isOnline"].GetBoolean ())

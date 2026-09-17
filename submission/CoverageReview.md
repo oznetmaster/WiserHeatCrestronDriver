@@ -1,4 +1,17 @@
-# Coverage source review - 16 September 2026
+# Coverage source review
+
+## Current review status - 17 September 2026
+
+The historical snapshot below no longer pins the current runtime. The subsequent room-registration and schedule-editor corrections require a new final source inventory and producer bindings. Do not populate acceptance checkboxes from the old snapshot or from the successful Debug workflow alone.
+
+| Source | Subsequent change | Required evidence |
+| --- | --- | --- |
+| `WiserDriverEntryPoint.cs`, `WiserPlatformDriver.cs` | Keep room controllers registered during reads; use standard SDK dispatch. | Preserve existing-room identity/registration during reads, verify discovery/removal, and resolve initial-commissioning reliability. One successful retry does not erase the retained first failure. |
+| `WiserRoomEntity.cs` | Preserve pending editor state across polling, detect observed schedule changes/reassignment, and publish day/time/temperature/slot updates. | The Debug selection/Cancel case and SDK events have passed. Still bind complete conditional-slot, adjustment and conflict scenarios to the final candidate. |
+| `WiserPlatformDriver.cs`, `WiserRoomEntity.cs` | Require fresh pre-save state and confirmed post-save day data. | Desktop regressions cover rejected stale saves, failed reads and ignored writes. Independently observe live Save Day and Save All on an isolated schedule, including scope and restoration. No atomic exclusion of external hub edits is claimed. |
+| Android control producer | Add optional initialization when a saved manual target is absent. | Pin the producer/settings policy separately. Report any retained inactive target and distinguish operating-state restoration from exact original-state restoration. Offline checks do not prove the unrun physical case. |
+
+## Historical snapshot - 16 September 2026
 
 The draft coverage snapshot now reflects the tracked runtime sources through `e24b5d40f41829a989279429fd207d588957902e`. This is a source review, not policy approval or completed test evidence. Generated local Debug revisions were excluded; the tracked manifest still declares release version `1.3.007.0000`. A final candidate version or any further behavior change requires another review.
 

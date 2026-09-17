@@ -33,8 +33,6 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	private readonly UiDefinitionProperty _uiDefinition;
 	private readonly Dictionary<string, WiserRoomEntity> _roomEntities = new (StringComparer.OrdinalIgnoreCase);
 	private readonly Dictionary<string, ConfigurableDriverEntity> _roomControllers = new (StringComparer.OrdinalIgnoreCase);
-	private readonly HashSet<string> _roomsAwaitingRebind = new (StringComparer.OrdinalIgnoreCase);
-	private readonly HashSet<string> _roomsReboundThisSession = new (StringComparer.OrdinalIgnoreCase);
 	private readonly object _entitiesLock = new ();
 
 	private WiserAPI _api = null!;
@@ -70,13 +68,17 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	internal WiserHeatingSchedule? GetAssignedScheduleForRoom (int roomId) =>
 		_api.Schedules?.GetByRoomId (roomId);
 
-	internal async Task<bool> SaveHeatingScheduleAsync (int scheduleId, IDictionary<string, object> scheduleData)
+	internal async Task<bool> SaveHeatingScheduleAsync (int roomId, int scheduleId, IDictionary<string, object> scheduleData, IDictionary<string, object> expectedSchedule)
 		{
 		if (scheduleData == null)
 			return false;
 
-		WiserHeatingSchedule? schedule = _api.Schedules?.GetById (WiserScheduleType.Heating, scheduleId) as WiserHeatingSchedule;
-		if (schedule == null)
+		// Refresh before writing: an open editor must not overwrite a changed shared
+		// schedule or save through a room that has since been assigned elsewhere.
+		if (!await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false))
+			return false;
+		WiserHeatingSchedule? schedule = GetAssignedScheduleForRoom (roomId);
+		if (schedule == null || schedule.Id != scheduleId || !WiserRoomEntity.ScheduleDaysMatch (expectedSchedule, schedule.ScheduleData))
 			return false;
 
 		Log ($"SaveHeatingScheduleAsync saving scheduleId={scheduleId} name='{schedule.Name ?? string.Empty}'");
@@ -84,7 +86,11 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		if (!succeeded)
 			return false;
 
-		await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
+		if (!await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false))
+			return false;
+		WiserHeatingSchedule? observed = GetAssignedScheduleForRoom (roomId);
+		if (observed == null || observed.Id != scheduleId || !WiserRoomEntity.ScheduleDaysMatch (scheduleData, observed.ScheduleData))
+			return false;
 		Log ($"SaveHeatingScheduleAsync completed scheduleId={scheduleId}");
 		return true;
 		}
@@ -304,105 +310,6 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	[Conditional ("DEBUG")]
 	private void Log (string message) =>
 		_logger?.Log (_driverLogId, LogEntryLevel.Info, message);
-
-	[Conditional ("DEBUG")]
-	internal void LogDispatchCallback (string message) =>
-		Log (message);
-
-	// The room rebind workaround is intentionally one-time per controller per live
-	// session. Reset it when reconnecting or when a controller disappears.
-	private void ResetRoomRebindState (string? controllerId = null)
-		{
-		lock (_entitiesLock)
-			{
-			if (string.IsNullOrWhiteSpace (controllerId))
-				{
-				_roomsAwaitingRebind.Clear ();
-				_roomsReboundThisSession.Clear ();
-				return;
-				}
-
-			string roomControllerId = controllerId!;
-			_ = _roomsAwaitingRebind.Remove (roomControllerId);
-			_ = _roomsReboundThisSession.Remove (roomControllerId);
-			}
-		}
-
-	// A freshly commissioned room can report online/ready but still miss the final
-	// wrapper promotion in Crestron Home. Queue a one-time child rebind the first
-	// time CH meaningfully interacts with that room controller.
-	internal void OnRoomControllerCallback (string controllerId)
-		{
-		if (string.IsNullOrWhiteSpace (controllerId) ||
-			!controllerId.StartsWith ("room_", StringComparison.OrdinalIgnoreCase))
-			return;
-
-		bool shouldQueue;
-		lock (_entitiesLock)
-			{
-			if (!_roomControllers.ContainsKey (controllerId) ||
-				_roomsReboundThisSession.Contains (controllerId))
-				{
-				Log ($"Skipping room rebind callback for {controllerId}; controller missing or already rebound this session");
-				return;
-				}
-
-			shouldQueue = _roomsAwaitingRebind.Add (controllerId);
-			}
-
-		if (!shouldQueue)
-			{
-			Log ($"Ignoring duplicate room rebind callback for {controllerId}");
-			return;
-			}
-
-		Log ($"Queueing one-time room rebind for {controllerId}");
-		_ = Task.Run (() => RebindRoomControllerAsync (controllerId));
-		}
-
-	// Re-register only the commissioned room child to reproduce the promotion path
-	// that a full gateway restart would otherwise provide.
-	private async Task RebindRoomControllerAsync (string controllerId)
-		{
-		try
-			{
-			await Task.Yield ();
-
-			ConfigurableDriverEntity? currentController;
-			WiserRoomEntity? currentEntity;
-			Dictionary<string, PlatformManagedDevice> managedDevicesCopy;
-			lock (_entitiesLock)
-				{
-				if (!_roomControllers.TryGetValue (controllerId, out currentController) ||
-					!_roomEntities.TryGetValue (controllerId, out currentEntity))
-					return;
-
-				managedDevicesCopy = new Dictionary<string, PlatformManagedDevice> (ManagedDevices, StringComparer.OrdinalIgnoreCase);
-				_roomControllers[controllerId] = new ConfigurableDriverEntity (controllerId, currentEntity, null);
-				currentController = _roomControllers[controllerId];
-				}
-
-			Log ($"Starting one-time room rebind for {controllerId}");
-			UpdateSubControllers (null, [controllerId]);
-			UpdateSubControllers ([currentController], null);
-			ManagedDevices = managedDevicesCopy;
-			currentEntity.StartPolling ();
-			Log ($"Completed one-time room rebind for {controllerId}");
-			}
-		catch (Exception ex)
-			{
-			LogError ($"Failed one-time room rebind for {controllerId}: {ex}");
-			throw;
-			}
-		finally
-			{
-			lock (_entitiesLock)
-				{
-				_ = _roomsAwaitingRebind.Remove (controllerId);
-				_ = _roomsReboundThisSession.Add (controllerId);
-				}
-			}
-		}
 
 	[Conditional ("DEBUG")]
 	private void LogDiscoveryCountChanged (int roomCount)
@@ -908,7 +815,6 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			entity.StopPolling ();
 		_roomControllers.Clear ();
 		_roomEntities.Clear ();
-		ResetRoomRebindState ();
 		if (ids.Count != 0)
 			UpdateSubControllers (null, ids);
 		ManagedDevices = new Dictionary<string, PlatformManagedDevice> (StringComparer.OrdinalIgnoreCase);
@@ -924,7 +830,6 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				return;
 			generation = ++_connectionGeneration;
 			StopRefreshLoop ();
-			ResetRoomRebindState ();
 			UpdateStatus ("Connecting", string.Empty);
 			SetReady (false);
 			}
@@ -979,14 +884,14 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			}
 		}
 
-	internal async Task RefreshSystemStateAsync (bool refreshSchedules = false)
+	internal async Task<bool> RefreshSystemStateAsync (bool refreshSchedules = false)
 		{
 		WiserAPI api;
 		long generation;
 		lock (_entitiesLock)
 			{
 			if (_disposed || _api == null)
-				return;
+				return false;
 			api = _api;
 			generation = _connectionGeneration;
 			}
@@ -996,17 +901,17 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			try
 				{
 				if (!await api.ReadHubDataAsync (CancellationToken.None).ConfigureAwait (false))
-					return;
+					return false;
 				}
 			catch when (_disposed || generation != _connectionGeneration || !ReferenceEquals (api, _api))
 				{
-				return;
+				return false;
 				}
 			}
 		lock (_entitiesLock)
 			{
 			if (_disposed || generation != _connectionGeneration || !ReferenceEquals (api, _api))
-				return;
+				return false;
 			if (readHub)
 				_lastScheduleRefreshUtc = DateTimeOffset.UtcNow;
 			List<WiserRoom> rooms = api.Rooms?.All ?? [];
@@ -1070,7 +975,6 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 				foreach (string controllerId in controllersToRemove)
 					{
-					ResetRoomRebindState (controllerId);
 					_ = _roomControllers.Remove (controllerId);
 					_ = _roomEntities.Remove (controllerId);
 					}
@@ -1105,6 +1009,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			else
 				UpdateStatus ("Connected - rooms discovered: " + ManagedDevices.Count, string.Empty);
 			}
+		return true;
 		}
 
 	private bool ShouldRefreshSchedules () =>
