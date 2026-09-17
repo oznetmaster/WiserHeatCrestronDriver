@@ -18,10 +18,10 @@ public static class ScheduleEditorRendering
 	private const string PREFIX = APP + ":id/";
 	private static bool Is (XElement node, string id) => (string?)node.Attribute ("resource-id") == PREFIX + id;
 	private static string Text (XElement node) => (string?)node.Attribute ("text") ?? string.Empty;
-	private static void Enabled (XElement node)
+	private static void Enabled (XElement node, bool allowDisabledSelf = false)
 		{
 		foreach (var current in node.AncestorsAndSelf ("node"))
-			if ((string?)current.Attribute ("package") != APP || (string?)current.Attribute ("enabled") != "true" || (string?)current.Attribute ("password") == "true")
+			if ((string?)current.Attribute ("package") != APP || ((string?)current.Attribute ("enabled") != "true" && !(allowDisabledSelf && current == node && (string?)current.Attribute ("enabled") == "false")) || (string?)current.Attribute ("password") == "true")
 				throw new InvalidDataException ("An editor control or its containing group belongs to another app, is masked, or is disabled.");
 		}
 	private static (int Left, int Top, int Right, int Bottom) Bounds (XElement node)
@@ -79,8 +79,11 @@ public static class ScheduleEditorRendering
 					{
 					var buttons = row.Elements ("node").Where (node => Is (node, id)).ToArray ();
 					if (buttons.Length != 1) throw new InvalidDataException ("The labelled setpoint row has a missing or ambiguous action.");
-					Enabled (buttons[0]);
-					if ((string?)buttons[0].Attribute ("clickable") != "true") throw new InvalidDataException ("A setpoint action is not operable.");
+					decimal value = editor.GetProperty (property + kind).GetDecimal ();
+					bool outwardLimit = id.EndsWith ("_minus", StringComparison.Ordinal) ? value == 5m : value == 35m;
+					// A disabled outward action is valid only at its exact endpoint; its row and ancestors must remain enabled.
+					Enabled (buttons[0], allowDisabledSelf: outwardLimit);
+					if ((string?)buttons[0].Attribute ("enabled") == "true" && (string?)buttons[0].Attribute ("clickable") != "true") throw new InvalidDataException ("A setpoint action is not operable.");
 					complete &= Inside (buttons[0], viewport);
 					}
 			if (!complete) continue;

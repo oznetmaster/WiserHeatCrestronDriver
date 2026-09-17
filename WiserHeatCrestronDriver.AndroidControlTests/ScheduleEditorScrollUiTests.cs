@@ -21,7 +21,12 @@ public sealed partial class GatewayUiTests
 		}
 
 	[Test, Category ("LiveControl")]
-	public async Task ScheduleEditorObservesEveryCurrentRowAndRestoresState ()
+	public Task ScheduleEditorObservesEveryCurrentRowAndRestoresState () => InspectCurrentEditorRowsAsync (false);
+
+	[Test, Category ("LiveControl")]
+	public Task ScheduleEditorCurrentRowsRespectTemperatureLimitsAndCancel () => InspectCurrentEditorRowsAsync (true);
+
+	private async Task InspectCurrentEditorRowsAsync (bool exerciseSetpoints)
 		{
 		Assert.That (_nameRestored && _roomStatePreserved, Is.True, "An earlier restoration needs reconciliation.");
 		if (_settings!.ControlRooms.Length == 0 || _settings.ControlRooms.Select (room => room.DeviceId).Distinct ().Count () != _settings.ControlRooms.Length ||
@@ -57,7 +62,12 @@ public sealed partial class GatewayUiTests
 			var schedules = await ReadHub ("schedules", timeout.Token);
 			var originalEditor = ScheduleEditorObservation.Editor (before.PropertyValues);
 			ScheduleEditorObservation.RequireMatchesHub (originalEditor, schedules, scheduleId);
-			string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + ".editor-scroll";
+			// Validate every original before any pending edit; unsupported values cannot be restored through the bounded setter.
+			if (exerciseSetpoints && Enumerable.Range (1, 10).Where (slot => originalEditor.GetProperty ("editSlot" + slot + "Visible").GetBoolean ())
+				.Select (slot => originalEditor.GetProperty ("editSlot" + slot + "Temperature").GetDecimal ())
+				.Any (value => value < 5m || value > 35m || value % 0.5m != 0m))
+				throw new InvalidDataException ("Boundary testing requires restorable original temperatures within 5-35 degrees in half-degree steps.");
+			string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + (exerciseSetpoints ? ".editor-boundaries" : ".editor-scroll");
 			string evidence = Path.Combine (_session!.Context.EvidenceDirectory, check + ".records");
 			Directory.CreateDirectory (evidence);
 			async Task Record (string phase, object value)
@@ -70,6 +80,8 @@ public sealed partial class GatewayUiTests
 			await Record ("original", new { Editor = originalEditor, Schedules = schedules, Rooms = ScheduleEditorObservation.RoomAssignments (domain), Activity = activity });
 			_roomStatePreserved = false;
 			Exception? failure = null;
+			JsonElement ownedBefore = originalEditor, ownedAfter = originalEditor;
+			void OwnTransition (JsonElement from, JsonElement to) { ownedBefore = from; ownedAfter = to; }
 			try
 				{
 				await _navigation!.InspectRoomExtensionPagesAsync (check, binding.RoomName, before.Name!, binding.PageTitle, async (pages, token) =>
@@ -85,6 +97,7 @@ public sealed partial class GatewayUiTests
 						var expected = Enumerable.Range (1, 10).Where (slot => originalEditor.GetProperty ("editSlot" + slot + "Visible").GetBoolean ())
 							.SelectMany (slot => new[] { (slot, "Time"), (slot, "Temperature") }).ToHashSet ();
 						var observed = new HashSet<(int Slot, string Kind)> ();
+						var exercised = new HashSet<int> ();
 						string? previous = null;
 						int gestures = 0;
 						bool complete = false;
@@ -107,6 +120,12 @@ public sealed partial class GatewayUiTests
 								}, token);
 							if (viewport == 0 && _settings.RequireEditorScrolling) Assert.That (controls.Count, Is.LessThan (expected.Count), "This case requires an actual off-screen control, not a fully fitted editor.");
 							foreach (var value in controls) observed.Add ((value.Slot, value.Kind));
+							if (exerciseSetpoints)
+								foreach (int slot in controls.Where (value => value.Kind == "Temperature").Select (value => value.Slot).Where (slot => !exercised.Contains (slot)))
+									{
+									await ExerciseEditorBoundaryRowAsync (check, [binding.PageTitle, "Schedule", "Edit Schedule"], binding, slot, originalEditor, OwnTransition, Record, token);
+									exercised.Add (slot);
+									}
 							await Record ("viewport-" + viewport, new { Controls = controls, CancelVisible = cancelVisible, ExpectedCount = expected.Count, ObservedCount = observed.Count, Gestures = gestures });
 							if (observed.SetEquals (expected) && cancelVisible) { complete = true; break; }
 							if (previous == current) throw new InvalidDataException ("The editor stopped moving before all controls and Cancel were observed.");
@@ -117,7 +136,8 @@ public sealed partial class GatewayUiTests
 							gestures++;
 							}
 						Assert.That (complete && (!_settings.RequireEditorScrolling || gestures > 0), Is.True, "Every current control must be completely observed; require scrolling only for a configured smaller-screen case.");
-						await Record ("coverage", new { Complete = complete, Gestures = gestures, Expected = expected.Select (value => new { Slot = value.slot, Kind = value.Item2 }), Observed = observed.Select (value => new { value.Slot, value.Kind }) });
+						Assert.That (!exerciseSetpoints || exercised.SetEquals (expected.Where (value => value.Item2 == "Temperature").Select (value => value.slot)), Is.True);
+						await Record ("coverage", new { Complete = complete, ExercisedSlots = exercised, Gestures = gestures, Expected = expected.Select (value => new { Slot = value.slot, Kind = value.Item2 }), Observed = observed.Select (value => new { value.Slot, value.Kind }) });
 						}
 					catch (Exception error) { inspectionFailure = error; throw; }
 					finally
@@ -125,6 +145,9 @@ public sealed partial class GatewayUiTests
 						using var cleanup = new CancellationTokenSource (TimeSpan.FromMinutes (2));
 						try
 							{
+							var pending = ScheduleEditorObservation.Editor ((await ReadRoomAsync (binding, cleanup.Token)).PropertyValues);
+							if (!JsonElement.DeepEquals (pending, ownedBefore) && !JsonElement.DeepEquals (pending, ownedAfter))
+								throw new InvalidDataException ("Unrelated editor changes prevent cancelling the owned pending edit.");
 							await Record ("cancel-intent", new { Expected = originalEditor, UncertainScroll = uncertainScroll });
 							await RevealEditorNavigationAsync (pages, check + ".close-editor", "Cancel", cleanup.Token, allowScroll: !uncertainScroll);
 							await pages.ClosePageAsync (cleanup.Token);

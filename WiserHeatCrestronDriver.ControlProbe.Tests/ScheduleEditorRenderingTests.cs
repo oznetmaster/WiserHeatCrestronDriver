@@ -143,4 +143,44 @@ public sealed class ScheduleEditorRenderingTests
 		Assert.That (Check (page, false).Select (value => value.Kind), Is.EqualTo (new[] { "Time" }));
 		Assert.Throws<InvalidDataException> (() => Check (page));
 		}
+	[TestCase (5, "minus", true)]
+	[TestCase (35, "plus", true)]
+	[TestCase (5, "plus", false)]
+	[TestCase (35, "minus", false)]
+	[TestCase (5.5, "minus", false)]
+	[TestCase (34.5, "plus", false)]
+	public void OnlyOutwardEndpointButtonMayBeDisabled (decimal temperature, string action, bool accepted)
+		{
+		var page = Page (1);
+		page.Editor["editSlot1Temperature"] = temperature;
+		page.Xml.Descendants ("node").Single (node => (string?)node.Attribute ("resource-id") == APP + ":id/customdeviceraiselowerwithtext_value")
+			.SetAttributeValue ("text", temperature.ToString ("0.0", CultureInfo.InvariantCulture) + "°");
+		var button = page.Xml.Descendants ("node").Single (node => (string?)node.Attribute ("resource-id") == APP + ":id/customdeviceraiselowerwithtext_" + action);
+		button.SetAttributeValue ("enabled", "false");
+		button.SetAttributeValue ("clickable", "false");
+		if (accepted) Assert.That (Check (page).Count, Is.EqualTo (2));
+		else Assert.Throws<InvalidDataException> (() => Check (page));
+		}
+
+	[TestCase ("masked")]
+	[TestCase ("other-app")]
+	[TestCase ("row-disabled")]
+	[TestCase ("missing-enabled")]
+	public void EndpointExceptionDoesNotHideBrokenControls (string mutation)
+		{
+		var page = Page (1);
+		page.Editor["editSlot1Temperature"] = 5m;
+		page.Xml.Descendants ("node").Single (node => (string?)node.Attribute ("resource-id") == APP + ":id/customdeviceraiselowerwithtext_value").SetAttributeValue ("text", "5.0°");
+		var button = page.Xml.Descendants ("node").Single (node => (string?)node.Attribute ("resource-id") == APP + ":id/customdeviceraiselowerwithtext_minus");
+		button.SetAttributeValue ("enabled", "false");
+		switch (mutation)
+			{
+			case "masked": button.SetAttributeValue ("password", "true"); break;
+			case "other-app": button.SetAttributeValue ("package", "other.app"); break;
+			case "row-disabled": button.Parent!.SetAttributeValue ("enabled", "false"); break;
+			case "missing-enabled": button.Attribute ("enabled")!.Remove (); break;
+			}
+		Assert.Throws<InvalidDataException> (() => Check (page));
+		}
+
 	}

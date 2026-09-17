@@ -171,6 +171,8 @@ Build the processor project in Debug in Visual Studio to build and deploy using 
 
 After a state-changing command completes, the driver reads fresh hub state before publishing the result. Hot-water and Away buttons therefore show the observed state before they become available again; boost, schedule and setpoint controls also refresh immediately. Routine polling remains throttled.
 
+The opt-in Android boundary fixture also exercises both directions at the temperature limits for each current row, including rows revealed by scrolling, then verifies Cancel and unchanged independent hub schedules. Its endpoint preparation is separate from the Android button inputs. See the [control-test setup and scope](WiserHeatCrestronDriver.AndroidControlTests/README.md).
+
 SDK command regressions also verify schedule-editor temperature limits, non-finite input, half-degree rounding, Cancel restoration and continued hub refresh after an ignored command. The current source ignores temperatures outside the advertised 5-35 degree range before starting an edit. This correction is validated in a development candidate and is not part of the existing v1.3.7 release; see [current validation](submission/ValidationStatus.md).
 
 ### Expanded driver behavior tests
