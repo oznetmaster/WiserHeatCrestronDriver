@@ -1,12 +1,24 @@
 # Wiser submission pilot status
 
+## Candidate 1.3.10 loaded and inspected - 18 September 2026
+
+The corrected immutable Release package passed its desktop, Mono processor, read-only hub and installed-state gates. Its original gateway instance updated successfully and is configured, online and ready. Both polling-log regressions passed on the processor. The temporary CI instance and stored test package were removed and the shared reservation released.
+
+Five subsequent Android checks passed against the same installed package bytes: gateway controls twice, native Celsius current temperature and heating target against independent hub readings, the complete open schedule choices through two fresh hub reads, and the room schedule/day/time selectors. No physical controls or hub writes were sent. Home, guarded state, original inventory, temporary-child cleanup, private-settings deletion and released reservations were verified. The thermostat and gateway captures were visually reviewed at the tested display profile; gauge pixel position is not validated by these tests.
+
+A separate three-test control run passed against those identical candidate bytes: Away changed and returned to its original state, hot water reached both requested states and returned to its original control policy, and the managed room completed Auto -> Manual -> Auto. Independent hub and processor observations confirmed restoration, including the unchanged saved manual temperature; no initialization exception was needed. Both gateway pages and the room page returned to Home. Frozen producer hashes, the installed payload, original inventory, temporary-child removal, private-settings deletion and released reservations were independently checked. These eight Android passes cover one configuration and display profile. Recorded cycle times include automation and observation overhead and are not claims about UI-only response latency.
+
+The exact package SHA-256 is `7513db936f593c39b8e0fbeba3eab1162ae035ad5557eb3eaf228e6ab23a5542`. Its eleven-page help and dependency notices passed final package verification. A first processor attempt caught a misplaced embedded-manifest startup test: test hosts intentionally remove dependency driver manifests. That regression now runs in the desktop SDK project and the separate actual-package smoke test; it was not ignored. The candidate's production code and package bytes were unchanged by this test correction.
+
+This is partial candidate acceptance, not completed submission. Other configurations and display profiles, native setpoint/boost actions and bounds, busy/error behavior, outages, multiple-instance interpretation, complete producer bindings, 24-hour endurance, signed form and final delivery remain outstanding. Candidate 1.3.10 has not been publicly released or submitted.
+
 ## Corrected submission candidate 1.3.10 - 18 September 2026
 
 The first 1.3.9 candidate passed packaging checks but failed actual processor startup. Its new assembly name no longer matched the embedded definition filename expected by the SDK's default lookup. This is a rejected candidate, not a released or accepted driver. Its original package and failure evidence are retained unchanged.
 
 Candidate 1.3.10 explicitly identifies its embedded definition and removes repeated schedule-list diagnostics from unchanged polls. A desktop test reproduced the exact startup exception before the correction. The corrected source and renamed merged assembly initialized successfully, and Debug/Release regression suites verified quiet unchanged polling, reported schedule changes and retained connection errors. These local checks do not establish final candidate hardware acceptance. A new version distinguishes the corrected bytes from the rejected processor candidate.
 
-The illustrated help is being rebuilt for the new version. Final package verification, processor/UI acceptance, endurance, completed signed form and authorized delivery remain pending.
+The illustrated help was rebuilt and verified for the new version. The candidate gates and bounded UI inspections above are complete; the remaining full acceptance, endurance, completed signed form and authorized delivery are pending.
 
 ## Submission package preparation - 18 September 2026
 
