@@ -11,6 +11,12 @@ See the [product changelog](CHANGELOG.md) for shipped changes. This document pre
 
 <!-- development-history -->
 
+## Schedule membership and rejected selections - 2026-09-18 (no driver release)
+
+The open Android schedule selector passed temporary unassigned schedule addition and removal on Debug `1.3.007.0029`, after an explicitly approved capacity cleanup. Original hub settings and selection, Home, temporary-child removal, inventory and released reservations were verified. This result does not cover stale-ID rejection or the final Release candidate.
+
+New regression tests reproduced a driver defect: invalid or deleted schedule IDs could replace the published selection before validation, and a different valid choice could replace it while another room command was busy. The source fix validates choices against the current catalog and publishes selection only from refreshed hub state. Nine focused checks and the desktop SDK suite pass, including pending, rejected and successful assignment requests. The gated Debug update passed 492 local checks, 135 processor checks (including all nine new cases under Mono), three read-only live-hub checks and three installed-state checks. It updated the submission driver to `1.3.007.0030`, removed its temporary test instance and package files, and released its processor reservation. Home retains a cached catalog entry until its next planned reboot. This is a tested source fix, not a published driver release or final-candidate acceptance. See [validation status](submission/ValidationStatus.md).
+
 ## Gateway control validation - 2026-09-18 (no driver release)
 
 Validated Away-mode changes and restoration through the Android app on the unchanged Debug candidate. The hot-water check exposed test assumptions about aggregate override status and inactive fields omitted after cancelling an override. Corrected those assumptions, added regressions, and restored scheduled control independently before a fresh run. The corrected normal hot-water fixture passed both UI states and original scheduled-policy restoration, with owned-child cleanup and released reservations. No production driver or library code changed. See [validation status](submission/ValidationStatus.md#gateway-away-and-hot-water-controls---18-september-2026) for the retained initial failure, recovery and exact limits.

@@ -295,7 +295,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			return;
 			}
 
-		SelectedScheduleId = selectedScheduleId;
+		// Publish the assignment only when fresh hub state confirms it.
 		SelectSchedule (selectedScheduleId);
 		}
 
@@ -1032,7 +1032,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 				}
 			}
 
-		if (scheduleId == 0 && !int.TryParse (scheduleIdText, out scheduleId))
+		if (scheduleId <= 0)
 			{
 			LogInfo ($"SelectSchedule could not resolve value='{scheduleIdText}' to a schedule id");
 			return;

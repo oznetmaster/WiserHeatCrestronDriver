@@ -754,6 +754,8 @@ public sealed partial class PlatformDiscoveryTests
 		internal int HotWaterCommands;
 		internal int DomainReads;
 		internal int ScheduleWrites;
+		internal int ScheduleAssignments;
+		internal bool? AcceptScheduleAssignment;
 		internal bool AllowScheduleWrites;
 		internal bool IgnoreScheduleWrite;
 		internal bool FailScheduleRead;
@@ -764,6 +766,17 @@ public sealed partial class PlatformDiscoveryTests
 		internal readonly TaskCompletionSource<bool> Release = new (TaskCreationOptions.RunContinuationsAsynchronously);
 		protected override async Task<HttpResponseMessage> SendAsync (HttpRequestMessage request, CancellationToken cancellationToken)
 			{
+			if (request.Method.Method == "PATCH" && request.RequestUri.AbsolutePath.EndsWith ("/schedules/Assign"))
+				{
+				ScheduleAssignments++;
+				Assert.That (AcceptScheduleAssignment.HasValue, Is.True, "This scenario must not assign a schedule.");
+				if (AcceptScheduleAssignment == false)
+					return new HttpResponseMessage (HttpStatusCode.BadRequest) { Content = new StringContent ("{}") };
+				string assignment = await request.Content.ReadAsStringAsync ();
+				Assert.That (assignment, Does.Contain ("\"id\":9"));
+				Rooms = Rooms.Replace ("\"ScheduleId\":7", "\"ScheduleId\":9");
+				return new HttpResponseMessage (HttpStatusCode.NoContent);
+				}
 			if (request.Method.Method == "PATCH" && request.RequestUri.AbsolutePath.EndsWith ("/schedules/Heating/7"))
 				{
 				ScheduleWrites++;
