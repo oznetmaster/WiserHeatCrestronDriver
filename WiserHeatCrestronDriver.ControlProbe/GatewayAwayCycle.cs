@@ -77,7 +77,7 @@ public static class GatewayAwayCycle
 			throw new InvalidDataException ("A room override changed during gateway control.");
 		}
 
-	public static async Task<GatewayAwayResult> RunAsync (IGatewayAwaySession session, TimeSpan timeout, CancellationToken token)
+	public static async Task<GatewayAwayResult> RunAsync (IGatewayAwaySession session, TimeSpan timeout, CancellationToken token, IGatewayControlObserver? observer = null)
 		{
 		if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromMinutes (2)) throw new ArgumentOutOfRangeException (nameof (timeout));
 		GatewayAwaySnapshot? original = null;
@@ -114,6 +114,15 @@ public static class GatewayAwayCycle
 			if (!stable.ActionEnabled || IsAway (stable) != before || stable.HomeAway != before)
 				throw new InvalidDataException ("Starting gateway state changed.");
 			await session.RecordAsync ("change-intent", new { Enabled = !before, Snapshot = stable });
+			if (observer != null)
+				{
+				await observer.BeforeInputAsync (stable.Hub, deadline.Token);
+				stable = await session.ReadAsync (deadline.Token);
+				RequirePreserved (original, stable);
+				if (!stable.ActionEnabled || IsAway (stable) != before || stable.HomeAway != before)
+					throw new InvalidDataException ("Primary Away state changed while observing the peer; no input was issued.");
+				await session.RecordAsync ("peer-pre-input-revalidated", new { Snapshot = stable });
+				}
 			deadline.Token.ThrowIfCancellationRequested ();
 			attempted = true;
 			restored = false;
@@ -121,6 +130,7 @@ public static class GatewayAwayCycle
 			await session.SetAwayAsync (!before, false, deadline.Token);
 			var changed = await Wait (!before, stable.RefreshUtc, deadline.Token);
 			await session.RecordAsync ("changed", new { Snapshot = changed, Seconds = elapsed.Elapsed.TotalSeconds });
+			if (observer != null) await observer.AfterInputAsync (changed.Hub, deadline.Token);
 			passed = true;
 			}
 		catch (Exception failure)
@@ -149,6 +159,12 @@ public static class GatewayAwayCycle
 					var final = await Wait (IsAway (original), changed.RefreshUtc, cleanup.Token, recovery: true);
 					await session.RecordAsync ("restored", new { Snapshot = final, Seconds = elapsed.Elapsed.TotalSeconds });
 					restored = true;
+					try { if (observer != null) await observer.AfterRestorationAsync (final.Hub, cleanup.Token); }
+					catch (Exception failure)
+						{
+						passed = false;
+						try { await session.RecordAsync ("restored-peer-failed", new { Exception = failure.ToString () }); } catch { }
+						}
 					try { await session.VerifyRestoredUiAsync (final, cleanup.Token); }
 					catch (Exception failure)
 						{

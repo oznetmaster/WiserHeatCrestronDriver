@@ -23,10 +23,14 @@ public sealed partial class GatewayUiTests
 		}
 
 	[Test, Category ("LiveControl")]
-	public async Task GatewayHotWaterChangesBothStatesAndRestoresOriginalPolicy ()
+	public Task GatewayHotWaterChangesBothStatesAndRestoresOriginalPolicy () => RunGatewayHotWaterAsync (requirePeer: false);
+	[Test, Category ("LiveControl"), Category ("MultipleInstance")]
+	public Task GatewayHotWaterUpdatesBothInstancesAndRestoresOriginalPolicy () => RunGatewayHotWaterAsync (requirePeer: true);
+	private async Task RunGatewayHotWaterAsync (bool requirePeer)
 		{
 		Assert.That (_nameRestored && _roomStatePreserved, Is.True, "An earlier restoration needs reconciliation.");
 		if (!_settings!.AllowGatewayHotWaterControl) Assert.Ignore ("Enable AllowGatewayHotWaterControl to temporarily operate whole-house hot water.");
+		if (requirePeer && !_settings.ObservePeerDuringGatewayControls) Assert.Ignore ("Enable ObservePeerDuringGatewayControls for this required two-instance case.");
 		if (_settings.Rooms.Length != 1 || string.IsNullOrWhiteSpace (_settings.ControlHubSettingsPath) || !Path.IsPathFullyQualified (_settings.ControlHubSettingsPath))
 			throw new InvalidDataException ("One bound child and absolute private hub settings are required to verify the gateway's physical hub.");
 		var hub = JsonSerializer.Deserialize<HubSettings> (File.ReadAllText (_settings.ControlHubSettingsPath), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
@@ -36,8 +40,10 @@ public sealed partial class GatewayUiTests
 		http.DefaultRequestHeaders.Add ("SECRET", hub.Secret);
 		using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (6));
 		var gateway = await ReadGatewayAsync (timeout.Token);
-		string check = "wiser.gateway-hot-water";
+		string check = requirePeer ? "wiser.gateway-hot-water-two-instances" : "wiser.gateway-hot-water";
 		var session = new GatewayHotWaterSession (this, hub, http, _settings.Rooms[0], gateway, check);
+		await using var peer = await GatewayPeerControlObserver.OpenAsync (this, hub, check, timeout.Token);
+		bool controlStarted = false;
 		HotWaterControlResult? result = null;
 		Exception? failure = null;
 		try
@@ -53,7 +59,8 @@ public sealed partial class GatewayUiTests
 					throw new InvalidDataException ("The selected text is not a unique gateway tile.");
 				}, timeout.Token);
 			await session.WaitForPageAsync (timeout.Token);
-			result = await HotWaterControlCycle.RunAsync (session, TimeSpan.FromSeconds (90), timeout.Token);
+			controlStarted = true;
+			result = await HotWaterControlCycle.RunAsync (session, TimeSpan.FromSeconds (90), timeout.Token, peer);
 			_roomStatePreserved = result.RestorationConfirmed;
 			}
 		catch (Exception error) { failure = error; throw; }
@@ -80,6 +87,11 @@ public sealed partial class GatewayUiTests
 				_roomStatePreserved = false;
 				try { await session.RecordAsync ("navigation-recovery-required", new { Exception = cleanupFailure.ToString () }); } catch { }
 				if (failure == null) throw;
+				}
+			finally
+				{
+				if (peer != null) await peer.CompleteAsync (!controlStarted || result?.RestorationConfirmed == true,
+					failure != null || result?.Passed != true || !_roomStatePreserved);
 				}
 			}
 		Assert.That (result?.Passed, Is.True, result?.Detail);

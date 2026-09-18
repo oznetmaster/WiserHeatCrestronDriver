@@ -72,6 +72,60 @@ public sealed class GatewayAwayCycleTests
 			}
 		}
 	private static Task<GatewayAwayResult> Run (Session session) => GatewayAwayCycle.RunAsync (session, TimeSpan.FromMilliseconds (160), CancellationToken.None);
+	[TestCase ("before", false), TestCase ("after", false), TestCase ("after", true), TestCase ("restored", false), TestCase ("restored", true)]
+	public async Task PeerFailureDoesNotPreventOwnedAwayRestoration (string phase, bool cancel)
+		{
+		var session = new Session (true);
+		var original = session.State;
+		var observer = new FailingGatewayObserver (phase, cancel);
+		var result = await GatewayAwayCycle.RunAsync (session, TimeSpan.FromMilliseconds (160), CancellationToken.None, observer);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs, Is.EqualTo (phase == "before" ? Array.Empty<bool> () : new[] { false, true }));
+		GatewayAwayCycle.RequirePreserved (original, session.State);
+		Assert.That (GatewayAwayCycle.IsAway (session.State), Is.True);
+		if (phase != "before")
+			{
+			Assert.That (observer.Calls, Does.Contain ("restored"));
+			Assert.That (session.Records, Does.Contain ("restored-ui-observed"));
+			}
+		}
+	[Test]
+	public async Task PrimaryStateIsRecheckedAfterWaitingForPeerBeforeSendingInput ()
+		{
+		var session = new Session ();
+		var observer = new FailingGatewayObserver () { BeforeAction = () =>
+			session.State = Change (session.State, value => value["System"]!["OverrideType"] = "Away") with { HomeAway = true } };
+		var result = await GatewayAwayCycle.RunAsync (session, TimeSpan.FromMilliseconds (160), CancellationToken.None, observer);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (session.Inputs, Is.Empty, "The external change must not be toggled or compensated by this test.");
+		Assert.That (GatewayAwayCycle.IsAway (session.State), Is.True);
+		}
+	[Test]
+	public async Task PersistentlyUnavailablePeerCannotBlockAwayCompensationOrFinalUiCheck ()
+		{
+		var session = new Session ();
+		var observer = new FailingGatewayObserver ("after", persistent: true);
+		var result = await GatewayAwayCycle.RunAsync (session, TimeSpan.FromMilliseconds (160), CancellationToken.None, observer);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True);
+		Assert.That (session.Inputs, Is.EqualTo (new[] { true, false }));
+		Assert.That (session.Records, Does.Contain ("restored-peer-failed").And.Contain ("restored-ui-observed"));
+		}
+	[Test]
+	public async Task PassingPeerObservesBothStatesAndRepeatedCyclesStopOnPeerFailure ()
+		{
+		var observer = new FailingGatewayObserver ();
+		var passed = await GatewayAwayCycle.RunAsync (new Session (), TimeSpan.FromMilliseconds (160), CancellationToken.None, observer);
+		Assert.That (passed.Passed, Is.True);
+		Assert.That (observer.Calls, Is.EqualTo (new[] { "before", "after", "restored" }));
+		int created = 0;
+		var failed = await GatewayAwayRepetition.RunAsync (_ => { created++; return new Session (); }, 3,
+			TimeSpan.FromMilliseconds (160), CancellationToken.None, new FailingGatewayObserver ("after"));
+		Assert.That (failed.Passed, Is.False);
+		Assert.That (failed.RestorationConfirmed, Is.True);
+		Assert.That (created, Is.EqualTo (1));
+		}
 	[TestCase (false), TestCase (true)]
 	public async Task AndroidFailureUsesDistinctGuardedCompensationAndRemainsFailed (bool initial)
 		{

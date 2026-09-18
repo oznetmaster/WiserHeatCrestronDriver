@@ -26,8 +26,25 @@ The workflow's private evidence folder receives `wiser.peer.*.json` records: res
 
 This case establishes only observed shared-hub convergence and preservation of local configuration. It does not change physical state, compare the second app's UI, measure command response, prove independent-hub behavior or complete the official multiple-instance item. Read-only samples cannot establish that no change occurred between observations. Payload comparison establishes matching extracted files and reviewed catalogue/instance metadata, not a direct attestation of process memory.
 
-## Remaining control sequence
+## Gateway control sequence
+
+Two additional opt-in cases connect peer observation to the existing restoration-aware controls:
+
+```text
+WiserHeatCrestronDriver.AndroidTests.GatewayUiTests.GatewayAwayUpdatesBothInstancesAndRestoresOriginal
+WiserHeatCrestronDriver.AndroidTests.GatewayUiTests.GatewayHotWaterUpdatesBothInstancesAndRestoresOriginalPolicy
+```
+
+Select these exact names to require peer participation. Enable `ObservePeerDuringGatewayControls` plus the corresponding `AllowGatewayAwayControl` or `AllowGatewayHotWaterControl` flag, and provide the same private peer settings. A missing opt-in produces a skipped case, which cannot satisfy the workflow's required-test gate. The original single-instance case names are unchanged; they can optionally observe the peer when the flag is enabled.
+
+These control cases retain their existing one-room binding to independently identify the selected hub and their original-state/restoration requirements. Unlike the gateway-only baseline, their plans must supply that existing or explicitly managed child. Before any physical command, the fixture verifies and reserves the peer, compares the candidate payload and records both configurations. It then checks shared state before each input and waits for a strictly newer peer refresh after observed commands. After waiting for the peer, it rechecks the primary hub state before sending the input; a changed starting state stops the test rather than operating on an old observation. Peer observations are bounded to 30 seconds, with the cycle's existing deadline still enforced. Recorded `SecondsSincePreInputObservation` is measured from the pre-input observation, not from the physical command itself; use the primary control journal for its command timing.
+
+No peer observation is required before compensation. A failed peer check after an input fails the test but leaves independent physical restoration running. Peer agreement is checked again only after the hub's original policy is confirmed restored. Peer failure and UI failure are separately recorded; neither can turn the test green or erase confirmed physical restoration. Offline regressions exercise peer loss, cancellation, failure before the second hot-water input and a peer that remains unavailable during recovery.
+
+The peer observer sends no control commands. At completion it checks payload/configuration preservation and releases its own reservation only when physical restoration and those checks are confirmed. Otherwise it records the unresolved outcome and retains the reservation for reconciliation; disposal does not remove it. Existing failures are preserved if peer cleanup also fails. A preflight failure before a control cycle begins releases a successfully acquired peer reservation; an uncertain acquisition is never blindly removed.
+
+## Remaining control scope
 
 After the baseline, repeat the applicable candidate control/UI checks with each gateway acting in turn. Independently observe the other gateway during those actions. Shared hub changes should propagate to both, while unrelated room settings, schedules and local configuration remain intact. Preserve and restore every affected shared setting; avoid simultaneous physical commands from the two processors. Pending editor state and instance/session lifetime need separate checks, as does removing an owned temporary instance while the other continues operating.
 
-Those command-isolation and second-UI observations are still to be integrated and executed. Do not infer them from a successful baseline or from earlier tests of different package versions. The private plan chooses actual processors, rooms and ownership; this document grants no authority to interrupt an active endurance run.
+Gateway peer observation is implemented but has not yet run on hardware. Peer observations for room/schedule controls, the second UI and temporary-instance removal/session effects remain to be integrated and executed. Do not infer them from a successful baseline or from earlier tests of different package versions. The private plan chooses actual processors, rooms and ownership; this document grants no authority to interrupt an active endurance run.

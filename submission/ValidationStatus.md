@@ -35,7 +35,7 @@ Producer hashes and source digests are retained before execution and compared af
 
 ## Remaining acceptance work
 
-The [two-instance baseline](TwoInstanceTesting.md) is now executable through the opt-in control fixture and released installed-tests workflow. Offline regressions validate distinct pinned identities, fresh shared-state convergence and preservation of each instance's configuration; the project builds and the case is discoverable. It has not run against the processors. Command isolation, the second UI, instance removal/session effects and full official multiple-instance acceptance remain outstanding.
+The [two-instance checks](TwoInstanceTesting.md) now include a read-only baseline and distinct Away/hot-water cases requiring peer observation. Offline regressions validate pinned identities, fresh shared-state convergence, configuration preservation and independent physical restoration despite peer failure. The project builds and the cases are discoverable; none has run against the processors. Room/schedule peer observations, the second UI, instance removal/session effects and full official multiple-instance acceptance remain outstanding.
 
 The control project now has explicit equal/different/absent saved-manual-target cases, with offline validation of their preconditions and restoration handling. They require separately selected physical runs after the current observation period; their existence does not expand the candidate's completed evidence above. A room must actually meet the selected starting condition, and the absent case retains its separate initialization permission and restoration limitation.
 

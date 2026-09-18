@@ -66,7 +66,7 @@ public static class HotWaterControlCycle
 		catch (NotSupportedException) { return false; }
 		return snapshot.ActionEnabled && snapshot.HomeOn == On (Water (snapshot), "WaterHeatingState");
 		}
-	public static async Task<HotWaterControlResult> RunAsync (IHotWaterControlSession session, TimeSpan timeout, CancellationToken token)
+	public static async Task<HotWaterControlResult> RunAsync (IHotWaterControlSession session, TimeSpan timeout, CancellationToken token, IGatewayControlObserver? observer = null)
 		{
 		if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromMinutes (2)) throw new ArgumentOutOfRangeException (nameof (timeout));
 		HotWaterControlSnapshot? original = null;
@@ -107,6 +107,15 @@ public static class HotWaterControlCycle
 			foreach (bool enabled in new[] { !plan.OriginallyOn, plan.OriginallyOn })
 				{
 				await session.RecordAsync ("ui-" + (++step) + "-intent", new { Enabled = enabled, Snapshot = current });
+				if (observer != null)
+					{
+					await observer.BeforeInputAsync (current.Hub, deadline.Token);
+					current = await session.ReadAsync (deadline.Token);
+					RequireGuarded (original, current);
+					if (!(step == 1 ? Restored (plan, current) && On (Water (current), "WaterHeatingState") == plan.OriginallyOn : ManualTarget (current, !plan.OriginallyOn)))
+						throw new InvalidDataException ("Primary hot-water state changed while observing the peer; no further input was issued.");
+					await session.RecordAsync ("ui-" + step + "-peer-revalidated", new { Snapshot = current });
+					}
 				deadline.Token.ThrowIfCancellationRequested ();
 				requested = enabled; requestedAfter = current.RefreshUtc;
 				attempted = true; restored = false;
@@ -114,6 +123,7 @@ public static class HotWaterControlCycle
 				await session.SetHotWaterAsync (enabled, deadline.Token);
 				current = await Wait (s => ManualTarget (s, enabled), requestedAfter, deadline.Token);
 				await session.RecordAsync ("ui-" + step + "-observed", new { Snapshot = current, Seconds = elapsed.Elapsed.TotalSeconds });
+				if (observer != null) await observer.AfterInputAsync (current.Hub, deadline.Token);
 				}
 			passed = true;
 			}
@@ -157,6 +167,12 @@ public static class HotWaterControlCycle
 					var final = await Wait (s => Restored (plan, s), original.RefreshUtc, cleanup.Token, recovery: true);
 					await session.RecordAsync ("restored", new { Snapshot = final });
 					restored = true;
+					try { if (observer != null) await observer.AfterRestorationAsync (final.Hub, cleanup.Token); }
+					catch (Exception failure)
+						{
+						passed = false;
+						try { await session.RecordAsync ("restored-peer-failed", new { Exception = failure.ToString () }); } catch { }
+						}
 					try { await session.VerifyRestoredUiAsync (final, cleanup.Token); }
 					catch (Exception failure)
 						{

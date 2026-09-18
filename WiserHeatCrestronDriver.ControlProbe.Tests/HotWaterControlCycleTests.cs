@@ -11,6 +11,71 @@ namespace WiserHeatCrestronDriver.ControlProbe.Tests;
 [TestFixture]
 public sealed class HotWaterControlCycleTests
 	{
+	[TestCase ("before", false), TestCase ("after", false), TestCase ("after", true), TestCase ("restored", false), TestCase ("restored", true)]
+	public async Task PeerFailureDoesNotPreventOriginalHotWaterPolicyRestoration (string phase, bool cancel)
+		{
+		var session = new Session (on: true, stored: false);
+		var original = await session.ReadForRecoveryAsync (CancellationToken.None);
+		var plan = HotWaterRestoration.Capture (original.Hub.Domain);
+		var observer = new FailingGatewayObserver (phase, cancel);
+		var result = await HotWaterControlCycle.RunAsync (session, TimeSpan.FromMilliseconds (160), CancellationToken.None, observer);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		var final = await session.ReadForRecoveryAsync (CancellationToken.None);
+		HotWaterControlCycle.RequireGuarded (original, final);
+		HotWaterRestoration.RequireRestored (plan, final.Hub.Domain);
+		Assert.That (final.HomeOn, Is.True);
+		if (phase == "before") Assert.That (session.Inputs, Is.Empty);
+		else
+			{
+			Assert.That (observer.Calls, Does.Contain ("restored"));
+			Assert.That (session.UiRestorationChecks, Is.EqualTo (1));
+			Assert.That (session.Inputs.Count, Is.EqualTo (phase == "after" ? 1 : 2));
+			}
+		}
+	[Test]
+	public async Task PrimaryHotWaterStateIsRecheckedAfterWaitingForPeerBeforeSendingInput ()
+		{
+		var session = new Session ();
+		var observer = new FailingGatewayObserver () { BeforeAction = () => session.Domain["HotWater"]![0]!["WaterHeatingState"] = "On" };
+		var result = await HotWaterControlCycle.RunAsync (session, TimeSpan.FromMilliseconds (160), CancellationToken.None, observer);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (session.Inputs, Is.Empty);
+		Assert.That (session.Restores, Is.Empty, "Do not undo an external preflight change.");
+		Assert.That ((await session.ReadForRecoveryAsync (CancellationToken.None)).HomeOn, Is.True);
+		}
+	[Test]
+	public async Task PeerFailureBeforeSecondInputStillRestoresTheFirstInput ()
+		{
+		var session = new Session ();
+		var original = await session.ReadForRecoveryAsync (CancellationToken.None);
+		var observer = new FailingGatewayObserver ("before", failOccurrence: 2);
+		var result = await HotWaterControlCycle.RunAsync (session, TimeSpan.FromMilliseconds (160), CancellationToken.None, observer);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True);
+		Assert.That (session.Inputs, Is.EqualTo (new[] { true }));
+		HotWaterRestoration.RequireRestored (HotWaterRestoration.Capture (original.Hub.Domain), (await session.ReadForRecoveryAsync (CancellationToken.None)).Hub.Domain);
+		}
+	[Test]
+	public async Task PersistentlyUnavailablePeerCannotBlockHotWaterCompensationOrFinalUiCheck ()
+		{
+		var session = new Session ();
+		var observer = new FailingGatewayObserver ("after", persistent: true);
+		var result = await HotWaterControlCycle.RunAsync (session, TimeSpan.FromMilliseconds (160), CancellationToken.None, observer);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True);
+		Assert.That (session.Inputs, Is.EqualTo (new[] { true }));
+		Assert.That (session.UiRestorationChecks, Is.EqualTo (1));
+		Assert.That (session.Records, Does.Contain ("restored-peer-failed"));
+		}
+	[Test]
+	public async Task PassingPeerObservesBothHotWaterInputsAndRestoredPolicy ()
+		{
+		var observer = new FailingGatewayObserver ();
+		var result = await HotWaterControlCycle.RunAsync (new Session (), TimeSpan.FromMilliseconds (160), CancellationToken.None, observer);
+		Assert.That (result.Passed, Is.True, result.Detail);
+		Assert.That (observer.Calls, Is.EqualTo (new[] { "before", "after", "before", "after", "restored" }));
+		}
 	private sealed class Session (bool on = false, bool stored = false, string policy = "Schedule") : IHotWaterControlSession
 		{
 		public readonly JsonNode Domain = JsonSerializer.SerializeToNode (new

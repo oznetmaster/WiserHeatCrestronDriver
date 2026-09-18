@@ -24,10 +24,14 @@ public sealed partial class GatewayUiTests
 		}
 
 	[Test, Category ("LiveControl")]
-	public async Task GatewayAwayChangesHubStateAndRestoresOriginal ()
+	public Task GatewayAwayChangesHubStateAndRestoresOriginal () => RunGatewayAwayAsync (requirePeer: false);
+	[Test, Category ("LiveControl"), Category ("MultipleInstance")]
+	public Task GatewayAwayUpdatesBothInstancesAndRestoresOriginal () => RunGatewayAwayAsync (requirePeer: true);
+	private async Task RunGatewayAwayAsync (bool requirePeer)
 		{
 		Assert.That (_nameRestored && _roomStatePreserved, Is.True, "An earlier restoration needs reconciliation.");
 		if (!_settings!.AllowGatewayAwayControl) Assert.Ignore ("Enable AllowGatewayAwayControl to temporarily change whole-house Away mode.");
+		if (requirePeer && !_settings.ObservePeerDuringGatewayControls) Assert.Ignore ("Enable ObservePeerDuringGatewayControls for this required two-instance case.");
 		if (_settings.Rooms.Length != 1 || string.IsNullOrWhiteSpace (_settings.ControlHubSettingsPath) || !Path.IsPathFullyQualified (_settings.ControlHubSettingsPath))
 			throw new InvalidDataException ("One bound child and absolute private hub settings are required to verify the gateway's physical hub.");
 		var hub = JsonSerializer.Deserialize<HubSettings> (File.ReadAllText (_settings.ControlHubSettingsPath), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
@@ -38,8 +42,10 @@ public sealed partial class GatewayUiTests
 		if (_settings.GatewayAwayCycles is < 1 or > 3) throw new InvalidDataException ("GatewayAwayCycles must be between one and three.");
 		using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (3 * _settings.GatewayAwayCycles + 3));
 		var gateway = await ReadGatewayAsync (timeout.Token);
-		string check = "wiser.gateway-away";
+		string check = requirePeer ? "wiser.gateway-away-two-instances" : "wiser.gateway-away";
 		var session = new GatewayAwaySession (this, hub, http, _settings.Rooms[0], gateway, check);
+		await using var peer = await GatewayPeerControlObserver.OpenAsync (this, hub, check, timeout.Token);
+		bool controlStarted = false;
 		GatewayAwayResult? result = null;
 		Exception? failure = null;
 		try
@@ -55,9 +61,10 @@ public sealed partial class GatewayUiTests
 					throw new InvalidDataException ("The selected text is not a unique gateway tile.");
 				}, timeout.Token);
 			await session.WaitForPageAsync (timeout.Token);
+			controlStarted = true;
 			result = await GatewayAwayRepetition.RunAsync (cycle =>
 				new GatewayAwaySession (this, hub, http, _settings.Rooms[0], gateway, check + ".cycle-" + (cycle + 1)),
-				_settings.GatewayAwayCycles, TimeSpan.FromSeconds (55), timeout.Token);
+				_settings.GatewayAwayCycles, TimeSpan.FromSeconds (55), timeout.Token, peer);
 			_roomStatePreserved = result.RestorationConfirmed;
 			}
 		catch (Exception error) { failure = error; throw; }
@@ -84,6 +91,11 @@ public sealed partial class GatewayUiTests
 				_roomStatePreserved = false;
 				try { await session.RecordAsync ("navigation-recovery-required", new { Exception = cleanupFailure.ToString () }); } catch { }
 				if (failure == null) throw;
+				}
+			finally
+				{
+				if (peer != null) await peer.CompleteAsync (!controlStarted || result?.RestorationConfirmed == true,
+					failure != null || result?.Passed != true || !_roomStatePreserved);
 				}
 			}
 		Assert.That (result?.Passed, Is.True, result?.Detail);

@@ -24,6 +24,23 @@ public sealed partial class GatewayUiTests
 		}
 	private sealed record PeerObservationSettings (string Host, string UserName, string Password, string CertificateSha256,
 		string SshFingerprint, int DeviceId, int LocationId, string Name, string CatalogueId, string PackagePath);
+	private PeerObservationSettings LoadPeerSettings (HubSettings hub)
+		{
+		if (string.IsNullOrWhiteSpace (_settings!.PeerObservationSettingsPath) || !Path.IsPathFullyQualified (_settings.PeerObservationSettingsPath))
+			throw new InvalidDataException ("An absolute private peer settings path is required.");
+		var peer = JsonSerializer.Deserialize<PeerObservationSettings> (File.ReadAllText (_settings.PeerObservationSettingsPath), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+			?? throw new InvalidDataException ("Missing peer settings.");
+		var context = _session!.Context;
+		AndroidWorkflowSession.VerifyContext (context);
+		if (!IPAddress.TryParse (context.ProcessorAddress, out var primaryAddress) || !IPAddress.TryParse (peer.Host, out var peerAddress) ||
+			primaryAddress.Equals (peerAddress) || string.IsNullOrWhiteSpace (peer.UserName) || string.IsNullOrWhiteSpace (peer.Password) ||
+			peer.CertificateSha256?.Length != 64 || !peer.CertificateSha256.All (char.IsAsciiHexDigit) ||
+			peer.CertificateSha256.Equals (_settings.CertificateSha256, StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace (peer.SshFingerprint) ||
+			peer.DeviceId <= 0 || peer.LocationId <= 0 || string.IsNullOrWhiteSpace (peer.Name) || string.IsNullOrWhiteSpace (peer.CatalogueId) ||
+			!Path.IsPathFullyQualified (peer.PackagePath) || string.IsNullOrWhiteSpace (hub.HubHost) || string.IsNullOrWhiteSpace (hub.Secret))
+			throw new InvalidDataException ("Two distinct pinned processors, an exact peer instance, a candidate package and a shared hub are required.");
+		return peer;
+		}
 
 	[Test, Category ("LiveReadOnly")]
 	public async Task TwoGatewayInstancesRefreshSharedHubWithoutChangingLocalConfiguration ()
@@ -35,19 +52,10 @@ public sealed partial class GatewayUiTests
 			string.IsNullOrWhiteSpace (_settings.ControlHubSettingsPath) || !Path.IsPathFullyQualified (_settings.ControlHubSettingsPath))
 			throw new InvalidDataException ("Absolute private peer and hub settings paths are required.");
 		var json = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-		var peer = JsonSerializer.Deserialize<PeerObservationSettings> (File.ReadAllText (_settings.PeerObservationSettingsPath!), json)
-			?? throw new InvalidDataException ("Missing peer settings.");
 		var hub = JsonSerializer.Deserialize<HubSettings> (File.ReadAllText (_settings.ControlHubSettingsPath), json)
 			?? throw new InvalidDataException ("Missing hub settings.");
+		var peer = LoadPeerSettings (hub);
 		var context = _session!.Context;
-		AndroidWorkflowSession.VerifyContext (context);
-		if (!IPAddress.TryParse (context.ProcessorAddress, out var primaryAddress) || !IPAddress.TryParse (peer.Host, out var peerAddress) ||
-			primaryAddress.Equals (peerAddress) || string.IsNullOrWhiteSpace (peer.UserName) || string.IsNullOrWhiteSpace (peer.Password) ||
-			peer.CertificateSha256?.Length != 64 || !peer.CertificateSha256.All (char.IsAsciiHexDigit) ||
-			peer.CertificateSha256.Equals (_settings.CertificateSha256, StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace (peer.SshFingerprint) ||
-			peer.DeviceId <= 0 || peer.LocationId <= 0 || string.IsNullOrWhiteSpace (peer.Name) || string.IsNullOrWhiteSpace (peer.CatalogueId) ||
-			!Path.IsPathFullyQualified (peer.PackagePath) || string.IsNullOrWhiteSpace (hub.HubHost) || string.IsNullOrWhiteSpace (hub.Secret))
-			throw new InvalidDataException ("Two distinct pinned processors, an exact peer instance, a candidate package and a shared hub are required.");
 		using var packageLock = new FileStream (peer.PackagePath, FileMode.Open, FileAccess.Read, FileShare.Read);
 		if (!Convert.ToHexString (SHA256.HashData (packageLock)).Equals (context.PackageSha256, StringComparison.OrdinalIgnoreCase))
 			throw new InvalidDataException ("Peer package differs from the active workflow candidate.");

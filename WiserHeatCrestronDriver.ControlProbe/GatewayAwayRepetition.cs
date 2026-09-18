@@ -7,7 +7,7 @@ namespace WiserHeatCrestronDriver.ControlProbe;
 public static class GatewayAwayRepetition
 	{
 	public static async Task<GatewayAwayResult> RunAsync (Func<int, IGatewayAwaySession> createSession, int cycles,
-		TimeSpan cycleTimeout, CancellationToken token)
+		TimeSpan cycleTimeout, CancellationToken token, IGatewayControlObserver? observer = null)
 		{
 		if (cycles is < 1 or > 3) throw new ArgumentOutOfRangeException (nameof (cycles));
 		ArgumentNullException.ThrowIfNull (createSession);
@@ -21,7 +21,7 @@ public static class GatewayAwayRepetition
 				original ??= before;
 				RequireOriginal (original, before);
 				await session.RecordAsync ("repetition-baseline", new { Cycle = cycle + 1, Cycles = cycles, Original = original, Before = before });
-				var result = await GatewayAwayCycle.RunAsync (session, cycleTimeout, token);
+				var result = await GatewayAwayCycle.RunAsync (session, cycleTimeout, token, observer);
 				if (!result.Passed || !result.RestorationConfirmed) return result;
 				var after = await session.ReadAsync (token);
 				RequireOriginal (original, after);
