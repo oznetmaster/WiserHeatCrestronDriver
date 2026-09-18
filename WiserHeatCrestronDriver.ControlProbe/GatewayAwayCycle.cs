@@ -13,6 +13,8 @@ public sealed record GatewayAwayResult (bool Passed, bool RestorationConfirmed, 
 public interface IGatewayAwaySession
 	{
 	Task<GatewayAwaySnapshot> ReadAsync (CancellationToken token);
+	Task<GatewayAwaySnapshot> ReadForRecoveryAsync (CancellationToken token);
+	Task VerifyRestoredUiAsync (GatewayAwaySnapshot snapshot, CancellationToken token);
 	Task RecordAsync (string phase, object value);
 	Task SetAwayAsync (bool enabled, bool recovery, CancellationToken token);
 	}
@@ -82,14 +84,14 @@ public static class GatewayAwayCycle
 		bool attempted = false, passed = false, restored = true;
 		string detail = "Preflight failed before any gateway control was sent.";
 		var elapsed = new Stopwatch ();
-		async Task<GatewayAwaySnapshot> Wait (bool enabled, DateTimeOffset after, CancellationToken cancellation)
+		async Task<GatewayAwaySnapshot> Wait (bool enabled, DateTimeOffset after, CancellationToken cancellation, bool recovery = false)
 			{
 			int matches = 0;
 			DateTimeOffset last = after;
 			while (true)
 				{
 				cancellation.ThrowIfCancellationRequested ();
-				var current = await session.ReadAsync (cancellation);
+				var current = recovery ? await session.ReadForRecoveryAsync (cancellation) : await session.ReadAsync (cancellation);
 				RequirePreserved (original!, current);
 				if (current.RefreshUtc < last) throw new InvalidDataException ("Gateway refresh moved backwards.");
 				last = current.RefreshUtc;
@@ -135,7 +137,7 @@ public static class GatewayAwayCycle
 					{
 					// An unchanged state after a lost tap is not evidence of non-delivery.
 					// Only an independently observed transition permits the distinct restoring tap.
-					var changed = await Wait (!IsAway (original), original.RefreshUtc, cleanup.Token);
+					var changed = await Wait (!IsAway (original), original.RefreshUtc, cleanup.Token, recovery: true);
 					await session.RecordAsync ("restore-intent", new { Enabled = IsAway (original), Snapshot = changed, Recovery = !passed });
 					elapsed.Restart ();
 					try { await session.SetAwayAsync (IsAway (original), !passed, cleanup.Token); }
@@ -144,9 +146,15 @@ public static class GatewayAwayCycle
 						passed = false;
 						await session.RecordAsync ("restore-input-error", new { Exception = failure.ToString () });
 						}
-					var final = await Wait (IsAway (original), changed.RefreshUtc, cleanup.Token);
+					var final = await Wait (IsAway (original), changed.RefreshUtc, cleanup.Token, recovery: true);
 					await session.RecordAsync ("restored", new { Snapshot = final, Seconds = elapsed.Elapsed.TotalSeconds });
 					restored = true;
+					try { await session.VerifyRestoredUiAsync (final, cleanup.Token); }
+					catch (Exception failure)
+						{
+						passed = false;
+						try { await session.RecordAsync ("restored-ui-failed", new { Exception = failure.ToString () }); } catch { }
+						}
 					detail = passed ? "Both Away transitions were observed and original guarded hub state restored." : "The test failed; original guarded hub state was independently restored without replay.";
 					}
 				catch (Exception failure)

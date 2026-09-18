@@ -32,7 +32,22 @@ public sealed class GatewayAwayCycleTests
 		public List<string> Records = [];
 		public string? Behavior;
 		public string? FailRecord;
-		public Task<GatewayAwaySnapshot> ReadAsync (CancellationToken token) { token.ThrowIfCancellationRequested (); return Task.FromResult (State); }
+		public bool UiUnavailable;
+		public bool RestoredUiUnavailable;
+		public List<bool> RecoveryInputs = [];
+		public Task<GatewayAwaySnapshot> ReadAsync (CancellationToken token)
+			{
+			token.ThrowIfCancellationRequested ();
+			if (UiUnavailable && Inputs.Count > 0) throw new IOException ("Android unavailable after input");
+			return Task.FromResult (State);
+			}
+		public Task<GatewayAwaySnapshot> ReadForRecoveryAsync (CancellationToken token) { token.ThrowIfCancellationRequested (); return Task.FromResult (State); }
+		public Task VerifyRestoredUiAsync (GatewayAwaySnapshot snapshot, CancellationToken token)
+			{
+			token.ThrowIfCancellationRequested ();
+			if (UiUnavailable || RestoredUiUnavailable) throw new IOException ("Restored UI unavailable");
+			return RecordAsync ("restored-ui-observed", new { Snapshot = snapshot });
+			}
 		public Task RecordAsync (string phase, object value)
 			{
 			if (phase == FailRecord) throw new IOException ("journal unavailable");
@@ -42,6 +57,7 @@ public sealed class GatewayAwayCycleTests
 			{
 			token.ThrowIfCancellationRequested ();
 			Inputs.Add (enabled);
+			RecoveryInputs.Add (recovery);
 			if (Behavior == "not-delivered") throw new IOException ("tap outcome unknown");
 			State = Change (State, n => n["System"]!["OverrideType"] = enabled ? "Away" : "None") with
 				{ HomeAway = enabled, RefreshUtc = State.RefreshUtc.AddSeconds (1) };
@@ -56,6 +72,50 @@ public sealed class GatewayAwayCycleTests
 			}
 		}
 	private static Task<GatewayAwayResult> Run (Session session) => GatewayAwayCycle.RunAsync (session, TimeSpan.FromMilliseconds (160), CancellationToken.None);
+	[TestCase (false), TestCase (true)]
+	public async Task AndroidFailureUsesDistinctGuardedCompensationAndRemainsFailed (bool initial)
+		{
+		var session = new Session (initial) { UiUnavailable = true };
+		var original = session.State;
+		var result = await Run (session);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs, Is.EqualTo (new[] { !initial, initial }));
+		Assert.That (session.RecoveryInputs, Is.EqualTo (new[] { false, true }));
+		GatewayAwayCycle.RequirePreserved (original, session.State);
+		Assert.That (GatewayAwayCycle.IsAway (session.State), Is.EqualTo (initial));
+		Assert.That (session.Records, Does.Contain ("restored-ui-failed"));
+		}
+	[Test]
+	public async Task FailedFinalUiDoesNotErasePhysicalRestorationOrPassTheTest ()
+		{
+		var session = new Session { RestoredUiUnavailable = true };
+		var result = await Run (session);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.RecoveryInputs, Is.EqualTo (new[] { false, false }), "Successful command observations still exercise both UI inputs.");
+		Assert.That (session.Records, Does.Contain ("restored").And.Contain ("restored-ui-failed"));
+		}
+	[Test]
+	public async Task UiFailureStopsRepetitionAfterRestoringTheOriginalState ()
+		{
+		var session = new Session { UiUnavailable = true };
+		int created = 0;
+		var result = await GatewayAwayRepetition.RunAsync (_ => { created++; return session; }, 3, TimeSpan.FromMilliseconds (160), CancellationToken.None);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True);
+		Assert.That (created, Is.EqualTo (1));
+		Assert.That (session.Inputs, Is.EqualTo (new[] { true, false }));
+		}
+	[TestCase ("foreign"), TestCase ("restart"), TestCase ("stale"), TestCase ("not-delivered"), TestCase ("ui-disagrees"), TestCase ("disabled")]
+	public async Task MissingAndroidDoesNotBypassIndependentStateGuards (string behavior)
+		{
+		var session = new Session { UiUnavailable = true, Behavior = behavior };
+		var result = await Run (session);
+		Assert.That (result.Passed || result.RestorationConfirmed, Is.False);
+		Assert.That (session.Inputs.Count, Is.EqualTo (1));
+		Assert.That (session.RecoveryInputs, Is.EqualTo (new[] { false }));
+		}
 	[TestCase (false), TestCase (true)]
 	public async Task EitherStartingStateIsRestored (bool initial)
 		{
