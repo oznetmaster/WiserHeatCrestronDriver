@@ -25,6 +25,15 @@ public sealed class ProcessorLifecycleTests
 #endif
 		}
 	[Test]
+	public void EntryPoint_LoadsEmbeddedDefinitionAndCreatesController ()
+		{
+		using var logger = new DriverLogger ("entrypoint-resource-test");
+		var args = new DriverControllerCreationArgs ("entrypoint-resource-test", TestSupport.DataDirectory, logger.AppLogger, null);
+		using var controller = new EntryPoint ().CreateDriverControllerInstance (args);
+		Assert.That (controller, Is.Not.Null);
+		}
+
+	[Test]
 	public void UnconfiguredDriver_CanBeCreatedDisposedAndCreatedAgain ()
 		{
 		using var logger = new DriverLogger ("processor-lifecycle-test");

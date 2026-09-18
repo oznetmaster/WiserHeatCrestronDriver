@@ -1,5 +1,13 @@
 # Wiser submission pilot status
 
+## Corrected submission candidate 1.3.10 - 18 September 2026
+
+The first 1.3.9 candidate passed packaging checks but failed actual processor startup. Its new assembly name no longer matched the embedded definition filename expected by the SDK's default lookup. This is a rejected candidate, not a released or accepted driver. Its original package and failure evidence are retained unchanged.
+
+Candidate 1.3.10 explicitly identifies its embedded definition and removes repeated schedule-list diagnostics from unchanged polls. A desktop test reproduced the exact startup exception before the correction. The corrected source and renamed merged assembly initialized successfully, and Debug/Release regression suites verified quiet unchanged polling, reported schedule changes and retained connection errors. These local checks do not establish final candidate hardware acceptance. A new version distinguishes the corrected bytes from the rejected processor candidate.
+
+The illustrated help is being rebuilt for the new version. Final package verification, processor/UI acceptance, endurance, completed signed form and authorized delivery remain pending.
+
 ## Submission package preparation - 18 September 2026
 
 Driver 1.3.8 and WiserHeatAPIv2 1.1.1 have been published. The separate 1.3.9 submission candidate preserves those runtime fixes and adds the approved illustrated help, matching submission filenames and dependency notices. It has not yet been published or accepted by Crestron.

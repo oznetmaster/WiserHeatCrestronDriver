@@ -37,12 +37,12 @@
     },
     {
       "path": "WiserHeatCrestronDriver/Thermostat_WiserHeat_IP_V2.json",
-      "sha256": "5ad71b9990c373509cef086ac8099c4cc0221eec144595804801fc1a3537e3a1",
+      "sha256": "311ec791d23203f9d25a8df00c658f0fc7961a38457fe277ec19b01546ccb181",
       "surface": null
     },
     {
       "path": "WiserHeatCrestronDriver/WiserDriverEntryPoint.cs",
-      "sha256": "66601c544e6d501dd164f7e2abaacda11e08242629cc00070cec99d5f1889967",
+      "sha256": "21cb36388b1afaf9631c61f46f01800f4f76f3f1ee0e3978213c456e917c2cef",
       "surface": null
     },
     {
@@ -52,7 +52,7 @@
     },
     {
       "path": "WiserHeatCrestronDriver/WiserRoomEntity.cs",
-      "sha256": "85fb1d3a1dc1cb4e9e1f4a3c824dcd69b298bec5aa06b53fd901bccac27fc394",
+      "sha256": "d2b16bc5ee7e9ac84f1a5c4e6a0a23621fb079c6404876d5c9b82a29e18c4190",
       "surface": null
     },
     {

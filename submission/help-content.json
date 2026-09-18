@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "title": "Drayton Wiser Heat Gateway Driver Help",
   "author": "Neil Colvin",
-  "version": "1.3.009.0000",
+  "version": "1.3.010.0000",
   "pending": [],
   "uiPages": [
     "platform.options",
@@ -21,7 +21,7 @@
       },
       {
         "kind": "paragraph",
-        "text": "This guide applies to driver version 1.3.9. It explains installation, gateway and room controls, schedule editing and the supported equipment. Package availability does not establish Crestron certification."
+        "text": "This guide applies to driver version 1.3.10. It explains installation, gateway and room controls, schedule editing and the supported equipment. Package availability does not establish Crestron certification."
       }
     ],
     "notes": [
@@ -262,11 +262,15 @@
     "history": [
       {
         "kind": "heading2",
-        "text": "Version 1.3.9"
+        "text": "Version 1.3.10"
       },
       {
         "kind": "paragraph",
         "text": "Includes this illustrated help and dependency notices in the submission package. Retains the schedule selection, editor conflict protection, room readiness and command-result fixes from version 1.3.8, using WiserHeatAPIv2 1.1.1."
+      },
+      {
+        "kind": "paragraph",
+        "text": "Loads the driver definition independently of the submission assembly name. Routine unchanged room polling no longer repeats schedule diagnostics; actual schedule changes and failures remain visible."
       }
     ],
     "license": [

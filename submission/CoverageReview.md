@@ -1,5 +1,9 @@
 # Coverage source review
 
+## Corrected candidate review - 18 September 2026
+
+Candidate 1.3.10 adds two reviewed changes to the proposal below: entry-point initialization now names the embedded definition explicitly, and unchanged polling no longer emits repeated schedule snapshots. Require initialization of the actual renamed merged package, followed by successful processor loading, plus retained observation of quiet steady-state polling, meaningful schedule-change messages and error visibility. Property and definition notifications remain unchanged. The prior 1.3.9 load failure is retained as failed evidence and cannot satisfy these obligations. Updated source hashes identify this correction; the execution policy and final acceptance remain incomplete.
+
 ## Submission candidate 1.3.9 review - 18 September 2026
 
 The current blueprint pins the candidate based on released driver 1.3.8 source `c63d2b15b51a8ac791074356e8cee4b9623fec98`, with submission version `1.3.009.0000` and illustrated help. The package and dependency inventory now participate in the source review. This is a reviewed coverage proposal, not an approved execution policy or completed self-test.

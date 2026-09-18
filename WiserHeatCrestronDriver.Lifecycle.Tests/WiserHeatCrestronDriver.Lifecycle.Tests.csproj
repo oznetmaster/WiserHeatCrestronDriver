@@ -22,5 +22,6 @@
     <Compile Include="../WiserHeatCrestronDriver.Tests/*.cs" Link="Tests/%(Filename)%(Extension)" />
     <None Include="../WiserHeatCrestronDriver/IncludeInPkg/**/*" Exclude="../WiserHeatCrestronDriver/IncludeInPkg/**/*.xsd" Link="DriverTestData/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../WiserHeatCrestronDriver/Thermostat_WiserHeat_IP_V2.json" Link="DriverTestData/DriverDefinition.json" CopyToOutputDirectory="PreserveNewest" />
+    <EmbeddedResource Include="../WiserHeatCrestronDriver/Thermostat_WiserHeat_IP_V2.json" LogicalName="WiserHeat.CrestronDriver.Thermostat_WiserHeat_IP_V2.json" />
   </ItemGroup>
 </Project>

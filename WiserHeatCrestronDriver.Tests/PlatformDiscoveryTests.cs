@@ -699,25 +699,32 @@ public sealed partial class PlatformDiscoveryTests
 		}
 	private sealed class TestLogger : DriverControllerLogger
 		{
-		public override bool IsEnabled (string id, LogEntryLevel level) => false;
-		public override LogEntryLevel GetCurrentLevel (string id) => LogEntryLevel.Error;
+		internal readonly System.Collections.Concurrent.ConcurrentQueue<(LogEntryLevel Level, string Message)> Entries = new ();
+		public override bool IsEnabled (string id, LogEntryLevel level) => true;
+		public override LogEntryLevel GetCurrentLevel (string id) => LogEntryLevel.Info;
 		public override void Exception (string id, Exception exception, string message, params object[] args)
 			{
+			Log (id, LogEntryLevel.Error, message + " " + exception, args);
 			}
 		public override void Log (string id, LogEntryLevel level, string message)
 			{
+			Entries.Enqueue ((level, message));
 			}
 		public override void Log (string id, LogEntryLevel level, string message, params object[] args)
 			{
+			Log (id, level, string.Format (System.Globalization.CultureInfo.InvariantCulture, message, args));
 			}
 		public override void Log<T1> (string id, LogEntryLevel level, string message, T1 arg1)
 			{
+			Log (id, level, message, new object[] { arg1 });
 			}
 		public override void Log<T1, T2> (string id, LogEntryLevel level, string message, T1 arg1, T2 arg2)
 			{
+			Log (id, level, message, new object[] { arg1, arg2 });
 			}
 		public override void Log<T1, T2, T3> (string id, LogEntryLevel level, string message, T1 arg1, T2 arg2, T3 arg3)
 			{
+			Log (id, level, message, new object[] { arg1, arg2, arg3 });
 			}
 		}
 	[Test]

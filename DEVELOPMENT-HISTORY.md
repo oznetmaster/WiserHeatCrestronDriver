@@ -1,5 +1,11 @@
 # Development and validation history
 
+## Submission startup and polling diagnostics - 2026-09-18 (not released)
+
+The first renamed submission candidate failed in the SDK's implicit embedded-JSON lookup. The entry point now identifies its resource explicitly. A regression reproduces the former exception in the desktop SDK harness; a separate smoke tool exercises the actual merged package, and hosted tests now include the renamed package check. It does not replace final processor acceptance.
+
+Repeated schedule construction/publication diagnostics accounted for over 99% of an 8 MB processor log sample. Unchanged polls now emit no such messages in either Debug or Release; changed options or selection produce a concise message. Existing UI notifications and failure logging remain intact. Regression checks cover repeated unchanged polls, a renamed schedule and a connection failure. The corrected submission candidate uses version 1.3.10; failed candidate 1.3.9 was not published.
+
 See the [product changelog](CHANGELOG.md) for shipped changes. This document preserves test, CI, build and submission preparation history. Dated development entries describe work at that time, not a published product version or completed acceptance. Version headings identify the release alongside which development work was recorded; processor-test versions identify separate test packages.
 
 ## Where changes belong

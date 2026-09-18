@@ -1077,21 +1077,19 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		string previousSelectedScheduleId = SelectedScheduleId ?? string.Empty;
 		DriverEntityAvailableValue[] nextScheduleValues = BuildScheduleAvailableValues ();
 		string nextSelectedScheduleId = BuildSelectedScheduleId (_room);
-		LogBreadcrumb ($"RefreshScheduleValues entered; notify={notify}, builtCount={nextScheduleValues.Length}, previousSelectedScheduleId='{previousSelectedScheduleId}', nextSelectedScheduleId='{nextSelectedScheduleId}', platformScheduleCount={_platform.HeatingSchedules.Count}");
 
 		ScheduleValues = nextScheduleValues;
 		SelectedScheduleId = nextSelectedScheduleId;
 		bool definitionChanged = UpdateScheduleSelectionDefinition (nextScheduleValues);
-		LogScheduleValues ($"RefreshScheduleValues(notify={notify})");
+		if (definitionChanged || !string.Equals (previousSelectedScheduleId, nextSelectedScheduleId, StringComparison.Ordinal))
+			LogBreadcrumb ($"Schedule selector changed; count={nextScheduleValues.Length}, selectedScheduleId='{nextSelectedScheduleId}'");
 
 		if (notify)
 			{
 			if (definitionChanged)
 				RaiseDefinitionChangedEvent ();
-			LogBreadcrumb ($"RefreshScheduleValues publishing selectedScheduleOptions; count={SelectedScheduleOptions.Length}, selectedScheduleId='{SelectedScheduleId ?? string.Empty}'");
 			NotifyPropertyChanged ("selectedScheduleOptions", new DriverEntityValue (SelectedScheduleOptions));
 			NotifyPropertyChanged ("selectedScheduleId", new DriverEntityValue (SelectedScheduleId ?? string.Empty));
-			LogInfo ($"Published schedule selector state; newCount={ScheduleValues?.Length ?? 0}, previousSelectedScheduleId='{previousSelectedScheduleId}', newSelectedScheduleId='{SelectedScheduleId ?? string.Empty}'");
 			}
 		}
 
@@ -1604,7 +1602,6 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	private DriverEntityAvailableValue[] BuildScheduleAvailableValues ()
 		{
 		var values = new List<DriverEntityAvailableValue> ();
-		var diagnostics = new List<string> ();
 		foreach (WiserHeatingSchedule? schedule in _platform.HeatingSchedules ?? [])
 			{
 			string labelText = BuildScheduleOptionValue (schedule);
@@ -1614,26 +1611,13 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			// the display string ensures the label is visible even without a
 			// translation dictionary entry.
 			var label = new DriverEntityLocalizedString (labelText, labelText);
-			diagnostics.Add ($"{value}:{labelText}(text='{label.Text}',key='{label.LocalizationKey ?? "<null>"}')");
 			values.Add (new DriverEntityAvailableValue (
 				value,
 				label,
 				false));
 			}
 
-		LogInfo ($"BuildScheduleAvailableValues produced count={values.Count}; schedules={(diagnostics.Count == 0 ? "<none>" : string.Join (", ", diagnostics))}");
-
 		return [.. values];
-		}
-
-	private void LogScheduleValues (string context)
-		{
-		var diagnostics = new List<string> ();
-		foreach (WiserHeatingSchedule? schedule in _platform.HeatingSchedules ?? [])
-			diagnostics.Add ($"{schedule?.Id ?? 0}:{BuildScheduleOptionValue (schedule)}");
-
-		WiserHeatingSchedule? assignedSchedule = ResolveAssignedSchedule (_room);
-		LogInfo ($"{context}; availableCount={_scheduleValues?.Length ?? 0}, selectedScheduleId='{SelectedScheduleId ?? string.Empty}', roomScheduleId={assignedSchedule?.Id ?? _room.ScheduleId}, roomScheduleName='{ResolveScheduleNameForLog (_room, assignedSchedule)}', platformSchedules={(diagnostics.Count == 0 ? "<none>" : string.Join (", ", diagnostics))}");
 		}
 
 	[Conditional ("DEBUG")]
@@ -1647,17 +1631,6 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 	private void LogBreadcrumb (string message) =>
 		_logger.Log (_driverLogId, LogEntryLevel.Info, $"Room '{ControllerId}': {message}");
-
-	private static string ResolveScheduleNameForLog (WiserRoom room, WiserHeatingSchedule? assignedSchedule)
-		{
-		if (assignedSchedule == null)
-			return string.Empty;
-
-		if (!string.IsNullOrWhiteSpace (assignedSchedule.Name))
-			return assignedSchedule.Name!;
-
-		return $"Schedule {assignedSchedule.Id}";
-		}
 
 	private static string BuildScheduleOptionValue (WiserHeatingSchedule? schedule) =>
 		string.IsNullOrWhiteSpace (schedule?.Name)

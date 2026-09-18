@@ -15,7 +15,7 @@ public sealed class EntryPoint : DriverAssemblyEntryPoint
 		DriverControllerCreationArgs args)
 		{
 		var resources = DriverImplementationResources.FromCreationArgs (
-			args, typeof (EntryPoint));
+			args, typeof (EntryPoint), "WiserHeat.CrestronDriver.Thermostat_WiserHeat_IP_V2.json");
 		return CreateController (new WiserPlatformDriver (args, resources), args);
 		}
 
