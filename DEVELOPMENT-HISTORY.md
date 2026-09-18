@@ -1,5 +1,11 @@
 # Development and validation history
 
+## Released Android evidence integration - 2026-09-18 (test tooling, no driver release)
+
+Both Android projects now consume TestAdapter 1.11.1 and DevTools 1.8.0. The complete read-only project passed against unchanged Release candidate 1.3.10 through the released Android workflow stage. The matching released Python auditor checked all three discovered cases, the complete 171-file producer inventory and 25 captures against pins retained before execution. State, Home, original inventory, temporary-child removal and reservation release were verified. The control project also builds with the upgraded dependencies without warnings or errors; its earlier hardware results retain their original tool versions.
+
+The integration used a private coordinator calling the released stage, not a complete protected CI submission. An earlier coordinator readback failure was reconciled separately and remains failed; the corrected run completed normally. These results do not authenticate the worker, satisfy the whole official plan or authorize a submission. See [candidate status](submission/ValidationStatus.md).
+
 ## Native thermostat control fixtures - 2026-09-18 (test tooling, no driver release)
 
 Added opt-in Android temperature and Boost cases with policy-aware restoration, retained original state, independently observed command completion and no replay after uncertain input. Scheduled and manual starting states, absent saved targets, cancellation, lost replies, foreign changes and incomplete restoration are covered by offline regressions. Both cases passed against unchanged candidate 1.3.10 from an Auto starting state, with original settings and schedule restoration, Home restoration and temporary-child cleanup verified. Earlier attempts corrected fixture label expectations and the hub's FromBoost origin for a Manual override; failed evidence was retained and restoration verified before rerunning. All 384 offline control tests pass. Ordinary desktop discovery skips the opt-in cases without private workflow context. See [control-test setup](WiserHeatCrestronDriver.AndroidControlTests/README.md) and [candidate status](submission/ValidationStatus.md) for scope and results.

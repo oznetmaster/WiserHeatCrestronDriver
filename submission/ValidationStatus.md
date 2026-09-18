@@ -1,5 +1,11 @@
 # Wiser submission pilot status
 
+## Released Android auditor integration - 18 September 2026
+
+The complete dedicated read-only Android suite passed against the unchanged 1.3.10 candidate using published TestAdapter 1.11.1 and DevTools 1.8.0. The released workflow stage retained the full producer inventory before execution; the released Python auditor accepted all three discovered cases, 171 producer files and 25 captures against separately retained pre-execution pins. Original checked state, Home and installed inventory were preserved, the owned temporary thermostat was removed, private settings were deleted and reservations were released. No heating command, driver update or reboot was sent.
+
+This repeats the read-only behaviors already described below through the new evidence path; it adds no new official-plan coverage. A private integration coordinator invoked the released Android stage directly. The complete public workflow and protected CI handoff have not been validated by this run, and same-account pin retention does not establish independent producer authentication. An earlier run passed its UI tests but failed coordinator readback; its failed result and separate successful cleanup remain retained. Only the corrected run completed normally. Both Android projects now reference these released dependencies; the control project builds cleanly, but was not rerun on hardware for this dependency change.
+
 ## Candidate 1.3.10 loaded and inspected - 18 September 2026
 
 The corrected immutable Release package passed its desktop, Mono processor, read-only hub and installed-state gates. Its original gateway instance updated successfully and is configured, online and ready. Both polling-log regressions passed on the processor. The temporary CI instance and stored test package were removed and the shared reservation released.
