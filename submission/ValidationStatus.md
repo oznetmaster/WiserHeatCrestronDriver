@@ -12,6 +12,10 @@ The exact package SHA-256 is `7513db936f593c39b8e0fbeba3eab1162ae035ad5557eb3eaf
 
 This is partial candidate acceptance, not completed submission. Other configurations and display profiles, native setpoint/boost actions and bounds, busy/error behavior, outages, multiple-instance interpretation, complete producer bindings, 24-hour endurance, signed form and final delivery remain outstanding. Candidate 1.3.10 has not been publicly released or submitted.
 
+## Native control fixtures prepared; hardware results pending
+
+Two additional opt-in Android cases now exercise native temperature increase/decrease and Boost On/Off with independent room-policy restoration. Twenty-one new offline regression cases passed, including cancellation after a delivered input and lost acknowledgements. The complete control suite then passed all 384 tests, and both Android cases skip correctly during context-free desktop testing. The driver package is unchanged. These fixtures have not yet run against the live candidate and add no passing submission evidence until that run and cleanup are verified.
+
 ## Corrected submission candidate 1.3.10 - 18 September 2026
 
 The first 1.3.9 candidate passed packaging checks but failed actual processor startup. Its new assembly name no longer matched the embedded definition filename expected by the SDK's default lookup. This is a rejected candidate, not a released or accepted driver. Its original package and failure evidence are retained unchanged.

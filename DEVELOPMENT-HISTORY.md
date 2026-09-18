@@ -1,7 +1,12 @@
+# Development and validation history
+
+## Native thermostat control fixtures - 2026-09-18 (test tooling, no driver release)
+
+Added opt-in Android temperature and Boost cases with policy-aware restoration, retained original state, independently observed command completion and no replay after uncertain input. Scheduled and manual starting states, absent saved targets, cancellation, lost replies, foreign changes and incomplete restoration are covered by offline regressions. Both cases remain pending real candidate validation; ordinary desktop discovery skips them without the private workflow context. The tested driver package is unchanged. See [control-test setup](WiserHeatCrestronDriver.AndroidControlTests/README.md) and [candidate status](submission/ValidationStatus.md) for scope and results.
+
 ## Entry-point test placement - 2026-09-18 (no driver release)
 
 The embedded-definition regression belongs to the desktop SDK project: processor test packages deliberately remove dependency driver manifests so their own package identity remains unambiguous. The first 1.3.10 processor run passed the logging regressions but caught this incorrect test placement, and blocked the actual driver update. The regression now runs in the desktop SDK suite; the separate smoke test still exercises the actual merged submission package. No test is ignored and no production code or candidate package bytes changed for this correction.
-# Development and validation history
 
 ## Submission startup and polling diagnostics - 2026-09-18 (not released)
 

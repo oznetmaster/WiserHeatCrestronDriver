@@ -33,5 +33,7 @@
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/GatewayAwayRepetition.cs" Link="GatewayAwayRepetition.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/HotWaterRestoration.cs" Link="HotWaterRestoration.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/HotWaterControlCycle.cs" Link="HotWaterControlCycle.cs" />
+    <Compile Include="../WiserHeatCrestronDriver.ControlProbe/RoomTemperatureRestoration.cs" Link="RoomTemperatureRestoration.cs" />
+    <Compile Include="../WiserHeatCrestronDriver.ControlProbe/RoomTemperatureCycle.cs" Link="RoomTemperatureCycle.cs" />
   </ItemGroup>
 </Project>
