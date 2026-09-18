@@ -54,7 +54,7 @@ Licensed under the MIT License with Commons Clause. See LICENSE in the repositor
     <Reference Include="System.Net.Http" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="WiserHeatAPIv2" Version="1.1.1" />
+    <PackageReference Include="WiserHeatAPIv2" Version="1.1.2" />
     <PackageReference Include="Crestron.DeviceDrivers.DevKit" Version="27.0.24" />
     <PackageReference Include="Hafner.Compatibility.MetaPackage" Version="1.9.0" />
   </ItemGroup>

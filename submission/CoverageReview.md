@@ -1,5 +1,13 @@
 # Coverage source review
 
+## Candidate 1.3.11 temperature and Off review - 18 September 2026
+
+The reviewed source changes keep raw hub/schedule data in Celsius and convert only at the display boundary. Display ranges represent the physical 5-30 C bounds in either unit. Off remains a control sentinel, with separate visibility and explicit minimum-temperature commands for the native thermostat and every editor slot. Time edits, other-slot edits, unit changes and cancellation must preserve Off. An explicit resume must not first restore the scheduled temperature; WiserHeatAPIv2 1.1.2 corrects that command path.
+
+The blueprint adds the native HeatingOffStatus and ten editor Off controls, plus preservation and deliberate-resume requirements for single and repeated instances. Supported one-to-eight-event layouts require observed visibility; defensive slots nine and ten retain synthetic coverage and runtime absence evidence. Current offline regressions cover values, commands, cancellation, saved payloads and real UI bindings, but do not substitute for visual/processor evidence on the new package.
+
+The published dependency assembly is pinned by hash, with its original license notice retained and linked to the released source commit. All these changes require a new immutable candidate; prior 1.3.10 acceptance cannot be transferred to it. The expanded draft has 571 scoped assertions and remains incomplete, with producer bindings and budgets still to be finalized.
+
 ## Corrected candidate review - 18 September 2026
 
 Candidate 1.3.10 adds two reviewed changes to the proposal below: entry-point initialization now names the embedded definition explicitly, and unchanged polling no longer emits repeated schedule snapshots. Require initialization of the actual renamed merged package, followed by successful processor loading, plus retained observation of quiet steady-state polling, meaningful schedule-change messages and error visibility. Property and definition notifications remain unchanged. The prior 1.3.9 load failure is retained as failed evidence and cannot satisfy these obligations. Updated source hashes identify this correction; the execution policy and final acceptance remain incomplete.

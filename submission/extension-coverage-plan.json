@@ -12,7 +12,7 @@
     },
     {
       "path": "WiserHeatCrestronDriver/IncludeInPkg/room/uidefinitions/UiDefinition.xml",
-      "sha256": "61251602b4bce8aa67b2fed1acd832f3338cc3d1e64a839a55920e4ef22684e1",
+      "sha256": "847fb453d8bbff8d3d7fa2c8a7c02b0af827a4ab628b89d2089e50769f25da5b",
       "surface": "room"
     },
     {
@@ -27,7 +27,7 @@
     },
     {
       "path": "WiserHeatCrestronDriver/IncludeInPkg/Translations/en-US.json",
-      "sha256": "2fd59c8932d646f3c8eb3a2014445539d6f3028a436c80e604a9ec9e79f61671",
+      "sha256": "dd0223fd8a8e262a369fea28dde054b78f41da83c071298c121727c20b5c4b7b",
       "surface": null
     },
     {
@@ -37,7 +37,7 @@
     },
     {
       "path": "WiserHeatCrestronDriver/Thermostat_WiserHeat_IP_V2.json",
-      "sha256": "311ec791d23203f9d25a8df00c658f0fc7961a38457fe277ec19b01546ccb181",
+      "sha256": "d34e8ea954bda540e2a3e26359c104362d7059dcac1c5adc5f2323f41267b23b",
       "surface": null
     },
     {
@@ -47,12 +47,12 @@
     },
     {
       "path": "WiserHeatCrestronDriver/WiserPlatformDriver.cs",
-      "sha256": "d75bba4ed67d50191aaa9c18fefb1c09ed1794e7f6409036da40bd06166ff4c5",
+      "sha256": "9810243e4d27355eea30992c0e77706cb9f3ce6fe6c573cdfc024f6c00d03e53",
       "surface": null
     },
     {
       "path": "WiserHeatCrestronDriver/WiserRoomEntity.cs",
-      "sha256": "d2b16bc5ee7e9ac84f1a5c4e6a0a23621fb079c6404876d5c9b82a29e18c4190",
+      "sha256": "5ce4e5dc6a16b86735bf48dcf00c3becf7a8dd8966b7889a8487dc9279d9acef",
       "surface": null
     },
     {
@@ -62,12 +62,22 @@
     },
     {
       "path": "WiserHeatCrestronDriver/WiserHeatCrestronDriver.csproj",
-      "sha256": "eda640373df2b8d3457f2f9428e46a6607e46ca66d9098790a921e29c652d9e9",
+      "sha256": "ac41b17b315417f179dcd432f7e21dbe1006f39b23d8f6b40cddb058c7f2f116",
       "surface": null
     },
     {
       "path": "submission/dependency-notices.json",
-      "sha256": "1818166dcd8ea0966e2aba7dde6d108685db5ba259e7adb904fa15d42a7d4b3c",
+      "sha256": "7d70704d9b11ada19b7384f128d7597657c9ba8e17b797ae8a1d647b56b673e7",
+      "surface": null
+    },
+    {
+      "path": "WiserHeatCrestronDriver/TemperatureDisplay.cs",
+      "sha256": "10a6b7c1b59e7ac40b81351988d87c3a2b67002e983fd78a5d4a3c7cc58579e9",
+      "surface": null
+    },
+    {
+      "path": "WiserHeatCrestronDriver/WiserRoomEntity.Temperature.cs",
+      "sha256": "a258a780eea3598c9bc996f7770a61b79fc91ab075cbe10072aaaf0c295b8795",
       "surface": null
     }
   ],
@@ -458,7 +468,18 @@
             "room/layout/EditSchedulePage",
             "room/layout/MainPage",
             "room/layout/SchedulePage",
-            "room/tile"
+            "room/tile",
+            "room/MainPage/HeatingOffStatus",
+            "room/EditSchedulePage/EditSlot1Off",
+            "room/EditSchedulePage/EditSlot2Off",
+            "room/EditSchedulePage/EditSlot3Off",
+            "room/EditSchedulePage/EditSlot4Off",
+            "room/EditSchedulePage/EditSlot5Off",
+            "room/EditSchedulePage/EditSlot6Off",
+            "room/EditSchedulePage/EditSlot7Off",
+            "room/EditSchedulePage/EditSlot8Off",
+            "room/EditSchedulePage/EditSlot9Off",
+            "room/EditSchedulePage/EditSlot10Off"
           ],
           "method": "android",
           "expectation": "Compare the final candidate definition/localization with this rendered target. Exercise all visibility/enabled variants, error states and conditional schedule slots. Record the complete observed inventory; source parsing alone is insufficient.",
@@ -515,7 +536,18 @@
             "room/MainPage/BoostButton",
             "room/MainPage/ScheduleButton",
             "room/SchedulePage/DisableScheduleButton",
-            "room/SchedulePage/EnableScheduleButton"
+            "room/SchedulePage/EnableScheduleButton",
+            "room/MainPage/HeatingOffStatus",
+            "room/EditSchedulePage/EditSlot1Off",
+            "room/EditSchedulePage/EditSlot2Off",
+            "room/EditSchedulePage/EditSlot3Off",
+            "room/EditSchedulePage/EditSlot4Off",
+            "room/EditSchedulePage/EditSlot5Off",
+            "room/EditSchedulePage/EditSlot6Off",
+            "room/EditSchedulePage/EditSlot7Off",
+            "room/EditSchedulePage/EditSlot8Off",
+            "room/EditSchedulePage/EditSlot9Off",
+            "room/EditSchedulePage/EditSlot10Off"
           ],
           "method": "combined",
           "expectation": "Verify label, status and repeated intended response. Exercise each defined busy/disabled/error condition for its full duration and recovery; compare device feedback. For undeclared alert behavior record explicit absence evidence rather than inventing an alert.",
@@ -796,6 +828,27 @@
           "minimumSeconds": 0,
           "responseLimitSeconds": null,
           "restore": true
+        },
+        {
+          "id": "off-target-preservation",
+          "targets": [
+            "room/MainPage/HeatingOffStatus",
+            "room/EditSchedulePage/EditSlot1Off",
+            "room/EditSchedulePage/EditSlot2Off",
+            "room/EditSchedulePage/EditSlot3Off",
+            "room/EditSchedulePage/EditSlot4Off",
+            "room/EditSchedulePage/EditSlot5Off",
+            "room/EditSchedulePage/EditSlot6Off",
+            "room/EditSchedulePage/EditSlot7Off",
+            "room/EditSchedulePage/EditSlot8Off",
+            "room/EditSchedulePage/EditSlot9Off",
+            "room/EditSchedulePage/EditSlot10Off"
+          ],
+          "method": "combined",
+          "expectation": "In Celsius and Fahrenheit, show Off as a control state, hide its numeric adjuster, and preserve the hub Off value through unit changes, time edits, unrelated slot edits, Save Day/All and Cancel. Explicit minimum-target actions must affect only the selected room or pending slot, send no intermediate scheduled target, and restore original target/mode/overrides and every affected shared schedule. Verify the visible button states and feedback after activation and ignore stale resume actions once a target is active. Exercise supported physical slots and retain synthetic-only coverage plus absence evidence for slots beyond hub capacity.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
         }
       ]
     },
@@ -1000,7 +1053,29 @@
             "$instance-two.room.schedulepage.enableschedulebutton",
             "$instance-two.room.schedulepage.scheduleselector",
             "$instance-two.room.schedulepage.schedulesummarydisplay",
-            "$instance-two.room.tile"
+            "$instance-two.room.tile",
+            "$instance-one.room.mainpage.heatingoffstatus",
+            "$instance-one.room.editschedulepage.editslot1off",
+            "$instance-one.room.editschedulepage.editslot2off",
+            "$instance-one.room.editschedulepage.editslot3off",
+            "$instance-one.room.editschedulepage.editslot4off",
+            "$instance-one.room.editschedulepage.editslot5off",
+            "$instance-one.room.editschedulepage.editslot6off",
+            "$instance-one.room.editschedulepage.editslot7off",
+            "$instance-one.room.editschedulepage.editslot8off",
+            "$instance-one.room.editschedulepage.editslot9off",
+            "$instance-one.room.editschedulepage.editslot10off",
+            "$instance-two.room.mainpage.heatingoffstatus",
+            "$instance-two.room.editschedulepage.editslot1off",
+            "$instance-two.room.editschedulepage.editslot2off",
+            "$instance-two.room.editschedulepage.editslot3off",
+            "$instance-two.room.editschedulepage.editslot4off",
+            "$instance-two.room.editschedulepage.editslot5off",
+            "$instance-two.room.editschedulepage.editslot6off",
+            "$instance-two.room.editschedulepage.editslot7off",
+            "$instance-two.room.editschedulepage.editslot8off",
+            "$instance-two.room.editschedulepage.editslot9off",
+            "$instance-two.room.editschedulepage.editslot10off"
           ],
           "method": "android",
           "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Compare the final candidate definition/localization with this rendered target. Exercise all visibility/enabled variants, error states and conditional schedule slots. Record the complete observed inventory; source parsing alone is insufficient. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
@@ -1054,7 +1129,29 @@
             "$instance-two.room.mainpage.boostbutton",
             "$instance-two.room.mainpage.schedulebutton",
             "$instance-two.room.schedulepage.disableschedulebutton",
-            "$instance-two.room.schedulepage.enableschedulebutton"
+            "$instance-two.room.schedulepage.enableschedulebutton",
+            "$instance-one.room.mainpage.heatingoffstatus",
+            "$instance-one.room.editschedulepage.editslot1off",
+            "$instance-one.room.editschedulepage.editslot2off",
+            "$instance-one.room.editschedulepage.editslot3off",
+            "$instance-one.room.editschedulepage.editslot4off",
+            "$instance-one.room.editschedulepage.editslot5off",
+            "$instance-one.room.editschedulepage.editslot6off",
+            "$instance-one.room.editschedulepage.editslot7off",
+            "$instance-one.room.editschedulepage.editslot8off",
+            "$instance-one.room.editschedulepage.editslot9off",
+            "$instance-one.room.editschedulepage.editslot10off",
+            "$instance-two.room.mainpage.heatingoffstatus",
+            "$instance-two.room.editschedulepage.editslot1off",
+            "$instance-two.room.editschedulepage.editslot2off",
+            "$instance-two.room.editschedulepage.editslot3off",
+            "$instance-two.room.editschedulepage.editslot4off",
+            "$instance-two.room.editschedulepage.editslot5off",
+            "$instance-two.room.editschedulepage.editslot6off",
+            "$instance-two.room.editschedulepage.editslot7off",
+            "$instance-two.room.editschedulepage.editslot8off",
+            "$instance-two.room.editschedulepage.editslot9off",
+            "$instance-two.room.editschedulepage.editslot10off"
           ],
           "method": "combined",
           "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Verify label, status and repeated intended response. Exercise each defined busy/disabled/error condition for its full duration and recovery; compare device feedback. For undeclared alert behavior record explicit absence evidence rather than inventing an alert. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
@@ -1444,6 +1541,38 @@
           ],
           "method": "combined",
           "expectation": "After resolving the two-instance interpretation and binding independent devices, repeat: After a state-changing thermostat command, verify fresh hub feedback before successful completion. A failed post-command read must not report confirmed success or leave controls permanently busy. Reconcile actual hub state before any further action; never replay an uncertain command automatically. Restore and verify target, mode and override state. Independently verify the other instance/device is unchanged and restore both. Two managed children are not automatically equivalent to two gateway instances.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-13-off-target-preservation",
+          "targets": [
+            "$instance-one.room.mainpage.heatingoffstatus",
+            "$instance-one.room.editschedulepage.editslot1off",
+            "$instance-one.room.editschedulepage.editslot2off",
+            "$instance-one.room.editschedulepage.editslot3off",
+            "$instance-one.room.editschedulepage.editslot4off",
+            "$instance-one.room.editschedulepage.editslot5off",
+            "$instance-one.room.editschedulepage.editslot6off",
+            "$instance-one.room.editschedulepage.editslot7off",
+            "$instance-one.room.editschedulepage.editslot8off",
+            "$instance-one.room.editschedulepage.editslot9off",
+            "$instance-one.room.editschedulepage.editslot10off",
+            "$instance-two.room.mainpage.heatingoffstatus",
+            "$instance-two.room.editschedulepage.editslot1off",
+            "$instance-two.room.editschedulepage.editslot2off",
+            "$instance-two.room.editschedulepage.editslot3off",
+            "$instance-two.room.editschedulepage.editslot4off",
+            "$instance-two.room.editschedulepage.editslot5off",
+            "$instance-two.room.editschedulepage.editslot6off",
+            "$instance-two.room.editschedulepage.editslot7off",
+            "$instance-two.room.editschedulepage.editslot8off",
+            "$instance-two.room.editschedulepage.editslot9off",
+            "$instance-two.room.editschedulepage.editslot10off"
+          ],
+          "method": "combined",
+          "expectation": "In Celsius and Fahrenheit, show Off as a control state, hide its numeric adjuster, and preserve the hub Off value through unit changes, time edits, unrelated slot edits, Save Day/All and Cancel. Explicit minimum-target actions must affect only the selected room or pending slot, send no intermediate scheduled target, and restore original target/mode/overrides and every affected shared schedule. Verify the visible button states and feedback after activation and ignore stale resume actions once a target is active. Exercise supported physical slots and retain synthetic-only coverage plus absence evidence for slots beyond hub capacity. Repeat independently on both approved instances; prove command/state isolation and restore each original state.",
           "minimumSeconds": 0,
           "responseLimitSeconds": null,
           "restore": true

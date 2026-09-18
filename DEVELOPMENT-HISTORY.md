@@ -1,5 +1,11 @@
 # Development and validation history
 
+## Candidate 1.3.11 preparation - 18 September 2026
+
+The candidate uses published WiserHeatAPIv2 1.1.2, whose release passed hosted and processor checks. Its published net472 DLL and retained MIT notice were independently reviewed and pinned. The driver now displays Celsius/Fahrenheit within supported physical limits and preserves Off targets and schedule slots until an explicit minimum-temperature action is chosen. The source-bound coverage draft includes those controls; its 571 scoped assertions are a plan, not completed acceptance.
+
+The driver passed 187 offline tests with three live cases skipped against the corrected local library package. The actual merged Release package built against the stable published dependency without warnings or errors. Its entry point initialized successfully in the desktop SDK smoke check. All eleven help pages were reviewed: the packaged PDF retains the original template logo, the seven approved figures and unchanged template geometry, with exact embedded PDF verification. The package hash is `b84375d629ac5af2f65c1f6cde4dabf74a6302ff100caafd65d157ac1e6ab3cf`. Earlier hardware evidence remains bound to unchanged installed candidate 1.3.10. Candidate 1.3.11 still requires package, processor and Android acceptance; no certification or final submission is claimed.
+
 ## Off-state preservation - 2026-09-18 (local candidate work)
 
 Off heating targets and schedule slots retain their control marker when display units change. The UI shows Off instead of a negative temperature; an explicit button labelled with the minimum target starts heating or changes only the selected pending slot. Editing another slot or a time preserves Off, and Cancel restores pending Off slots. Regressions cover Celsius/Fahrenheit, all ten slots, stale resume actions, saved payloads and bindings to real properties, commands and translations.
@@ -13,7 +19,7 @@ The driver now keeps hub models and schedule data in Celsius and converts at the
 
 Offline regressions cover initial and changed units, the SDK extension property-command path, raw Celsius writes, rejected inputs, pending schedule preservation and Boost configuration. The desktop driver suite passes 180 tests with three live cases skipped. The control suite passes 387 tests. The net472 driver/test build and Android control fixture build pass without warnings. An initial extension-command regression supplied a numeric value where the SDK requires text; the corrected fixture uses the actual UI input format and passes. No live heating operation was used for this work.
 
-These changes are not in installed candidate 1.3.10 or a published release. The help source has changed but its final PDF has not yet been rebuilt or reviewed. A new immutable package and corresponding processor/Android validation are still required; existing candidate evidence must not be reused as acceptance of changed bytes. Off-sentinel display behavior remains a separate review item before final acceptance.
+These changes are not in installed candidate 1.3.10 or a published release. The help source has changed but its final PDF has not yet been rebuilt or reviewed. A new immutable package and corresponding processor/Android validation are still required; existing candidate evidence must not be reused as acceptance of changed bytes. The later Off-state correction above supersedes the earlier open display question; physical UI acceptance remains outstanding.
 
 
 ## Candidate editor limits and interruption recovery - 2026-09-18 (no driver release)
