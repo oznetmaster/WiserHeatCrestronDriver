@@ -1,5 +1,11 @@
 # Wiser submission pilot status
 
+## Command-result patch candidate - 18 September 2026
+
+The gated update installed Debug `1.3.008.0001` with published WiserHeatAPIv2 1.1.1. Desktop tests, processor unit/lifecycle suites, three read-only live-hub checks and three installed-state checks passed. All 22 room-command and schedule-assignment result cases passed under the processor runtime. The temporary test instance and its package files were removed and the processor reservation released. Home may retain a cached catalog entry until its next planned reboot.
+
+This validates command-result behavior and the gated development update. Earlier Android results below remain tied to their recorded package versions; they are not proof for this changed candidate. Final immutable Release acceptance, remaining control/busy/error cases and the full endurance test are still pending. The GitHub patch release and Crestron submission are separate milestones.
+
 ## Repeated Away operation - 18 September 2026
 
 The two-cycle Android test passed against the exact installed Debug `1.3.007.0030` payload. Both Disabled -> Enabled -> Disabled cycles retained the same original guarded schedules, room settings and hot-water overrides. Independent hub and driver observations agreed with the visible labelled app row. All four transitions took approximately 14-15 seconds. Home restoration, owned-child removal, original inventory and reservation release passed. There was no driver rebuild or update for this test.

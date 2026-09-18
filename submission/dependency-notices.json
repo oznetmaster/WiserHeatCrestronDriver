@@ -14,7 +14,7 @@
       "id": "wiser-api-license",
       "path": "license-sources/wiser-api-license.txt",
       "sha256": "b522ab0781ac4f64c2a6d10988bb61e1883cd351f29561a92e04f0348ccb9b4d",
-      "source": "https://github.com/oznetmaster/WiserHeatAPIv2/blob/9a006cfe41d363ae8a61b684fa099a95157ab4e2/WiserHeatAPIv2/LICENSE"
+      "source": "https://github.com/oznetmaster/WiserHeatAPIv2/blob/ad7fbe999a612d6510b8834303a82116d87578f0/WiserHeatAPIv2/LICENSE"
     },
     {
       "id": "newtonsoft-json-license-md",
@@ -80,9 +80,9 @@
   "components": [
     {
       "assembly": "WiserHeatAPIv2.dll",
-      "sha256": "491ad22c811244488891a4ff5c89e6171e29b4fd580c7a38f8c0702c8a174ecb",
+      "sha256": "bf8ecb57beee6fca962c7914b95c2b8b1e0d3d13c385fa52921d3bdd673afdc5",
       "packageId": "WiserHeatAPIv2",
-      "packageVersion": "1.1.0.6",
+      "packageVersion": "1.1.1",
       "license": "MIT",
       "copyright": "Copyright \u00a9 2026 Neil Colvin",
       "noticeIds": [

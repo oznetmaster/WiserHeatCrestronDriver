@@ -176,7 +176,7 @@ After a state-changing command completes, the driver reads fresh hub state befor
 
 The opt-in Android boundary fixture also exercises both directions at the temperature limits for each current row, including rows revealed by scrolling, then verifies Cancel and unchanged independent hub schedules. Its endpoint preparation is separate from the Android button inputs. See the [control-test setup and scope](WiserHeatCrestronDriver.AndroidControlTests/README.md).
 
-SDK command regressions also verify schedule-editor temperature limits, non-finite input, half-degree rounding, Cancel restoration and continued hub refresh after an ignored command. The current source ignores temperatures outside the advertised 5-35 degree range before starting an edit. This correction is validated in a development candidate and is not part of the existing v1.3.7 release; see [current validation](submission/ValidationStatus.md).
+SDK command regressions also verify schedule-editor temperature limits, non-finite input, half-degree rounding, Cancel restoration and continued hub refresh after an ignored command. Version 1.3.8 ignores temperatures outside the advertised 5-35 degree range before starting an edit. See the [release notes](RELEASE-NOTES.md) and [submission validation status](submission/ValidationStatus.md) for their separate validation scopes.
 
 ### Expanded driver behavior tests
 

@@ -1042,8 +1042,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 		double newSetpoint = Math.Round (room.CurrentTargetTemperature + delta, 1, MidpointRounding.AwayFromZero);
 		await room.SetTargetTemperatureAsync (newSetpoint, CancellationToken.None).ConfigureAwait (false);
-		await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
-		return true;
+		return await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
 		}
 
 	internal string ControlHubAddress => _hubIpAddress.Trim ().ToLowerInvariant ();
@@ -1062,8 +1061,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		else
 			await room.SetManualTemperatureAsync (setpoint, CancellationToken.None).ConfigureAwait (false);
 
-		await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
-		return true;
+		return await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
 		}
 
 	internal async Task<bool> TriggerRoomBoostAsync (int roomId)
@@ -1077,8 +1075,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		else
 			await room.BoostAsync (_boostDelta, _boostDurationMinutes, CancellationToken.None).ConfigureAwait (false);
 
-		await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
-		return true;
+		return await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
 		}
 
 	internal async Task<bool> AdvanceRoomScheduleAsync (int roomId)
@@ -1088,8 +1085,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			return false;
 
 		await room.ScheduleAdvanceAsync (CancellationToken.None).ConfigureAwait (false);
-		await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
-		return true;
+		return await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
 		}
 
 	internal async Task<bool> SetRoomAssignedScheduleAsync (int roomId, int scheduleId)
@@ -1110,10 +1106,12 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 		Log ($"SetRoomAssignedScheduleAsync assigning roomId={roomId} to scheduleId={scheduleId} name='{targetSchedule.Name ?? string.Empty}'");
 
-		await targetSchedule.AssignScheduleAsync ([roomId], true, CancellationToken.None).ConfigureAwait (false);
-		await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
-		Log ($"SetRoomAssignedScheduleAsync completed roomId={roomId}, scheduleId={scheduleId}");
-		return true;
+		bool accepted = await targetSchedule.AssignScheduleAsync ([roomId], true, CancellationToken.None).ConfigureAwait (false);
+		// Refresh even after a rejected or uncertain reply; never replay the assignment.
+		bool refreshed = await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
+		bool succeeded = accepted && refreshed && GetAssignedScheduleForRoom (roomId)?.Id == scheduleId;
+		Log ($"SetRoomAssignedScheduleAsync completed roomId={roomId}, scheduleId={scheduleId}, success={succeeded}");
+		return succeeded;
 		}
 
 	internal async Task<bool> SetRoomScheduleEnabledAsync (int roomId, bool enabled)
@@ -1131,7 +1129,13 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				if (schedules.Count == 0)
 					return false;
 
-				await schedules[0].AssignScheduleAsync ([roomId], true, CancellationToken.None).ConfigureAwait (false);
+				if (!await SetRoomAssignedScheduleAsync (roomId, schedules[0].Id).ConfigureAwait (false))
+					return false;
+
+				// The confirmed refresh replaces the room snapshot; use it for the next command.
+				room = _api.Rooms?.GetById (roomId);
+				if (room == null)
+					return false;
 				}
 
 			string? autoMode = FindPreferredRoomMode (room, "Auto", "Scheduled", "Schedule");
@@ -1147,8 +1151,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				await room.SetManualTemperatureAsync (room.CurrentTargetTemperature, CancellationToken.None).ConfigureAwait (false);
 			}
 
-		await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
-		return true;
+		return await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
 		}
 
 	private static string? FindPreferredRoomMode (WiserRoom room, params string[] preferredModes)

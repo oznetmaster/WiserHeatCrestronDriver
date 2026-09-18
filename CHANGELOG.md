@@ -2,6 +2,16 @@
 
 This changelog records shipped features, fixes, compatibility and runtime dependency changes. See [development and validation history](DEVELOPMENT-HISTORY.md) for tests, CI, build tooling and work not yet released.
 
+## 1.3.8 - 2026-09-18
+
+- Keep schedule choices current and retain the confirmed assignment when a selection is invalid, rejected or pending.
+- Preserve unsaved schedule edits during polling, refuse stale saves, refresh displayed editor values and enforce the supported temperature range.
+- Restore room readiness after reconnection and avoid re-registering room controllers during state reads.
+- Require successful follow-up reads for room commands and a confirmed schedule assignment before enabling automatic control. Update WiserHeatAPIv2 to 1.1.1 for schedule failure reporting.
+- Keep action captions visible, use GitHub for public support, and expose driver lifetime and successful hub-refresh diagnostics.
+
+See [release notes](RELEASE-NOTES.md) for validation scope. Submission preparation and CI details remain in [development history](DEVELOPMENT-HISTORY.md).
+
 ## 1.3.7 - 2026-09-16
 
 - Guard schedule selection against overlapping room commands and expose room identity/activity for installed-driver verification.

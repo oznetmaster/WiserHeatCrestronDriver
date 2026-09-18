@@ -81,4 +81,39 @@ public sealed partial class PlatformDiscoveryTests
 		Assert.That (room.SelectedScheduleId, Is.EqualTo (accepted ? "9" : "7"));
 		Assert.That (_transport.ScheduleAssignments, Is.EqualTo (1), "Rejected requests must not be retried.");
 		}
+	[TestCase (false, false, false, false)]
+	[TestCase (true, true, false, false)]
+	[TestCase (true, false, true, false)]
+	[TestCase (true, false, false, true)]
+	public async Task EnableScheduleRequiresConfirmedAssignmentBeforeChangingMode (bool accepted, bool refreshFails, bool ignored, bool expected)
+		{
+		_transport.AcceptScheduleAssignment = accepted;
+		_transport.IgnoreScheduleAssignment = ignored;
+		_transport.AllowRoomCommands = true;
+		_transport.HeatingSchedules = "[{\"id\":9,\"Name\":\"Available schedule\"}]";
+		// The room's old schedule is no longer available, so enabling needs an assignment first.
+		await Refresh ("[{\"id\":4,\"Name\":\"Room\",\"ScheduleId\":7,\"Mode\":\"Manual\",\"CurrentSetPoint\":205}]");
+		_transport.FailScheduleRead = refreshFails;
+		bool result = await _driver.SetRoomScheduleEnabledAsync (4, true);
+		Assert.That (result, Is.EqualTo (expected));
+		Assert.That (_transport.ScheduleAssignments, Is.EqualTo (1));
+		Assert.That (_transport.RoomCommands, Is.EqualTo (expected ? 1 : 0), "Do not change mode when the required assignment has not been confirmed.");
+		}
+
+	[TestCase (false, false, false, false)]
+	[TestCase (true, true, false, false)]
+	[TestCase (true, false, true, false)]
+	[TestCase (true, false, false, true)]
+	public async Task ScheduleAssignmentReportsSuccessOnlyWithConfirmedAssignment (bool accepted, bool refreshFails, bool ignored, bool expected)
+		{
+		_transport.AcceptScheduleAssignment = accepted;
+		_transport.IgnoreScheduleAssignment = ignored;
+		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Assigned\"},{\"id\":9,\"Name\":\"Other\"}]";
+		await Refresh ("[{\"id\":4,\"Name\":\"Room\",\"ScheduleId\":7}]");
+		_transport.FailScheduleRead = refreshFails;
+		bool result = await _driver.SetRoomAssignedScheduleAsync (4, 9);
+		Assert.That (result, Is.EqualTo (expected), "An HTTP acknowledgement is not a confirmed room assignment.");
+		Assert.That (_transport.ScheduleAssignments, Is.EqualTo (1), "No failed or unconfirmed write may be replayed.");
+		Assert.That (Entities["room_4"].SelectedScheduleId, Is.EqualTo (expected ? "9" : "7"));
+		}
 	}

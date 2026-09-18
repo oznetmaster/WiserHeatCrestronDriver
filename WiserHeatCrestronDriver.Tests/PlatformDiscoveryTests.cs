@@ -468,17 +468,28 @@ public sealed partial class PlatformDiscoveryTests
 		Assert.That (room.EditSlot1Time, Is.EqualTo ("07:00"), "Keep the pending edit visible when its save cannot be confirmed.");
 		Assert.That (_transport.ScheduleWrites, Is.EqualTo (failure == "read-before" ? 0 : 1), "Never automatically repeat an uncertain schedule write.");
 		}
-	[TestCase ("boost")]
-	[TestCase ("cancel boost")]
-	[TestCase ("advance schedule")]
-	[TestCase ("disable schedule")]
-	public async Task RoomCommands_RefreshObservedStateInsidePollingInterval (string command)
+	[TestCase ("boost", false)]
+	[TestCase ("boost", true)]
+	[TestCase ("cancel boost", false)]
+	[TestCase ("cancel boost", true)]
+	[TestCase ("advance schedule", false)]
+	[TestCase ("advance schedule", true)]
+	[TestCase ("disable schedule", false)]
+	[TestCase ("disable schedule", true)]
+	[TestCase ("enable schedule", false)]
+	[TestCase ("enable schedule", true)]
+	[TestCase ("adjust setpoint", false)]
+	[TestCase ("adjust setpoint", true)]
+	[TestCase ("set setpoint", false)]
+	[TestCase ("set setpoint", true)]
+	public async Task RoomCommands_RefreshObservedStateInsidePollingInterval (string command, bool refreshFails)
 		{
 		_transport.AllowRoomCommands = true;
 		string origin = command == "cancel boost" ? "FromBoost" : "FromSchedule";
 		await Refresh ("[{\"id\":4,\"Name\":\"Before command\",\"ScheduleId\":7,\"Mode\":\"Auto\",\"CurrentSetPoint\":205,\"SetPointOrigin\":\"" + origin + "\"}]");
 		Set ("_lastScheduleRefreshUtc", DateTimeOffset.UtcNow);
 		int readsBeforeCommand = _transport.DomainReads;
+		_transport.FailScheduleRead = refreshFails;
 		bool accepted;
 		switch (command)
 			{
@@ -489,14 +500,23 @@ public sealed partial class PlatformDiscoveryTests
 			case "advance schedule":
 				accepted = await _driver.AdvanceRoomScheduleAsync (4);
 				break;
+			case "enable schedule":
+				accepted = await _driver.SetRoomScheduleEnabledAsync (4, true);
+				break;
+			case "adjust setpoint":
+				accepted = await _driver.AdjustRoomSetpointAsync (4, 0.5);
+				break;
+			case "set setpoint":
+				accepted = await _driver.SetRoomSetpointAsync (4, 21);
+				break;
 			default:
 				accepted = await _driver.SetRoomScheduleEnabledAsync (4, false);
 				break;
 			}
-		Assert.That (accepted, Is.True);
+		Assert.That (accepted, Is.EqualTo (!refreshFails), "Completion must not report success when its fresh hub read failed.");
 		Assert.That (_transport.RoomCommands, Is.GreaterThan (0));
 		Assert.That (_transport.DomainReads, Is.GreaterThan (readsBeforeCommand));
-		Assert.That (_driver.ManagedDevices["room_4"].Name, Is.EqualTo ("Hub confirmed"), "Command completion must publish the returned hub snapshot.");
+		Assert.That (_driver.ManagedDevices["room_4"].Name, Is.EqualTo (refreshFails ? "Before command" : "Hub confirmed"), "Only a successful hub read may publish the new state.");
 		}
 	[TestCase (false)]
 	[TestCase (true)]
@@ -756,6 +776,7 @@ public sealed partial class PlatformDiscoveryTests
 		internal int ScheduleWrites;
 		internal int ScheduleAssignments;
 		internal bool? AcceptScheduleAssignment;
+		internal bool IgnoreScheduleAssignment;
 		internal bool AllowScheduleWrites;
 		internal bool IgnoreScheduleWrite;
 		internal bool FailScheduleRead;
@@ -774,7 +795,8 @@ public sealed partial class PlatformDiscoveryTests
 					return new HttpResponseMessage (HttpStatusCode.BadRequest) { Content = new StringContent ("{}") };
 				string assignment = await request.Content.ReadAsStringAsync ();
 				Assert.That (assignment, Does.Contain ("\"id\":9"));
-				Rooms = Rooms.Replace ("\"ScheduleId\":7", "\"ScheduleId\":9");
+				if (!IgnoreScheduleAssignment)
+					Rooms = Rooms.Replace ("\"ScheduleId\":7", "\"ScheduleId\":9");
 				return new HttpResponseMessage (HttpStatusCode.NoContent);
 				}
 			if (request.Method.Method == "PATCH" && request.RequestUri.AbsolutePath.EndsWith ("/schedules/Heating/7"))
