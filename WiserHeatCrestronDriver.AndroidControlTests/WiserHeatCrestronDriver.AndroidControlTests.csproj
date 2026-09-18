@@ -27,5 +27,6 @@
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleLayoutIsolation.cs" Link="ScheduleLayoutIsolation.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleRenameIsolation.cs" Link="ScheduleRenameIsolation.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleChoiceScan.cs" Link="ScheduleChoiceScan.cs" />
+    <Compile Include="../WiserHeatCrestronDriver.ControlProbe/SuccessfulRefreshSequence.cs" Link="SuccessfulRefreshSequence.cs" />
   </ItemGroup>
 </Project>

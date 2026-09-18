@@ -11,6 +11,12 @@ See the [product changelog](CHANGELOG.md) for shipped changes. This document pre
 
 <!-- development-history -->
 
+## Unchanged schedule-choice refresh validation - 2026-09-18 (no driver release)
+
+- Added an opt-in read-only Android fixture that keeps the schedule selector open through two observed successful hub refreshes. It verifies the entire option list, original selection, independent hub state and driver lifetime, then confirms navigation and temporary-device cleanup.
+- Added regressions ensuring cached reads, malformed/backwards timestamps and restarted drivers cannot stand in for successful refresh evidence. The real development run passed without hub writes or editor compensation. See [validation status](submission/ValidationStatus.md) for exact-package scope and remaining acceptance work.
+
+
 ## Live schedule-choice validation - 2026-09-18 (no driver release)
 
 - Added explicitly enabled Android cases for a schedule renamed while the Schedule page or selection dialog is already open. Independent hub and driver observations require the original selected ID, updated label, complete option list and full state restoration.

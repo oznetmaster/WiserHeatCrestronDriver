@@ -1,5 +1,11 @@
 # Coverage source review
 
+## Open selector across unchanged refreshes - 18 September 2026
+
+The normal OpenScheduleChoicesSurviveRepeatedUnchangedHubRefreshes case passed on exact Debug1.3.007.0029 using public TestAdapter1.11.0. After observing the complete initial list, it witnessed two strictly advancing successful hub-read markers from the same installed driver lifetime. All16 choices and the original selected ID remained correct after both refreshes, with the selection dialog continuously open.
+
+The evidence audit confirmed matching independent persistent hub schedules and guarded room settings, unchanged editor/selection, no hub writes or editor compensation, observed Home restoration, original inventory/viewport, temporary-child removal, private-settings deletion and released reservations. The private producer copy and installed payload were hash-verified. This establishes the unchanged-list case for the tested candidate and display profile; added/deleted choices, stale-ID rejection, other profiles and final Release acceptance remain separate.
+
 ## Live schedule name changes - 18 September 2026
 
 Both open-page and already-open-dialog rename cases passed on exact Debug1.3.007.0029 using public TestAdapter1.11.0. Each changed only the name of an exclusively assigned schedule through the independent hub API. The running driver and app displayed the new label with the same selected ID; every schedule option was observed. No driver reload or dialog reopening was substituted for the update.

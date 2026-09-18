@@ -138,3 +138,11 @@ The fixture changes only the name of the exclusively assigned schedule through t
 Intents, actual hub readbacks, driver ID/label mappings and Android captures are retained privately. Cleanup restores the original name, full persistent schedules, guarded room settings, editor and Home. Uncertain writes are observed without replay; unrelated edits prevent automatic overwrites and retain the run for reconciliation. Ordinary tests stay offline without a workflow.
 
 This fixture does not establish choice addition/removal, rejection of deleted IDs, unchanged-list behavior across confirmed refresh events, every display profile or final acceptance. Actual completed runs and limitations are recorded in [validation status](../submission/ValidationStatus.md).
+
+### Open choices during unchanged hub refreshes
+
+OpenScheduleChoicesSurviveRepeatedUnchangedHubRefreshes is an opt-in LiveReadOnly case in LiveScheduleChoices. Enable AllowScheduleRefreshObservation, supply one ScheduleSaveRooms binding, its matching Rooms binding and the private ControlHubSettingsPath. No exclusive assignment is needed because this case never writes to the hub or selects another schedule. A workflow requiring this evidence must select the case explicitly and reject skips.
+
+The fixture inspects the complete open choice list, then observes two strictly advancing lastHubRefreshUtc markers from the same driverLifetimeId. These markers represent successful installed-driver hub reads, not elapsed time or cached management responses. After each observed refresh it compares the independent hub schedules, guarded room settings, driver ID/label mapping, selected ID and complete rendered options without reopening the dialog. It then returns to Home and verifies unchanged state. Private evidence records the markers and each complete list scan; stale markers time out, backwards or malformed markers and changed lifetimes fail. No hub writes or editor compensation commands are part of this case.
+
+This is separate from name mutation, added/deleted choices and final candidate acceptance. See [validation status](../submission/ValidationStatus.md) for actual runs and their scope.

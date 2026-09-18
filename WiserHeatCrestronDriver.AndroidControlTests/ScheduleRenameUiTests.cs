@@ -168,18 +168,18 @@ public sealed partial class GatewayUiTests
 				}
 			}
 
-		private async Task CaptureRenamedChoicesAsync (string[] labels, string selected, CancellationToken token)
+		private async Task CaptureRenamedChoicesAsync (string[] labels, string selected, CancellationToken token, string phase = "renamed-options")
 			{
 			var scan = new ScheduleChoiceScan (labels, selected);
 			for (int viewport = 0; viewport < 128; viewport++)
 				{
 				IReadOnlyList<AndroidSelectionOption> current = [];
-				await Session.CaptureAsync (check + ".renamed-options-" + viewport, h =>
+				await Session.CaptureAsync (check + "." + phase + "-" + viewport, h =>
 					{
 					current = CrestronHomeExtensionPages.ReadSelectionOptions (CrestronHomeExtensionPages.RequireSelection (h, RenameTitles));
 					}, token);
 				var action = scan.Observe (current.Select (option => new ScheduleChoiceValue (option.Label, option.Selected)).ToArray ());
-				await RecordAsync ("renamed-options-" + viewport, new { Options = current, Action = action.ToString () });
+				await RecordAsync (phase + "-" + viewport, new { Options = current, Action = action.ToString () });
 				if (action == ScheduleChoiceScanAction.Complete) return;
 				var hierarchy = await Session.Device.CaptureAsync (token);
 				RenameDialog (hierarchy);
@@ -190,7 +190,7 @@ public sealed partial class GatewayUiTests
 				int start = container.Top + (container.Bottom - container.Top) * 3 / 4;
 				int end = container.Top + (container.Bottom - container.Top) / 4;
 				if (action == ScheduleChoiceScanAction.ScrollUp) (start, end) = (end, start);
-				await RecordAsync ("rename-scroll-" + viewport, new { X = x, Start = start, End = end, Direction = action.ToString () });
+				await RecordAsync ("scroll-" + phase + "-" + viewport, new { X = x, Start = start, End = end, Direction = action.ToString () });
 				AndroidWorkflowSession.VerifyContext (Session.Context);
 				token.ThrowIfCancellationRequested ();
 				var profile = Session.Context.Profile;
