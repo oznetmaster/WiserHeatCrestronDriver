@@ -1,5 +1,9 @@
 # Development and validation history
 
+## Candidate 1.3.11 schedule mode validation - 18 September 2026
+
+The unchanged candidate passed an Auto → Manual → Auto cycle on the selected room. Its saved manual target was already present and equal to the scheduled target. Independent hub and Home observations, two completed driver commands and the original room policy were audited; no new manual target was initialized. The temporary child was removed, inventory and viewport preserved, private inputs deleted and reservations released. All 178 retained producer files and ten capture pairs matched their pins. Two rendered Schedule-page screenshots showed readable identity, status and the appropriate Enable/Disable action. Other manual-target variants, layouts and complete official-plan coverage remain separate work. No driver package or public release changed.
+
 ## Candidate 1.3.11 Celsius temperature revalidation - 18 September 2026
 
 The previously interrupted Celsius native temperature case passed in a fresh filtered run using the same candidate. Pre-execution discovery confirmed exactly the intended case; Boost was not repeated. Original policy, Home, inventory, owned-child removal, private-input deletion and reservation release were audited against the complete retained producer inventory. The original failed capture remains historical evidence; its cause was not reproduced or attributed to a shared Android-library defect.
