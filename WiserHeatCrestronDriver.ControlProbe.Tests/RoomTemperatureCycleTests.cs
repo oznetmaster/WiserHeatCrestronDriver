@@ -68,6 +68,13 @@ public sealed class RoomTemperatureCycleTests
 		public Task<RoomTemperatureSnapshot> ReadAsync (CancellationToken token)
 			{
 			token.ThrowIfCancellationRequested ();
+			if (Behavior == "capture-throws" && Inputs.Count != 0)
+				throw new IOException ("Synthetic unavailable Android capture.");
+			return Task.FromResult (State);
+			}
+		public Task<RoomTemperatureSnapshot> ReadRestorationAsync (CancellationToken token)
+			{
+			token.ThrowIfCancellationRequested ();
 			return Task.FromResult (State);
 			}
 		public Task RecordAsync (string phase, object value)
@@ -77,7 +84,7 @@ public sealed class RoomTemperatureCycleTests
 			Records.Add (phase);
 			return Task.CompletedTask;
 			}
-		private double Displayed (int raw) => State.TemperatureUnits == "Fahrenheit" ? raw * 0.18d + 32d : raw / 10d;
+		private double Displayed (int raw) => raw == -200 ? -20 : State.TemperatureUnits == "Fahrenheit" ? raw * 0.18d + 32d : raw / 10d;
 		private void RestoreRoom ()
 			{
 			State = Edit (State, d => d["Room"]![0] = JsonNode.Parse (_originalRoom!.Value.GetRawText ())) with
@@ -98,7 +105,8 @@ public sealed class RoomTemperatureCycleTests
 			else
 				{
 				bool boost = action == RoomTemperatureAction.BoostOn;
-				int target = RoomTemperatureRestoration.Room (State.Gateway.Hub, 9).GetProperty ("CurrentSetPoint").GetInt32 () + (boost ? 20 : action == RoomTemperatureAction.Raise ? 5 : -5);
+				int target = action == RoomTemperatureAction.PrepareOff ? -200 : action == RoomTemperatureAction.ResumeHeating ? 50 :
+					RoomTemperatureRestoration.Room (State.Gateway.Hub, 9).GetProperty ("CurrentSetPoint").GetInt32 () + (boost ? 20 : action == RoomTemperatureAction.Raise ? 5 : -5);
 				State = Edit (State, d =>
 					{
 						var room = d["Room"]![0]!;
@@ -120,7 +128,7 @@ public sealed class RoomTemperatureCycleTests
 				{
 				Activity = State.Activity with
 					{
-					Completed = State.Activity.Completed + 1
+					Completed = State.Activity.Completed + (action == RoomTemperatureAction.PrepareOff ? 0 : 1)
 					},
 				Gateway = State.Gateway with
 					{
@@ -306,7 +314,48 @@ public sealed class RoomTemperatureCycleTests
 		Assert.That (session.Inputs.Count, Is.EqualTo (behavior == "lost-input" ? 1 : 2));
 		Assert.That (session.Restores, Is.EqualTo (new[] { 0 }));
 		}
-	[TestCase ("not-delivered"), TestCase ("foreign"), TestCase ("away"), TestCase ("restart"), TestCase ("concurrent"), TestCase ("stale"), TestCase ("ui-disagrees")]
+	[TestCase ("Celsius", 18d, "ui-disagrees"), TestCase ("Fahrenheit", 64.4d, "ui-disagrees")]
+	[TestCase ("Celsius", 18d, "capture-throws"), TestCase ("Fahrenheit", 64.4d, "capture-throws")]
+	public async Task DisplayFailureStillRestoresIndependentlyProvenDelivery (string units, double target, string behavior)
+		{
+		var session = new Session { Behavior = behavior };
+		session.State = session.State with { TemperatureUnits = units, HomeTarget = target };
+		var original = session.State;
+		var result = await Run (session);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs.Count, Is.EqualTo (1));
+		Assert.That (session.Restores, Is.EqualTo (new[] { 0 }));
+		RoomTemperatureRestoration.RequireRestored (RoomTemperatureRestoration.Capture (RoomTemperatureRestoration.Room (original.Gateway.Hub, 9)), RoomTemperatureRestoration.Room (session.State.Gateway.Hub, 9));
+		Assert.That (session.Records, Does.Contain ("physical-restored"));
+		Assert.That (session.Records, Does.Not.Contain ("restored"));
+		}
+	[TestCase (false, "Celsius", 18d), TestCase (true, "Celsius", 18d)]
+	[TestCase (false, "Fahrenheit", 64.4d), TestCase (true, "Fahrenheit", 64.4d)]
+	public async Task PreparedOffAndSingleResumeRestoreOriginalPolicy (bool manual, string units, double target)
+		{
+		var session = new Session (manual);
+		session.State = session.State with { TemperatureUnits = units, HomeTarget = target };
+		var original = session.State;
+		var result = await RoomTemperatureCycle.RunOffAsync (session, TimeSpan.FromMilliseconds (500), CancellationToken.None);
+		Assert.That (result.Passed && result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs, Is.EqualTo (new[] { RoomTemperatureAction.PrepareOff, RoomTemperatureAction.ResumeHeating }));
+		Assert.That (session.State.Activity.Completed, Is.EqualTo (1), "Direct hub preparation must not be mistaken for a driver command.");
+		Assert.That (session.State.HomeTarget, Is.EqualTo (target).Within (0.00001));
+		RoomTemperatureRestoration.RequireRestored (RoomTemperatureRestoration.Capture (RoomTemperatureRestoration.Room (original.Gateway.Hub, 9)), RoomTemperatureRestoration.Room (session.State.Gateway.Hub, 9));
+		}
+	[TestCase ("lost-input"), TestCase ("ui-disagrees"), TestCase ("capture-throws")]
+	public async Task FailureAfterOffPreparationRestoresWithoutSendingResume (string behavior)
+		{
+		var session = new Session { Behavior = behavior };
+		var result = await RoomTemperatureCycle.RunOffAsync (session, TimeSpan.FromMilliseconds (250), CancellationToken.None);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs, Is.EqualTo (new[] { RoomTemperatureAction.PrepareOff }));
+		Assert.That (session.Restores, Is.EqualTo (new[] { 0 }));
+		Assert.That (session.State.HomeTarget, Is.EqualTo (18));
+		}
+	[TestCase ("not-delivered"), TestCase ("foreign"), TestCase ("away"), TestCase ("restart"), TestCase ("concurrent"), TestCase ("stale")]
 	public async Task UnattributableStateNeverAuthorizesCompensation (string behavior)
 		{
 		var session = new Session { Behavior = behavior };

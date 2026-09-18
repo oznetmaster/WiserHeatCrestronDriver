@@ -23,14 +23,20 @@ public sealed partial class GatewayUiTests
 			{
 			get; init;
 			}
+		public bool AllowNativeThermostatOffControl { get; init; }
 		}
 
 	[TestCase (false), TestCase (true), Category ("LiveControl")]
-	public async Task NativeThermostatInputsChangeHubAndRestorePolicy (bool boost)
+	public Task NativeThermostatInputsChangeHubAndRestorePolicy (bool boost) => RunNativeControlAsync (boost, off: false);
+
+	[Test, Category ("LiveControl")]
+	public Task NativeThermostatOffResumeRestoresPolicy () => RunNativeControlAsync (boost: false, off: true);
+
+	private async Task RunNativeControlAsync (bool boost, bool off)
 		{
 		Assert.That (_nameRestored && _roomStatePreserved, Is.True, "Earlier restoration must be reconciled before more controls.");
-		if (!_settings!.AllowNativeThermostatControl)
-			Assert.Ignore ("Explicitly enable native thermostat temperature and boost controls.");
+		if (off ? !_settings!.AllowNativeThermostatOffControl : !_settings!.AllowNativeThermostatControl)
+			Assert.Ignore ("Explicitly enable the selected native thermostat control scope.");
 		if (_settings.ControlRooms.Length != 1 || string.IsNullOrWhiteSpace (_settings.ControlHubSettingsPath) || !Path.IsPathFullyQualified (_settings.ControlHubSettingsPath))
 			throw new InvalidDataException ("One explicit room and absolute private hub settings are required.");
 		var hub = JsonSerializer.Deserialize<HubSettings> (File.ReadAllText (_settings.ControlHubSettingsPath), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
@@ -43,11 +49,12 @@ public sealed partial class GatewayUiTests
 		var binding = _settings.Rooms.Single (r => r.DeviceId == control.DeviceId);
 		using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (15));
 		var original = await ReadRoomAsync (binding, timeout.Token);
-		string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + (boost ? ".native-boost" : ".native-setpoint");
+		string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + (off ? ".native-off" : boost ? ".native-boost" : ".native-setpoint");
 		await _navigation!.InspectRoomExtensionPagesAsync (check, binding.RoomName, original.Name!, binding.PageTitle, async (_, token) =>
 			{
 				var session = new NativeTemperatureSession (this, hub, http, binding, control, original, check);
-				var result = await RoomTemperatureCycle.RunAsync (session, boost, TimeSpan.FromMinutes (3), token);
+				var result = off ? await RoomTemperatureCycle.RunOffAsync (session, TimeSpan.FromMinutes (3), token)
+					: await RoomTemperatureCycle.RunAsync (session, boost, TimeSpan.FromMinutes (3), token);
 				_roomStatePreserved = result.RestorationConfirmed;
 				await session.RecordAsync ("result", result);
 				Assert.That (result.Passed, Is.True, result.Detail);
@@ -75,12 +82,28 @@ public sealed partial class GatewayUiTests
 			_ => throw new InvalidDataException ("Native controls require explicit Celsius or Fahrenheit units.")
 			};
 		private string Formatted (double value) => value.ToString ("0.0", CultureInfo.InvariantCulture) + (TemperatureUnits == "Celsius" ? "°C" : "°F");
+		private string MinimumLabel => TemperatureUnits == "Celsius" ? "Set to 5°C" : "Set to 41°F";
 		private bool DisplayMatches (AndroidHierarchy hierarchy, double target, bool boost)
 			{
 			var page = Page (hierarchy);
-			var row = CrestronHomePages.ReadStatusAndButton (page, "Boost");
-			return page.RequireUnique (Target).Text == Formatted (target) && row.Enabled &&
-				string.Equals (row.Status, boost ? "Boost Active" : "Boost Off", StringComparison.OrdinalIgnoreCase) && row.Action == (boost ? "Boost Off" : "Boost On");
+			try
+				{
+				var row = CrestronHomePages.ReadStatusAndButton (page, "Boost");
+				bool boostMatches = row.Enabled && string.Equals (row.Status, boost ? "Boost Active" : "Boost Off", StringComparison.OrdinalIgnoreCase) &&
+					row.Action == (boost ? "Boost Off" : "Boost On");
+				if (target != -20)
+					return boostMatches && page.RequireUnique (Target).Text == Formatted (target);
+				var offRow = CrestronHomePages.ReadStatusAndButton (page, original.PropertyValues["deviceLabel"].GetString () + " Wiser Thermostat");
+				page.RequireAbsent (Target);
+				page.RequireAbsent (CrestronHomePages.Resource ("customdevice_thermostat_heatPlus"));
+				page.RequireAbsent (CrestronHomePages.Resource ("customdevice_thermostat_heatMinus"));
+				return boostMatches && offRow.Enabled && offRow.Status.Equals ("Off", StringComparison.OrdinalIgnoreCase) && offRow.Action == MinimumLabel;
+				}
+			catch (InvalidOperationException)
+				{
+				// UI and configuration arrive independently. A mismatch permits another read, never an input.
+				return false;
+				}
 			}
 		private async Task<JsonElement> ReadHub (string group, CancellationToken token)
 			{
@@ -89,7 +112,9 @@ public sealed partial class GatewayUiTests
 			using var data = JsonDocument.Parse (await response.Content.ReadAsStringAsync (token));
 			return data.RootElement.Clone ();
 			}
-		public async Task<RoomTemperatureSnapshot> ReadAsync (CancellationToken token)
+		public Task<RoomTemperatureSnapshot> ReadAsync (CancellationToken token) => ReadCoreAsync (token, observeUi: true);
+		public Task<RoomTemperatureSnapshot> ReadRestorationAsync (CancellationToken token) => ReadCoreAsync (token, observeUi: false);
+		private async Task<RoomTemperatureSnapshot> ReadCoreAsync (CancellationToken token, bool observeUi)
 			{
 			AndroidWorkflowSession.VerifyContext (Session.Context);
 			var before = await fixture.ReadRoomAsync (fixture._processor!, binding, token);
@@ -105,13 +130,14 @@ public sealed partial class GatewayUiTests
 					room.PropertyValues["controlDeviceId"].GetString () != physical + "/room/" + roomId.ToString (CultureInfo.InvariantCulture) ||
 					room.PropertyValues["temperatureUnits"].GetString () != TemperatureUnits)
 					throw new InvalidDataException ("Native controls require the unchanged, explicitly bound thermostat and temperature units.");
-			var hierarchy = await Session.Device.CaptureAsync (token);
+			var hierarchy = observeUi ? await Session.Device.CaptureAsync (token) : null;
 			double target = after.PropertyValues["targetTemperature"].GetDouble ();
 			bool boost = after.PropertyValues["isBoostActive"].GetBoolean ();
 			bool stable = Activity (before) == Activity (after) && before.PropertyValues["targetTemperature"].GetDouble () == target && before.PropertyValues["isBoostActive"].GetBoolean () == boost;
+			bool offPropertiesAgree = !observeUi || after.PropertyValues["isHeatingOff"].GetBoolean () == (target == -20) && after.PropertyValues["hasHeatingTarget"].GetBoolean () == (target != -20);
 			var state = new RoomTemperatureSnapshot (new (physical, gateway.PropertyValues["driverLifetimeId"].GetString ()!,
 				SuccessfulRefreshSequence.ParseTimestamp (gateway.PropertyValues["lastHubRefreshUtc"].GetString ()!), new (schedules, domain),
-				gateway.PropertyValues["awayModeIsEnabled"].GetBoolean (), true), roomId, Activity (after), target, boost, stable && DisplayMatches (hierarchy, target, boost))
+				gateway.PropertyValues["awayModeIsEnabled"].GetBoolean (), true), roomId, Activity (after), target, boost, stable && offPropertiesAgree && hierarchy != null && DisplayMatches (hierarchy, target, boost))
 				{
 				TemperatureUnits = TemperatureUnits
 				};
@@ -162,8 +188,26 @@ public sealed partial class GatewayUiTests
 			RoomTemperatureRestoration.RequireGuarded (_plan, _original.Gateway, current.Gateway);
 			if (current.Activity != _intent.Activity || current.HomeTarget != _intent.HomeTarget || current.HomeBoost != _intent.HomeBoost || !current.UiMatches)
 				throw new InvalidDataException ("State changed after the control intent; input was not repeated.");
+			if (action == RoomTemperatureAction.PrepareOff)
+				{
+				if (!fixture._settings!.AllowNativeThermostatOffControl || _inputs != 0)
+					throw new InvalidOperationException ("Off preparation requires its separate authorization and a fresh first input.");
+				_inputs++;
+				var request = JsonSerializer.SerializeToElement (new { RequestOverride = new { Type = "Manual", SetPoint = -200 } });
+				await RecordAsync ("prepare-off-http-intent", new { _plan.RoomId, Request = request });
+				using var message = new HttpRequestMessage (HttpMethod.Patch, "http://" + hub.HubHost + "/data/v2/domain/Room/" + _plan.RoomId.ToString (CultureInfo.InvariantCulture))
+					{
+					Content = new StringContent (request.GetRawText (), Encoding.UTF8, "application/json")
+					};
+				using var response = await http.SendAsync (message, token);
+				await RecordAsync ("prepare-off-http-response", new { Status = (int)response.StatusCode });
+				response.EnsureSuccessStatusCode ();
+				_intent = null;
+				return;
+				}
 			bool boost = action is RoomTemperatureAction.BoostOn or RoomTemperatureAction.BoostOff;
-			var selector = boost ? Text (action == RoomTemperatureAction.BoostOn ? "Boost On" : "Boost Off")
+			var selector = action == RoomTemperatureAction.ResumeHeating ? Text (MinimumLabel)
+				: boost ? Text (action == RoomTemperatureAction.BoostOn ? "Boost On" : "Boost Off")
 				: CrestronHomePages.Resource (action == RoomTemperatureAction.Raise ? "customdevice_thermostat_heatPlus" : "customdevice_thermostat_heatMinus");
 			void Guard (AndroidHierarchy hierarchy)
 				{
@@ -186,7 +230,7 @@ public sealed partial class GatewayUiTests
 			if (_plan == null || _original == null || plan.RoomId != _plan.RoomId || index < 0 || index >= _plan.Requests.Length ||
 				!JsonElement.DeepEquals (request, _plan.Requests[index]) || _restores.Contains (index))
 				throw new InvalidDataException ("Compensation must match the captured plan and must not be repeated.");
-			RoomTemperatureRestoration.RequireGuarded (_plan, _original.Gateway, (await ReadAsync (token)).Gateway);
+			RoomTemperatureRestoration.RequireGuarded (_plan, _original.Gateway, (await ReadRestorationAsync (token)).Gateway);
 			await RecordAsync ("restore-http-" + index + "-intent", new
 				{
 				plan.RoomId,

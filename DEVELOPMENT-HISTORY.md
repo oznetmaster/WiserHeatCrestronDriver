@@ -1,5 +1,11 @@
 # Development and validation history
 
+## Candidate 1.3.11 Off/resume and display-failure restoration - 18 September 2026
+
+The Celsius Off/resume case passed against the unchanged candidate. It prepared Off on the independently bound hub room, verified that native target controls were hidden and the explicit resume action was visible, used one Set to 5 C action, then restored and independently verified the original Auto policy. Home, temporary-child removal, inventory preservation, private-input deletion and reservation release were verified. The initial attempt caught a UI/configuration observation race and restored safely; that failure is retained separately. The corrected fixture waits for observations to agree without replaying input.
+
+Physical recovery now uses independent hub observations when screen inspection fails, while preserving device identity, command attribution and household isolation checks. A failed final display assertion remains a failed test even when physical restoration succeeds. The focused and complete offline regression suites passed; Android fixtures built without warnings or errors. No driver package or public release changed. These cases do not establish the remaining manual/Fahrenheit Off variants or complete submission acceptance.
+
 ## Candidate 1.3.11 Fahrenheit controls and configuration restoration - 18 September 2026
 
 The unchanged candidate passed both selected native Fahrenheit temperature and Boost cases. A guarded configuration cycle changed only the display-unit setting, verified preservation of the other saved values, then independently restored the complete original Celsius configuration after physical-control restoration and temporary-child cleanup. The producer inventory contained 177 files. Original hub policy, Home, inventory, private-settings deletion and reservation release were audited. The two reviewed 1080x2400 screenshots show readable Fahrenheit values and controls; exact gauge calibration and other layouts remain separate.

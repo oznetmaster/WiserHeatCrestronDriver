@@ -4,6 +4,16 @@ This separately selected NUnit project includes the existing Android inspections
 
 The original `WiserHeatCrestronDriver.AndroidTests` project remains read-only apart from its optional restored name challenge. Selecting that project never includes these control cases. Neither project connects to Android or a processor during ordinary desktop test runs; all fixtures skip without the workflow context.
 
+## Native thermostat controls
+
+For writable native controls, select `NativeThermostatInputsChangeHubAndRestorePolicy` and enable `AllowNativeThermostatControl` in the private settings. Its two cases exercise a temperature increase/decrease and Boost On/Off. They require exactly one `ControlRooms` binding, its matching `Rooms` binding and `ControlHubSettingsPath`. The room must start with an ordinary Auto or Manual policy and no active override. Saved manual state, including an absent value in Auto mode, must be preserved. Celsius and Fahrenheit displays are compared with the hub's raw Celsius values; changing units during a case stops it.
+
+`NativeThermostatOffResumeRestoresPolicy` requires the separate `AllowNativeThermostatOffControl` flag and the same bindings. It deliberately prepares Off with one direct hub request, waits for the Off UI, then presses the displayed Set to 5 C or Set to 41 F action once. It verifies physical feedback and restores the original policy. This is a test of resuming from prepared Off, not a test of a nonexistent native Off button. Existing active overrides are not replaced by either fixture.
+
+These cases preserve physical state using independent hub observations even if the screen cannot be read. Missing or inconsistent UI during a bounded observation can be read again; input commands are never automatically repeated. Unproven command delivery or foreign state prevents automatic compensation. Physical restoration does not turn a failed UI assertion into a pass. The workflow must retain its reservations when restoration remains unconfirmed.
+
+The Celsius Auto Off/resume case and both Fahrenheit native-control cases have passed on the submission candidate. Other starting-state/unit variants still require their own validation; compiling a fixture is not evidence that every variant passed.
+
 ## Read-only native thermostat temperatures
 
 `NativeThermostatTemperaturesMatchHubAndReturnHome` is tagged `LiveReadOnly`. Select this exact test and set `"AllowThermostatTemperatureObservation": true` in the private UI settings, with the existing `Rooms`, `ControlRooms` and `ControlHubSettingsPath` bindings. It reads the hub directly and compares its current temperature and heating target with both the processor properties and the native Android thermostat labels. It sends no heating, mode, boost or schedule commands. Selecting the whole control project also selects its separate control tests; use an explicit test filter for a read-only run.

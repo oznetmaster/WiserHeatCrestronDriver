@@ -8,7 +8,7 @@ namespace WiserHeatCrestronDriver.ControlProbe;
 
 public enum RoomTemperatureAction
 	{
-	Raise, Lower, BoostOn, BoostOff
+	Raise, Lower, BoostOn, BoostOff, PrepareOff, ResumeHeating
 	}
 public sealed record RoomTemperatureActivity (string Epoch, long Completed, int Pending);
 public sealed record RoomTemperatureSnapshot (GatewayAwaySnapshot Gateway, int RoomId, RoomTemperatureActivity Activity,
@@ -21,12 +21,13 @@ public sealed record RoomTemperatureResult (bool Passed, bool RestorationConfirm
 public interface IRoomTemperatureSession
 	{
 	Task<RoomTemperatureSnapshot> ReadAsync (CancellationToken token);
+	Task<RoomTemperatureSnapshot> ReadRestorationAsync (CancellationToken token) => ReadAsync (token);
 	Task RecordAsync (string phase, object value);
 	Task InputAsync (RoomTemperatureAction action, CancellationToken token);
 	Task RestoreAsync (int index, RoomTemperatureRestorePlan plan, JsonElement request, CancellationToken token);
 	}
 
-/// <summary>One native increase/decrease pair or Boost On/Off pair, with independent policy restoration.</summary>
+/// <summary>Native setpoint, Boost, or prepared Off/resume controls, with independent policy restoration.</summary>
 public static class RoomTemperatureCycle
 	{
 	private static JsonElement Room (RoomTemperatureSnapshot snapshot) => RoomTemperatureRestoration.Room (snapshot.Gateway.Hub, snapshot.RoomId);
@@ -36,10 +37,10 @@ public static class RoomTemperatureCycle
 	private static double RawTarget (RoomTemperatureSnapshot snapshot) => snapshot.TemperatureUnits switch
 		{
 		"Celsius" => snapshot.HomeTarget * 10,
-		"Fahrenheit" => (snapshot.HomeTarget - 32) / 0.18d,
+		"Fahrenheit" => snapshot.HomeTarget == -20 ? -200 : (snapshot.HomeTarget - 32) / 0.18d,
 		_ => double.NaN
 		};
-	private static bool Restored (RoomTemperatureRestorePlan plan, RoomTemperatureSnapshot snapshot)
+	private static bool Restored (RoomTemperatureRestorePlan plan, RoomTemperatureSnapshot snapshot, bool verifyUi = true)
 		{
 		try
 			{
@@ -47,18 +48,23 @@ public static class RoomTemperatureCycle
 			}
 		catch (InvalidDataException) { return false; }
 		catch (NotSupportedException) { return false; }
-		return Agrees (snapshot) && !snapshot.HomeBoost;
+		return !verifyUi || Agrees (snapshot) && !snapshot.HomeBoost;
 		}
-	public static async Task<RoomTemperatureResult> RunAsync (IRoomTemperatureSession session, bool boost, TimeSpan timeout, CancellationToken token)
+	public static Task<RoomTemperatureResult> RunAsync (IRoomTemperatureSession session, bool boost, TimeSpan timeout, CancellationToken token) =>
+		RunCoreAsync (session, boost, false, timeout, token);
+	public static Task<RoomTemperatureResult> RunOffAsync (IRoomTemperatureSession session, TimeSpan timeout, CancellationToken token) =>
+		RunCoreAsync (session, false, true, timeout, token);
+	private static async Task<RoomTemperatureResult> RunCoreAsync (IRoomTemperatureSession session, bool boost, bool off, TimeSpan timeout, CancellationToken token)
 		{
 		if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromMinutes (3))
 			throw new ArgumentOutOfRangeException (nameof (timeout));
 		RoomTemperatureSnapshot? original = null;
 		RoomTemperatureRestorePlan? plan = null;
-		int submitted = 0;
+		int submitted = 0, commands = 0;
 		bool attempted = false, passed = false, restored = true;
 		string detail = "Preflight failed before any room control input.";
 		Func<RoomTemperatureSnapshot, bool>? requested = null;
+		Func<RoomTemperatureSnapshot, bool>? delivered = null;
 		DateTimeOffset requestedAfter = default;
 		var elapsed = new Stopwatch ();
 		void Guard (RoomTemperatureSnapshot value)
@@ -66,22 +72,22 @@ public static class RoomTemperatureCycle
 			RoomTemperatureRestoration.RequireGuarded (plan!, original!.Gateway, value.Gateway);
 			if (value.RoomId != original.RoomId || value.TemperatureUnits != original.TemperatureUnits ||
 				value.Activity.Epoch != original.Activity.Epoch || value.Activity.Pending < 0 ||
-				value.Activity.Completed < original.Activity.Completed || value.Activity.Completed > original.Activity.Completed + submitted)
+				value.Activity.Completed < original.Activity.Completed || value.Activity.Completed > original.Activity.Completed + commands)
 				throw new InvalidDataException ("Room identity, temperature units, command lifetime or attribution changed.");
 			}
-		async Task<RoomTemperatureSnapshot> Wait (Func<RoomTemperatureSnapshot, bool> predicate, DateTimeOffset after, CancellationToken ct)
+		async Task<RoomTemperatureSnapshot> Wait (Func<RoomTemperatureSnapshot, bool> predicate, DateTimeOffset after, CancellationToken ct, bool independent = false)
 			{
 			int matches = 0;
 			var last = after;
 			while (true)
 				{
 				ct.ThrowIfCancellationRequested ();
-				var value = await session.ReadAsync (ct);
+				var value = independent ? await session.ReadRestorationAsync (ct) : await session.ReadAsync (ct);
 				Guard (value);
 				if (value.Gateway.RefreshUtc < last)
 					throw new InvalidDataException ("Refresh evidence moved backwards.");
 				last = value.Gateway.RefreshUtc;
-				bool ready = value.Activity.Pending == 0 && value.Activity.Completed == original!.Activity.Completed + submitted;
+				bool ready = value.Activity.Pending == 0 && value.Activity.Completed == original!.Activity.Completed + commands;
 				matches = ready && value.Gateway.RefreshUtc > after && predicate (value) ? matches + 1 : 0;
 				if (matches == 2)
 					return value;
@@ -93,7 +99,7 @@ public static class RoomTemperatureCycle
 		try
 			{
 			original = await session.ReadAsync (deadline.Token);
-			await session.RecordAsync ("preflight", new { Snapshot = original, Boost = boost });
+			await session.RecordAsync ("preflight", new { Snapshot = original, Boost = boost, Off = off });
 			plan = RoomTemperatureRestoration.Capture (Room (original));
 			if (!Guid.TryParseExact (original.Activity.Epoch, "N", out _) || original.Activity.Pending != 0 ||
 				original.Activity.Completed < 0 || original.Activity.Completed > long.MaxValue - 2 || !Restored (plan, original))
@@ -113,18 +119,20 @@ public static class RoomTemperatureCycle
 			if (start is < 50 or > 300)
 				throw new InvalidDataException ("Native temperature testing requires a restorable target within 5–30°C.");
 			int delta = start <= 295 ? 5 : -5;
-			RoomTemperatureAction[] actions = boost ? [RoomTemperatureAction.BoostOn, RoomTemperatureAction.BoostOff]
+			RoomTemperatureAction[] actions = off ? [RoomTemperatureAction.PrepareOff, RoomTemperatureAction.ResumeHeating]
+				: boost ? [RoomTemperatureAction.BoostOn, RoomTemperatureAction.BoostOff]
 				: delta > 0 ? [RoomTemperatureAction.Raise, RoomTemperatureAction.Lower] : [RoomTemperatureAction.Lower, RoomTemperatureAction.Raise];
 			foreach (var action in actions)
 				{
-				int target = submitted == 0 ? start + delta : start;
-				requested = boost
+				int target = off ? submitted == 0 ? -200 : 50 : submitted == 0 ? start + delta : start;
+				delivered = boost
 					? action == RoomTemperatureAction.BoostOn
-						? value => Agrees (value) && value.HomeBoost && Room (value).GetProperty ("OverrideTimeoutUnixTime").GetInt64 () > DateTimeOffset.UtcNow.ToUnixTimeSeconds ()
-						: value => Restored (plan, value)
-					: value => Agrees (value) && Room (value).GetProperty ("CurrentSetPoint").GetInt32 () == target &&
+						? value => RoomTemperatureRestoration.Origin (Room (value)) == "FromBoost" && Room (value).GetProperty ("OverrideTimeoutUnixTime").GetInt64 () > DateTimeOffset.UtcNow.ToUnixTimeSeconds ()
+						: value => Restored (plan, value, verifyUi: false)
+					: value => Room (value).GetProperty ("CurrentSetPoint").GetInt32 () == target &&
 						(plan.Scheduled ? Room (value).GetProperty ("OverrideType").GetString () == "Manual"
 							: RoomTemperatureRestoration.Origin (Room (value)) == "FromManualMode" && ScheduleObservation.ManualTarget (Room (value)) == target);
+				requested = value => Agrees (value) && delivered (value);
 				await session.RecordAsync ("input-" + (submitted + 1) + "-intent", new
 					{
 					Action = action,
@@ -134,6 +142,8 @@ public static class RoomTemperatureCycle
 				deadline.Token.ThrowIfCancellationRequested ();
 				requestedAfter = current.Gateway.RefreshUtc;
 				submitted++;
+				if (action != RoomTemperatureAction.PrepareOff)
+					commands++;
 				attempted = true;
 				restored = false;
 				elapsed.Restart ();
@@ -161,21 +171,21 @@ public static class RoomTemperatureCycle
 			}
 		finally
 			{
-			if (attempted && plan != null && original != null && requested != null)
+			if (attempted && plan != null && original != null && delivered != null)
 				{
 				using var cleanup = new CancellationTokenSource (timeout * 3);
 				try
 					{
 					// Observe delivery before compensation, even if input acknowledgement was lost. Never repeat the input.
-					var current = await Wait (requested, requestedAfter, cleanup.Token);
-					if (!Restored (plan, current))
+					var current = await Wait (delivered, requestedAfter, cleanup.Token, independent: true);
+					if (!Restored (plan, current, verifyUi: false))
 						{
 						int index = 0;
 						foreach (var request in plan.Requests)
 							{
 							bool cancel = request.GetProperty ("RequestOverride").GetProperty ("Type").GetString () == "None";
-							bool Done (RoomTemperatureSnapshot value) => cancel ? Restored (plan, value)
-								: Agrees (value) && ScheduleObservation.ManualTarget (Room (value)) == plan.ManualTarget && Room (value).GetProperty ("CurrentSetPoint").GetInt32 () == plan.ManualTarget;
+							bool Done (RoomTemperatureSnapshot value) => cancel ? Restored (plan, value, verifyUi: false)
+								: ScheduleObservation.ManualTarget (Room (value)) == plan.ManualTarget && Room (value).GetProperty ("CurrentSetPoint").GetInt32 () == plan.ManualTarget;
 							await session.RecordAsync ("restore-" + index + "-intent", new
 								{
 								Snapshot = current,
@@ -194,7 +204,7 @@ public static class RoomTemperatureCycle
 									Exception = failure.ToString ()
 									});
 								}
-							current = await Wait (Done, after, cleanup.Token);
+							current = await Wait (Done, after, cleanup.Token, independent: true);
 							await session.RecordAsync ("restore-" + index + "-observed", new
 								{
 								Snapshot = current
@@ -202,21 +212,26 @@ public static class RoomTemperatureCycle
 							index++;
 							}
 						}
-					await session.RecordAsync ("restored", new
+					await session.RecordAsync ("physical-restored", new
 						{
 						Snapshot = current
 						});
 					restored = true;
-					detail = passed ? "Both UI inputs and original room policy were independently confirmed, with household settings preserved."
+					using var display = CancellationTokenSource.CreateLinkedTokenSource (cleanup.Token);
+					display.CancelAfter (timeout);
+					current = await Wait (value => Restored (plan, value), requestedAfter, display.Token);
+					await session.RecordAsync ("restored", new { Snapshot = current });
+					detail = passed ? "The selected controls and original room policy were independently confirmed, with household settings preserved."
 						: "The test failed; original room policy was restored without replaying the uncertain input.";
 					}
 				catch (Exception failure)
 					{
 					passed = false;
-					detail = "Room restoration is unconfirmed. Retain reservations and reconcile the journal.";
+					detail = restored ? "Original physical policy was restored, but UI verification failed. The test remains failed."
+						: "Room restoration is unconfirmed. Retain reservations and reconcile the journal.";
 					try
 						{
-						await session.RecordAsync ("recovery-required", new
+						await session.RecordAsync (restored ? "ui-verification-failed" : "recovery-required", new
 							{
 							Exception = failure.ToString ()
 							});
