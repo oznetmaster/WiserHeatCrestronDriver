@@ -11,6 +11,11 @@ See the [product changelog](CHANGELOG.md) for shipped changes. This document pre
 
 <!-- development-history -->
 
+## Native thermostat temperature inspection - 2026-09-18 (no driver release)
+
+Added an explicitly enabled, read-only Android check comparing the current temperature, unit label and heating target with paired independent hub readings and processor properties. It scopes the repeated target identifier to the native heating setpoint control, allows bounded refresh propagation, captures screenshots and verifies Home restoration. The dedicated fixture passed on the unchanged Debug candidate `1.3.007.0029`; its temporary child was removed and the original inventory and both reservations were verified. No heating command was sent. This establishes ordinary Celsius label rendering for the observed case, not gauge needle geometry, every temperature boundary or final Release-candidate acceptance. See the [control-project guide](WiserHeatCrestronDriver.AndroidControlTests/README.md#read-only-native-thermostat-temperatures) for opt-in settings and limitations.
+
+
 ## Gateway control fixture preparation - 2026-09-18 (no driver release)
 
 - Added an opt-in Android Away-mode cycle with independent hub observations, guarded room/schedule/override preservation, response timing and observed Home restoration. It supports either initial Away state and never replays an uncertain input. Whole-house authorization and actual hardware validation remain separate prerequisites.

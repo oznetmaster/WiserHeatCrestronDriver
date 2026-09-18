@@ -4,6 +4,11 @@ This separately selected NUnit project includes the existing Android inspections
 
 The original `WiserHeatCrestronDriver.AndroidTests` project remains read-only apart from its optional restored name challenge. Selecting that project never includes these control cases. Neither project connects to Android or a processor during ordinary desktop test runs; all fixtures skip without the workflow context.
 
+## Read-only native thermostat temperatures
+
+`NativeThermostatTemperaturesMatchHubAndReturnHome` is tagged `LiveReadOnly`. Select this exact test and set `"AllowThermostatTemperatureObservation": true` in the private UI settings, with the existing `Rooms`, `ControlRooms` and `ControlHubSettingsPath` bindings. It reads the hub directly and compares its current temperature and heating target with both the processor properties and the native Android thermostat labels. It sends no heating, mode, boost or schedule commands. Selecting the whole control project also selects its separate control tests; use an explicit test filter for a read-only run.
+
+The test requires stable readings bracketing each screen capture, Celsius display, a valid measured temperature from 0 to 60 degrees and an ordinary heating target from 5 to 30 degrees. It allows up to 90 seconds for normal refresh propagation using read-only observations. An unavailable sensor value, error sentinel or unsupported target cannot count as a successful comparison. The repeated target-value identifier is scoped to the heating setpoint control on the verified front page. Private evidence retains the hub readings, corresponding processor values, screenshot, hierarchy and comparison outcome; navigation verifies return to Home even when inspection fails. The visible gauge must exist, but its drawn needle position and icon pixels are not validated by this test.
 ## Select the project and rooms explicitly
 
 Use the existing private processor workflow, with `AndroidTests.Project` pointing to this project's `.csproj`. Follow the [Android setup and room binding instructions](../WiserHeatCrestronDriver.AndroidTests/README.md). In that private UI settings file, add:
