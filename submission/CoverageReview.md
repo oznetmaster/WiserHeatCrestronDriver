@@ -1,5 +1,13 @@
 # Coverage source review
 
+## Evidence-to-form checkpoint - 18 September 2026
+
+The bundled coverage command verified the current reviewed source snapshot and reproduced the existing draft policy hash without changing the candidate declaration. Its 571 scoped assertions map to 35 official form items; these are obligations, not a required number of independent physical test runs. One verified sequence can support several assertions. The 342 assertions under the multiple-instance item remain dependent on resolving the platform-driver interpretation and independent device bindings; a second room child must not silently satisfy that requirement.
+
+The packaged validator accepts the unchanged candidate's package structure and metadata. A deliberate check with no official attestations reports all 571 missing requirements and blocks completion. Existing successful unit, processor and Android results therefore cannot automatically check the official form. Their narrower evidence still needs reviewed scope/producer/latency/restoration bindings; absence proposals need actual applicability review, and collection must complete before endurance acceptance.
+
+The retained official form confirms that power and network interruptions require at least 60 seconds, followed by bounded recovery checks. A software reboot is not the physical power-outage case. Those tests must follow the current uninterrupted endurance observation and use an explicitly agreed isolation arrangement. No interruption, final form generation or submission was performed for this checkpoint.
+
 ## Candidate 1.3.11 temperature and Off review - 18 September 2026
 
 The reviewed source changes keep raw hub/schedule data in Celsius and convert only at the display boundary. Display ranges represent the physical 5-30 C bounds in either unit. Off remains a control sentinel, with separate visibility and explicit minimum-temperature commands for the native thermostat and every editor slot. Time edits, other-slot edits, unit changes and cancellation must preserve Off. An explicit resume must not first restore the scheduled temperature; WiserHeatAPIv2 1.1.2 corrects that command path.
