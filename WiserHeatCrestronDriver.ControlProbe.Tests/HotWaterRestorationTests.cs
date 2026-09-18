@@ -21,13 +21,12 @@ public sealed class HotWaterRestorationTests
 		return JsonSerializer.SerializeToElement (root);
 		}
 	[TestCase (false, false), TestCase (false, true), TestCase (true, false), TestCase (true, true)]
-	public void ScheduledStateRestoresLatentOverrideThenCancelsIt (bool on, bool stored)
+	public void ScheduledStateCancelsTemporaryOverride (bool on, bool stored)
 		{
 		var domain = Domain (on, stored: stored); var plan = HotWaterRestoration.Capture (domain);
 		Assert.That (plan.Policy, Is.EqualTo (HotWaterControlPolicy.Schedule));
-		Assert.That (plan.Requests.Length, Is.EqualTo (2));
-		Assert.That (plan.Requests[0].GetProperty ("RequestOverride").GetProperty ("SetPoint").GetInt32 (), Is.EqualTo (stored ? 110 : -20));
-		Assert.That (plan.Requests[1].GetProperty ("RequestOverride").GetProperty ("Type").GetString (), Is.EqualTo ("None"));
+		Assert.That (plan.Requests.Length, Is.EqualTo (1));
+		Assert.That (plan.Requests[0].GetProperty ("RequestOverride").GetProperty ("Type").GetString (), Is.EqualTo ("None"));
 		HotWaterRestoration.RequireRestored (plan, domain);
 		}
 	[TestCase (false), TestCase (true)]
@@ -60,10 +59,17 @@ public sealed class HotWaterRestorationTests
 		Assert.DoesNotThrow (() => HotWaterRestoration.RequireRestored (plan, Domain (true)));
 		}
 	[Test]
-	public void OriginalLatentStateCannotBeLostEvenWhenScheduleIsRestored ()
+	public void ClearingScheduleOverrideCanRemoveInactiveFields ()
 		{
-		var plan = HotWaterRestoration.Capture (Domain ());
-		Assert.Throws<InvalidDataException> (() => HotWaterRestoration.RequireRestored (plan, Domain (stored: true)));
+		var plan = HotWaterRestoration.Capture (Domain (true));
+		var current = JsonNode.Parse (Domain (true).GetRawText ())!;
+		current["HotWater"]![0]!.AsObject ().Remove ("OverrideWaterHeatingState");
+		current["HotWater"]![0]!["OverrideType"] = "None";
+		current["HotWater"]![0]!["AwayModeSuppressed"] = false;
+		Assert.DoesNotThrow (() => HotWaterRestoration.RequireRestored (plan, JsonSerializer.SerializeToElement (current)));
+		current["HotWater"]![0]!["HotWaterDescription"] = "FromManualOverride";
+		current["HotWater"]![0]!["OverrideType"] = "Manual";
+		Assert.Throws<InvalidDataException> (() => HotWaterRestoration.Capture (JsonSerializer.SerializeToElement (current)));
 		}
 	[TestCase (1234), TestCase (9999999999L), TestCase (-1)]
 	public void TimedOverridesAreRejectedBeforeAnyMutationPlan (long deadline)

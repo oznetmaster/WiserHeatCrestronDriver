@@ -41,7 +41,7 @@ public static class GatewayAwayCycle
 		JsonElement Project (JsonElement value, Func<string, bool> include) => JsonSerializer.SerializeToElement (
 			value.EnumerateObject ().Where (p => include (p.Name)).ToDictionary (p => p.Name, p => p.Value));
 		bool SystemField (string name) => settings.Contains (name, StringComparer.Ordinal) ||
-			name != "OverrideType" && (name.Contains ("Override", StringComparison.OrdinalIgnoreCase) || name.Contains ("Boost", StringComparison.OrdinalIgnoreCase));
+			name is not ("OverrideType" or "UserOverridesActive") && (name.Contains ("Override", StringComparison.OrdinalIgnoreCase) || name.Contains ("Boost", StringComparison.OrdinalIgnoreCase));
 		bool WaterField (string name) => name is "id" or "DeviceId" or "ScheduleId" or "Mode" or "AwayModeSuppressed" ||
 			name.Contains ("Override", StringComparison.OrdinalIgnoreCase) || name.Contains ("Boost", StringComparison.OrdinalIgnoreCase);
 		JsonElement WaterSettings (JsonElement value)
@@ -50,7 +50,13 @@ public static class GatewayAwayCycle
 			int[] ids = entries.Select (v => v.GetProperty ("id").GetInt32 ()).ToArray ();
 			if (ids.Any (id => id <= 0) || ids.Distinct ().Count () != ids.Length)
 				throw new InvalidDataException ("Hot-water controller identities must be unique.");
-			return JsonSerializer.SerializeToElement (entries.OrderBy (v => v.GetProperty ("id").GetInt32 ()).Select (v => Project (v, WaterField)));
+			return JsonSerializer.SerializeToElement (entries.OrderBy (v => v.GetProperty ("id").GetInt32 ()).Select (v =>
+				{
+				var fields = v.EnumerateObject ().Where (p => WaterField (p.Name)).ToDictionary (p => p.Name, p => p.Value);
+				// The hub omits false on some reads and explicitly returns it after clearing an override.
+				if (!fields.ContainsKey ("AwayModeSuppressed")) fields["AwayModeSuppressed"] = JsonSerializer.SerializeToElement (false);
+				return fields;
+				}));
 			}
 		foreach (var entry in new[] { (Name: "System", Filter: (Func<string, bool>)SystemField), (Name: "HotWater", Filter: (Func<string, bool>)WaterField) })
 			{

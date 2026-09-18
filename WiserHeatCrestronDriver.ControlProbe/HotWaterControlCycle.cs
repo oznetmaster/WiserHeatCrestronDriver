@@ -132,7 +132,7 @@ public static class HotWaterControlCycle
 					foreach (var request in plan.Requests)
 						{
 						bool cancel = request.GetProperty ("RequestOverride").GetProperty ("Type").GetString () == "None";
-						bool AlreadyDone (HotWaterControlSnapshot s) => cancel ? Restored (plan, s) : ManualTarget (s, plan.StoredOverrideOn);
+						bool AlreadyDone (HotWaterControlSnapshot s) => cancel ? Restored (plan, s) : ManualTarget (s, plan.StoredOverrideOn ?? throw new InvalidDataException ("Missing original manual target."));
 						if (AlreadyDone (current))
 							{
 							await session.RecordAsync ("restore-" + index + "-already-observed", new { Snapshot = current, Request = request });

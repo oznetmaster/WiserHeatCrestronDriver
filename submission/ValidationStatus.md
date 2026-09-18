@@ -1,5 +1,15 @@
 # Wiser submission pilot status
 
+## Gateway Away and hot-water controls - 18 September 2026
+
+The normal Android Away fixture passed on exact Debug `1.3.007.0029`: Disabled -> Enabled -> Disabled, with independent hub and processor observations, guarded settings preservation and observed Home restoration. Its temporary child was removed and the original inventory and reservations were restored.
+
+The hot-water fixture initially stopped after its first Off input because the hub added the derived `UserOverridesActive` status. A separate recovery cleared that owned override once and independently confirmed scheduled control. The failed test remains failed in the evidence. The response also showed that clearing an override can remove its inactive target and return an explicit false `AwayModeSuppressed`; comparisons now distinguish these representations from actual setting changes. Scheduled control is restored by cancelling the temporary override, rather than attempting to preserve an inactive override target. Manual modes and active overrides still require an explicit original target, and timed overrides remain unsupported by this fixture.
+
+A fresh normal fixture then passed On -> Off -> On followed by verified scheduled-policy restoration. Independent hub/processor/UI observations, persistent schedules, guarded room and gateway settings, Home, temporary-child removal, original inventory and reservation release all passed. Offline regression tests cover the sparse-response and aggregate-status cases while retaining foreign-change and uncertain-input checks. The UI cycle allows a bounded 90 seconds for both observed transitions.
+
+These changes affect test producers and evidence interpretation, not the installed driver. The observed physical starting policy was scheduled control; this does not establish physical acceptance of every manual/timed combination, a final immutable Release candidate or the 24-hour endurance requirement.
+
 ## Schedule membership and hub capacity - 18 September 2026
 
 The first normal add/remove fixture attempt on exact Debug 1.3.007.0029 returned HTTP 400, "Could not create new schedule", before any new schedule was observed. The hub already held 16 heating schedules. Schneider's [UK/Ireland system guide](https://www.productinfo.schneider-electric.com/wiser_home/wiser-home-sug-uk/English/System%20User%20Guide_Wiser_Home_UK%20%28Bookmap%29.pdf) documents a maximum of 16 climate schedules per hub. This full-capacity attempt cannot establish whether the complete seven-day creation payload is accepted when space is available.

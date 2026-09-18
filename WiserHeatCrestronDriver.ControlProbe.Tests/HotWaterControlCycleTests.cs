@@ -29,6 +29,7 @@ public sealed class HotWaterControlCycleTests
 		public List<int> Restores = [];
 		public List<string> Records = [];
 		public string? Behavior;
+		public bool SparseHubResponses;
 		public string? FailRecord;
 		public CancellationTokenSource? CancelAfterFirst;
 		private JsonNode Water => Domain["HotWater"]![0]!;
@@ -48,6 +49,7 @@ public sealed class HotWaterControlCycleTests
 			{
 			string state = enabled ? "On" : "Off";
 			Water["OverrideType"] = "Manual"; Water["OverrideWaterHeatingState"] = state;
+			if (SparseHubResponses) Domain["System"]!["UserOverridesActive"] = true;
 			Water["WaterHeatingState"] = state; Water["HotWaterRelayState"] = state;
 			Water["HotWaterDescription"] = "FromManualOverride";
 			if (Behavior == "own-deadline") Water["OverrideTimeoutUnixTime"] = DateTimeOffset.UtcNow.AddHours (1).ToUnixTimeSeconds ();
@@ -82,6 +84,12 @@ public sealed class HotWaterControlCycleTests
 				Water["HotWaterDescription"] = auto ? "FromSchedule" : "FromManualMode";
 				string state = Water[auto ? "ScheduledWaterHeatingState" : "OverrideWaterHeatingState"]!.GetValue<string> ();
 				Water["WaterHeatingState"] = state; Water["HotWaterRelayState"] = state;
+				if (SparseHubResponses)
+					{
+					Domain["System"]!.AsObject ().Remove ("UserOverridesActive");
+					Water.AsObject ().Remove ("OverrideWaterHeatingState");
+					Water["AwayModeSuppressed"] = false;
+					}
 				_refresh = _refresh.AddSeconds (1);
 				}
 			if (Behavior == "lost-compensation") throw new IOException ("compensation reply lost");
@@ -91,8 +99,8 @@ public sealed class HotWaterControlCycleTests
 	private static Task<HotWaterControlResult> Run (Session session, CancellationToken token = default) =>
 		HotWaterControlCycle.RunAsync (session, TimeSpan.FromMilliseconds (300), token);
 
-	[TestCase (false, false, "Schedule", 1), TestCase (false, true, "Schedule", 2)]
-	[TestCase (true, false, "Schedule", 2), TestCase (true, true, "Schedule", 1)]
+	[TestCase (false, false, "Schedule", 1), TestCase (false, true, "Schedule", 1)]
+	[TestCase (true, false, "Schedule", 1), TestCase (true, true, "Schedule", 1)]
 	[TestCase (false, false, "ManualMode", 1), TestCase (true, true, "ManualMode", 1)]
 	[TestCase (false, false, "ManualOverride", 0), TestCase (true, true, "ManualOverride", 0)]
 	public async Task BothUiStatesAndOriginalPolicyAreRestored (bool on, bool stored, string policy, int writes)
@@ -126,7 +134,7 @@ public sealed class HotWaterControlCycleTests
 		{
 		var session = new Session { Behavior = "cancel-ignored" }; var result = await Run (session);
 		Assert.That (result.Passed || result.RestorationConfirmed, Is.False);
-		Assert.That (session.Restores, Is.EqualTo (new[] { 1 }));
+		Assert.That (session.Restores, Is.EqualTo (new[] { 0 }));
 		}
 	[Test]
 	public async Task DeadlineCreatedByAnOwnedOverrideMustBeCleared ()
@@ -143,12 +151,24 @@ public sealed class HotWaterControlCycleTests
 		Assert.That (result.Passed, Is.False); Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
 		Assert.That (session.Inputs.Count, Is.EqualTo (1));
 		}
-	[TestCase ("original", 0, true), TestCase ("ui-1-intent", 0, true), TestCase ("restore-1-intent", 2, false), TestCase ("restored", 2, false)]
+	[TestCase ("original", 0, true), TestCase ("ui-1-intent", 0, true), TestCase ("restore-0-intent", 2, false), TestCase ("restored", 2, false)]
 	public async Task IntentAndRestorationEvidenceAreRequired (string phase, int inputs, bool restored)
 		{
 		var session = new Session { FailRecord = phase }; var result = await Run (session);
 		Assert.That (result.Passed, Is.False); Assert.That (result.RestorationConfirmed, Is.EqualTo (restored));
 		Assert.That (session.Inputs.Count, Is.EqualTo (inputs));
+		}
+	[TestCase (false), TestCase (true)]
+	public async Task HubAggregateFlagAndRemovedInactiveTargetDoNotPreventScheduleRestoration (bool sparseBefore)
+		{
+		var session = new Session (true) { SparseHubResponses = true };
+		if (sparseBefore) session.Domain["HotWater"]![0]!.AsObject ().Remove ("OverrideWaterHeatingState");
+		var result = await Run (session);
+		Assert.That (result.Passed && result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs, Is.EqualTo (new[] { false, true }));
+		Assert.That (session.Restores, Is.EqualTo (new[] { 0 }));
+		Assert.That (session.Domain["HotWater"]![0]!["OverrideType"]!.GetValue<string> (), Is.EqualTo ("None"));
+		Assert.That (session.Domain["HotWater"]![0]!["OverrideWaterHeatingState"], Is.Null);
 		}
 	[Test]
 	public async Task ExistingTimerIsLeftUntouched ()

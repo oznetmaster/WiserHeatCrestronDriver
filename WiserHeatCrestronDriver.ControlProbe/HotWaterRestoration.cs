@@ -6,15 +6,19 @@ using System.Text.Json;
 namespace WiserHeatCrestronDriver.ControlProbe;
 
 public enum HotWaterControlPolicy { Schedule, ManualMode, ManualOverride }
-public sealed record HotWaterRestorePlan (int Id, HotWaterControlPolicy Policy, bool OriginallyOn, bool StoredOverrideOn, JsonElement Original)
+public sealed record HotWaterRestorePlan (int Id, HotWaterControlPolicy Policy, bool OriginallyOn, bool? StoredOverrideOn, JsonElement Original)
 	{
 	/// <summary>Candidate compensations using the library's supported request shape. Actual hub acceptance is separately required.</summary>
-	public JsonElement[] Requests => Policy == HotWaterControlPolicy.ManualOverride
-		? [ManualRequest ()] : [ManualRequest (), JsonSerializer.SerializeToElement (new { RequestOverride = new { Type = "None" } })];
-	private JsonElement ManualRequest () => JsonSerializer.SerializeToElement (new { RequestOverride = new { Type = "Manual", SetPoint = StoredOverrideOn ? 110 : -20 } });
+	public JsonElement[] Requests => Policy switch
+		{
+		HotWaterControlPolicy.Schedule => [JsonSerializer.SerializeToElement (new { RequestOverride = new { Type = "None" } })],
+		HotWaterControlPolicy.ManualOverride => [ManualRequest ()],
+		_ => [ManualRequest (), JsonSerializer.SerializeToElement (new { RequestOverride = new { Type = "None" } })]
+		};
+	private JsonElement ManualRequest () => JsonSerializer.SerializeToElement (new { RequestOverride = new { Type = "Manual", SetPoint = (StoredOverrideOn ?? throw new InvalidDataException ("Manual restoration requires an observed target.")) ? 110 : -20 } });
 	}
 
-/// <summary>Capture and compare the original control policy, including latent override state. This class sends no requests.</summary>
+/// <summary>Capture and compare the original control policy and any active manual target. This class sends no requests.</summary>
 public static class HotWaterRestoration
 	{
 	private static bool On (JsonElement value, string name) => value.GetProperty (name).GetString () switch
@@ -47,7 +51,10 @@ public static class HotWaterRestoration
 			("Auto", "FromManualOverride") when type is null or "Manual" => HotWaterControlPolicy.ManualOverride,
 			_ => throw new NotSupportedException ("This hot-water mode/source/override combination does not have an implemented restoration plan.")
 			};
-		bool active = On (water, "WaterHeatingState"), stored = On (water, "OverrideWaterHeatingState");
+		bool active = On (water, "WaterHeatingState");
+		bool? stored = water.TryGetProperty ("OverrideWaterHeatingState", out _) ? On (water, "OverrideWaterHeatingState") : null;
+		if (policy != HotWaterControlPolicy.Schedule && stored == null)
+			throw new InvalidDataException ("Manual control requires an explicit override target.");
 		if (On (water, "HotWaterRelayState") != active || (policy == HotWaterControlPolicy.Schedule ? On (water, "ScheduledWaterHeatingState") : stored) != active)
 			throw new InvalidDataException ("Hot-water target, control source and relay have not settled consistently.");
 		if (policy == HotWaterControlPolicy.Schedule && water.GetProperty ("ScheduleId").GetInt32 () <= 0)
@@ -58,12 +65,15 @@ public static class HotWaterRestoration
 	public static void RequireRestored (HotWaterRestorePlan plan, JsonElement domain)
 		{
 		var current = Capture (domain);
-		if (current.Id != plan.Id || current.Policy != plan.Policy || current.StoredOverrideOn != plan.StoredOverrideOn)
-			throw new InvalidDataException ("The original hot-water identity, policy or latent manual state was not restored.");
+		if (current.Id != plan.Id || current.Policy != plan.Policy || plan.Policy != HotWaterControlPolicy.Schedule && current.StoredOverrideOn != plan.StoredOverrideOn)
+			throw new InvalidDataException ("The original hot-water identity, policy or active manual target was not restored.");
 		// Sensor/relay readings may follow a later schedule event; restore control policy, not historic time.
 		if (plan.Policy != HotWaterControlPolicy.Schedule && current.OriginallyOn != plan.OriginallyOn)
 			throw new InvalidDataException ("The original manual hot-water target was not restored.");
-		string[] settings = ["Mode", "ScheduleId", "DeviceId", "AwayModeSuppressed"];
+		// Clearing a scheduled override removes its inactive target; it is not a persistent manual setting.
+		bool Suppressed (JsonElement water) => water.TryGetProperty ("AwayModeSuppressed", out var value) && value.GetBoolean ();
+		if (Suppressed (plan.Original) != Suppressed (current.Original)) throw new InvalidDataException ("Away suppression changed.");
+		string[] settings = ["Mode", "ScheduleId", "DeviceId"];
 		foreach (string name in settings)
 			{
 			bool before = plan.Original.TryGetProperty (name, out var oldValue), now = current.Original.TryGetProperty (name, out var value);

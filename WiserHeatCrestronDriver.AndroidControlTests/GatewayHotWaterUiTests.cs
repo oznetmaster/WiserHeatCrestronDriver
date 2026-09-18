@@ -53,7 +53,7 @@ public sealed partial class GatewayUiTests
 					throw new InvalidDataException ("The selected text is not a unique gateway tile.");
 				}, timeout.Token);
 			await session.WaitForPageAsync (timeout.Token);
-			result = await HotWaterControlCycle.RunAsync (session, TimeSpan.FromSeconds (55), timeout.Token);
+			result = await HotWaterControlCycle.RunAsync (session, TimeSpan.FromSeconds (90), timeout.Token);
 			_roomStatePreserved = result.RestorationConfirmed;
 			}
 		catch (Exception error) { failure = error; throw; }

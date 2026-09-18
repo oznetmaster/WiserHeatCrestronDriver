@@ -11,6 +11,10 @@ See the [product changelog](CHANGELOG.md) for shipped changes. This document pre
 
 <!-- development-history -->
 
+## Gateway control validation - 2026-09-18 (no driver release)
+
+Validated Away-mode changes and restoration through the Android app on the unchanged Debug candidate. The hot-water check exposed test assumptions about aggregate override status and inactive fields omitted after cancelling an override. Corrected those assumptions, added regressions, and restored scheduled control independently before a fresh run. The corrected normal hot-water fixture passed both UI states and original scheduled-policy restoration, with owned-child cleanup and released reservations. No production driver or library code changed. See [validation status](submission/ValidationStatus.md#gateway-away-and-hot-water-controls---18-september-2026) for the retained initial failure, recovery and exact limits.
+
 ## Native thermostat temperature inspection - 2026-09-18 (no driver release)
 
 Added an explicitly enabled, read-only Android check comparing the current temperature, unit label and heating target with paired independent hub readings and processor properties. It scopes the repeated target identifier to the native heating setpoint control, allows bounded refresh propagation, captures screenshots and verifies Home restoration. The dedicated fixture passed on the unchanged Debug candidate `1.3.007.0029`; its temporary child was removed and the original inventory and both reservations were verified. No heating command was sent. This establishes ordinary Celsius label rendering for the observed case, not gauge needle geometry, every temperature boundary or final Release-candidate acceptance. See the [control-project guide](WiserHeatCrestronDriver.AndroidControlTests/README.md#read-only-native-thermostat-temperatures) for opt-in settings and limitations.
