@@ -1,5 +1,11 @@
 # Development and validation history
 
+## Candidate editor limits and interruption recovery - 2026-09-18 (no driver release)
+
+Three existing Android cases passed against unchanged Release candidate 1.3.10 with TestAdapter 1.11.1 and DevTools 1.8.0. All four displayed schedule rows exercised the pending editor's 5–35°C limits and half-degree return steps. Separate deliberate interruptions after changing the day and time both restored the original editor, hub schedules and room settings. Home restoration, frozen producer files, original device inventory, removal of the temporary thermostat and released reservations were verified. No schedule was saved to the hub.
+
+This is filtered coverage for one four-slot Celsius layout. Boundary preparation used SDK properties before Android button checks; it does not prove native thermostat limits or every layout. The interrupted operations remain failed in their raw receipts; their test cases pass by verifying the expected recovery. The separate Fahrenheit investigation reproduced library conversion defects offline and is being corrected before final acceptance.
+
 ## Released Android evidence integration - 2026-09-18 (test tooling, no driver release)
 
 Both Android projects now consume TestAdapter 1.11.1 and DevTools 1.8.0. The complete read-only project passed against unchanged Release candidate 1.3.10 through the released Android workflow stage. The matching released Python auditor checked all three discovered cases, the complete 171-file producer inventory and 25 captures against pins retained before execution. State, Home, original inventory, temporary-child removal and reservation release were verified. The control project also builds with the upgraded dependencies without warnings or errors; its earlier hardware results retain their original tool versions.

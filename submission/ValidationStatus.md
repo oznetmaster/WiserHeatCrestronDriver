@@ -1,5 +1,11 @@
 # Wiser submission pilot status
 
+## Editor checks and temperature-unit finding - 18 September 2026
+
+The unchanged 1.3.10 candidate passed three additional filtered Android cases: pending editor bounds on all four displayed rows, and recovery from deliberate day/time edit interruptions. Original editor values, complete schedules and guarded room settings matched the final observations. Home, original inventory, producer files, temporary-child removal, private-settings removal and reservation release were verified. The retained upper-limit screenshot shows 35.0° with the outward button disabled. No hub Save was sent. This establishes the current four-slot Celsius editor behavior only, not physical setpoint bounds or complete official-plan acceptance.
+
+Offline characterization of the published WiserHeatAPIv2 1.1.1 dependency reproduced incorrect Imperial readings and writes. The driver also has fixed Celsius range metadata which needs review for Fahrenheit. The candidate is not ready for final acceptance; library and driver corrections and fresh candidate validation remain pending. Existing evidence stays bound to the original package bytes.
+
 ## Released Android auditor integration - 18 September 2026
 
 The complete dedicated read-only Android suite passed against the unchanged 1.3.10 candidate using published TestAdapter 1.11.1 and DevTools 1.8.0. The released workflow stage retained the full producer inventory before execution; the released Python auditor accepted all three discovered cases, 171 producer files and 25 captures against separately retained pre-execution pins. Original checked state, Home and installed inventory were preserved, the owned temporary thermostat was removed, private settings were deleted and reservations were released. No heating command, driver update or reboot was sent.
