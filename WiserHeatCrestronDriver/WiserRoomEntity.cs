@@ -72,12 +72,12 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		_platform = platform;
 		_room = room;
 		DeviceLabel = room.Name ?? controllerId;
-		TargetTemperature = room.CurrentTargetTemperature;
-		CurrentTemperature = room.CurrentTemperature;
+		TemperatureUnits = TemperatureDisplay.NormalizeUnits (platform.TemperatureUnits);
+		TargetTemperature = TemperatureDisplay.FromCelsius (room.CurrentTargetTemperature, TemperatureUnits);
+		CurrentTemperature = TemperatureDisplay.FromCelsius (room.CurrentTemperature, TemperatureUnits);
 		IsBoostActive = IsRoomBoostActive (room);
 		BoostStateLabel = IsBoostActive ? "^BoostOnLabel" : "^BoostOffLabel";
 		BoostActionLabel = IsBoostActive ? "^BoostOffActionLabel" : "^BoostOnActionLabel";
-		TemperatureUnits = "Celsius";
 		bool isScheduleAvailable = platform.HasHeatingSchedules;
 		ScheduleSummary = BuildScheduleSummary (room);
 		ScheduleEnabled = IsScheduleEnabled (room);
@@ -123,6 +123,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		var setPropertyValue = new ExtensionSetPropertyValueExecutor (GetCommand, resources.Logger);
 		AddCommand (this, ExtensionSetPropertyValueExecutor.CommandName, setPropertyValue);
 		UpdateScheduleSelectionDefinition (ScheduleValues);
+		UpdateTemperatureDefinitions ();
 
 		_suppressPropertyNotifications = false;
 		NotifyEditStateChanged ();
@@ -160,7 +161,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		private set => SetAndNotify ("currentTemperature", value, ref field);
 		}
 
-	[EntityProperty (Id = "targetTemperature", FriendlyName = "Target Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityProperty (Id = "targetTemperature", FriendlyName = "Target Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 30.0, RangeStepSize = 0.5)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public double TargetTemperature
 		{
@@ -174,6 +175,9 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		double value)
 		{
 		LogInfo ($"UI requested targetTemperature value={value}");
+		if (!TemperatureDisplay.TrySetpoint (value, TemperatureUnits, out double celsius))
+			return;
+		value = TemperatureDisplay.FromCelsius (celsius, TemperatureUnits);
 		if (!TryBeginRoomAction ())
 			return;
 
@@ -186,7 +190,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 		TargetTemperature = value;
 		_ = FireAndForgetAsync (
-			() => _platform.SetRoomSetpointAsync (_room.Id, value),
+			() => _platform.SetRoomSetpointAsync (_room.Id, celsius),
 			"set target temperature");
 		}
 
@@ -468,7 +472,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		private set => _editSlotTimes[9] = value ?? string.Empty;
 		}
 
-	[EntityProperty (Id = "editSlot1Temperature", FriendlyName = "Edit Slot 1 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityProperty (Id = "editSlot1Temperature", FriendlyName = "Edit Slot 1 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 30.0, RangeStepSize = 0.5)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public double EditSlot1Temperature
 		{
@@ -476,7 +480,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		private set => _editSlotTemperatures[0] = value;
 		}
 
-	[EntityProperty (Id = "editSlot2Temperature", FriendlyName = "Edit Slot 2 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityProperty (Id = "editSlot2Temperature", FriendlyName = "Edit Slot 2 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 30.0, RangeStepSize = 0.5)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public double EditSlot2Temperature
 		{
@@ -484,7 +488,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		private set => _editSlotTemperatures[1] = value;
 		}
 
-	[EntityProperty (Id = "editSlot3Temperature", FriendlyName = "Edit Slot 3 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityProperty (Id = "editSlot3Temperature", FriendlyName = "Edit Slot 3 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 30.0, RangeStepSize = 0.5)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public double EditSlot3Temperature
 		{
@@ -492,7 +496,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		private set => _editSlotTemperatures[2] = value;
 		}
 
-	[EntityProperty (Id = "editSlot4Temperature", FriendlyName = "Edit Slot 4 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityProperty (Id = "editSlot4Temperature", FriendlyName = "Edit Slot 4 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 30.0, RangeStepSize = 0.5)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public double EditSlot4Temperature
 		{
@@ -500,7 +504,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		private set => _editSlotTemperatures[3] = value;
 		}
 
-	[EntityProperty (Id = "editSlot5Temperature", FriendlyName = "Edit Slot 5 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityProperty (Id = "editSlot5Temperature", FriendlyName = "Edit Slot 5 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 30.0, RangeStepSize = 0.5)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public double EditSlot5Temperature
 		{
@@ -508,7 +512,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		private set => _editSlotTemperatures[4] = value;
 		}
 
-	[EntityProperty (Id = "editSlot6Temperature", FriendlyName = "Edit Slot 6 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityProperty (Id = "editSlot6Temperature", FriendlyName = "Edit Slot 6 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 30.0, RangeStepSize = 0.5)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public double EditSlot6Temperature
 		{
@@ -516,7 +520,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		private set => _editSlotTemperatures[5] = value;
 		}
 
-	[EntityProperty (Id = "editSlot7Temperature", FriendlyName = "Edit Slot 7 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityProperty (Id = "editSlot7Temperature", FriendlyName = "Edit Slot 7 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 30.0, RangeStepSize = 0.5)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public double EditSlot7Temperature
 		{
@@ -524,7 +528,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		private set => _editSlotTemperatures[6] = value;
 		}
 
-	[EntityProperty (Id = "editSlot8Temperature", FriendlyName = "Edit Slot 8 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityProperty (Id = "editSlot8Temperature", FriendlyName = "Edit Slot 8 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 30.0, RangeStepSize = 0.5)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public double EditSlot8Temperature
 		{
@@ -532,7 +536,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		private set => _editSlotTemperatures[7] = value;
 		}
 
-	[EntityProperty (Id = "editSlot9Temperature", FriendlyName = "Edit Slot 9 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityProperty (Id = "editSlot9Temperature", FriendlyName = "Edit Slot 9 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 30.0, RangeStepSize = 0.5)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public double EditSlot9Temperature
 		{
@@ -540,7 +544,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		private set => _editSlotTemperatures[8] = value;
 		}
 
-	[EntityProperty (Id = "editSlot10Temperature", FriendlyName = "Edit Slot 10 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 35.0, RangeStepSize = 0.5)]
+	[EntityProperty (Id = "editSlot10Temperature", FriendlyName = "Edit Slot 10 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 30.0, RangeStepSize = 0.5)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public double EditSlot10Temperature
 		{
@@ -809,14 +813,26 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	public void UpdateFromRoom (WiserRoom room, string? temperatureUnits)
 		{
 		_room = room;
+		string units = TemperatureDisplay.NormalizeUnits (temperatureUnits);
+		bool unitsChanged = units != TemperatureUnits;
+		TemperatureUnits = units;
+		if (unitsChanged)
+			{
+			UpdateTemperatureDefinitions ();
+			LoadSelectedEditDay (EditSelectedDay);
+			if (_frameworkReady != 0)
+				{
+				RaiseDefinitionChangedEvent ();
+				NotifyEditSlotStateChanged ();
+				}
+			}
 
 		DeviceLabel = _room.Name ?? DeviceLabel;
-		CurrentTemperature = _room.CurrentTemperature;
-		TargetTemperature = _room.CurrentTargetTemperature;
+		CurrentTemperature = TemperatureDisplay.FromCelsius (_room.CurrentTemperature, TemperatureUnits);
+		TargetTemperature = TemperatureDisplay.FromCelsius (_room.CurrentTargetTemperature, TemperatureUnits);
 		IsBoostActive = IsRoomBoostActive (_room);
 		BoostStateLabel = IsBoostActive ? "^BoostOnLabel" : "^BoostOffLabel";
 		BoostActionLabel = IsBoostActive ? "^BoostOffActionLabel" : "^BoostOnActionLabel";
-		TemperatureUnits = temperatureUnits ?? string.Empty;
 		bool isScheduleAvailable = _platform.HasHeatingSchedules;
 		ScheduleSummary = BuildScheduleSummary (_room);
 		ScheduleEnabled = IsScheduleEnabled (_room);
@@ -1049,6 +1065,31 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	private Task<bool> AssignSelectedScheduleAsync (int roomId, int scheduleId) =>
 		_platform.SetRoomAssignedScheduleAsync (roomId, scheduleId);
 
+	private void UpdateTemperatureDefinitions ()
+		{
+		using (DefinitionLock.Enter ())
+			{
+			var range = new DriverEntityValueRange (
+				TemperatureDisplay.FromCelsius (TemperatureDisplay.MinimumCelsius, TemperatureUnits),
+				TemperatureDisplay.FromCelsius (TemperatureDisplay.MaximumCelsius, TemperatureUnits),
+				TemperatureDisplay.Step (TemperatureUnits));
+			void Define (string id, Func<WiserRoomEntity, double> getter)
+				{
+				var definition = DriverEntityPropertyDefinition.Create (DriverEntityValueType.Number,
+					range: range, units: TemperatureUnits);
+				AddProperty (this, id, new DelegatePropertyInstance (definition,
+					new DriverEntityPropertyMetadata (programmable: false, extensionUiProperty: true),
+					(instance, _) => new DriverEntityValue (getter ((WiserRoomEntity)instance))));
+				}
+			Define ("targetTemperature", room => room.TargetTemperature);
+			for (int index = 0; index < MAX_EDITABLE_SCHEDULE_SLOTS; index++)
+				{
+				int slot = index;
+				Define (GetEditSlotTemperaturePropertyId (slot), room => room._editSlotTemperatures[slot]);
+				}
+			}
+		}
+
 	private bool UpdateScheduleSelectionDefinition (DriverEntityAvailableValue[] values)
 		{
 		using (DefinitionLock.Enter ())
@@ -1273,7 +1314,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			{
 			_editSlotVisible[i] = true;
 			_editSlotTimes[i] = slots[i].Time;
-			_editSlotTemperatures[i] = slots[i].Temperature;
+			_editSlotTemperatures[i] = TemperatureDisplay.FromCelsius (slots[i].Temperature, TemperatureUnits);
 			_editSlotErrors[i] = string.Empty;
 			}
 		}
@@ -1320,22 +1361,22 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			}
 
 		if (!double.TryParse (temperatureText, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) ||
-			double.IsNaN (parsed) || double.IsInfinity (parsed) || parsed < 5.0 || parsed > 35.0)
+			!TemperatureDisplay.TrySetpoint (parsed, TemperatureUnits, out double celsius))
 			{
-			LogInfo ($"Ignored edit slot temperature update for slot={slotIndex + 1} because '{temperatureText}' is not a finite value in the supported 5-35 degree range");
+			LogInfo ($"Ignored edit slot temperature update for slot={slotIndex + 1} because '{temperatureText}' is outside the supported temperature range");
 			return;
 			}
 
 		// Only valid input starts an edit; ignored commands must keep following hub refreshes.
 		_editingSchedule = true;
-		parsed = Math.Round (parsed * 2.0, MidpointRounding.AwayFromZero) / 2.0;
+		parsed = TemperatureDisplay.FromCelsius (celsius, TemperatureUnits);
 		if (_editSlotTemperatures[slotIndex].Equals (parsed))
 			{
 			LogInfo ($"Ignored edit slot temperature update for slot={slotIndex + 1} because value is unchanged ({parsed.ToString (CultureInfo.InvariantCulture)})");
 			return;
 			}
 
-		slot.Temperature = parsed;
+		slot.Temperature = celsius;
 		_editSlotTemperatures[slotIndex] = parsed;
 		NotifyPropertyChanged (GetEditSlotTemperaturePropertyId (slotIndex), new DriverEntityValue (parsed));
 		string slotErrorPropertyId = GetEditSlotErrorPropertyId (slotIndex);

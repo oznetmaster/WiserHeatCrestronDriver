@@ -80,7 +80,7 @@ public static class ScheduleEditorRendering
 					var buttons = row.Elements ("node").Where (node => Is (node, id)).ToArray ();
 					if (buttons.Length != 1) throw new InvalidDataException ("The labelled setpoint row has a missing or ambiguous action.");
 					decimal value = editor.GetProperty (property + kind).GetDecimal ();
-					bool outwardLimit = id.EndsWith ("_minus", StringComparison.Ordinal) ? value == 5m : value == 35m;
+					bool outwardLimit = id.EndsWith ("_minus", StringComparison.Ordinal) ? value == 5m : value == 30m;
 					// A disabled outward action is valid only at its exact endpoint; its row and ancestors must remain enabled.
 					Enabled (buttons[0], allowDisabledSelf: outwardLimit);
 					if ((string?)buttons[0].Attribute ("enabled") == "true" && (string?)buttons[0].Attribute ("clickable") != "true") throw new InvalidDataException ("A setpoint action is not operable.");

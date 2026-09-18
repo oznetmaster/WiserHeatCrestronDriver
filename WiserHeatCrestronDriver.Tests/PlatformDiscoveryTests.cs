@@ -775,6 +775,7 @@ public sealed partial class PlatformDiscoveryTests
 		internal string HotWaterState;
 		internal bool AllowRoomCommands;
 		internal int RoomCommands;
+		internal string LastRoomWrite;
 		internal bool AllowAwayCommands;
 		internal bool Away;
 		internal int AwayCommands;
@@ -827,6 +828,7 @@ public sealed partial class PlatformDiscoveryTests
 			if (request.Method.Method == "PATCH" && request.RequestUri.AbsolutePath.EndsWith ("/domain/Room/4") && AllowRoomCommands)
 				{
 				RoomCommands++;
+				LastRoomWrite = await request.Content.ReadAsStringAsync ();
 				Rooms = Rooms.Replace ("Before command", "Hub confirmed");
 				return new HttpResponseMessage (HttpStatusCode.NoContent);
 				}

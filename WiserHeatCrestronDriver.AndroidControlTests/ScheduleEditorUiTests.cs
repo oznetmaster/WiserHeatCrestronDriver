@@ -204,9 +204,9 @@ public sealed partial class GatewayUiTests
 			var before = ScheduleEditorObservation.Editor ((await ReadRoomAsync (binding, token)).PropertyValues);
 			decimal original = before.GetProperty (property).GetDecimal ();
 			// These are the editor's published range and step, not the room's manual target.
-			if (original < 5m || original > 35m || original % 0.5m != 0m)
+			if (original < 5m || original > 30m || original % 0.5m != 0m)
 				throw new InvalidDataException ("The pending setpoint is outside the editor's supported range or step.");
-			bool increase = original == 5m || original < 35m && slot % 2 == 1;
+			bool increase = original == 5m || original < 30m && slot % 2 == 1;
 			decimal expectedTemperature = original + (increase ? 0.5m : -0.5m);
 			var expectedValues = JsonSerializer.Deserialize<Dictionary<string, JsonElement>> (before.GetRawText ())!;
 			expectedValues[property] = JsonSerializer.SerializeToElement (expectedTemperature);

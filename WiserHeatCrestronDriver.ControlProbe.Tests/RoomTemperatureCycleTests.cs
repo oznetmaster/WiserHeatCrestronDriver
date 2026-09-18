@@ -196,6 +196,36 @@ public sealed class RoomTemperatureCycleTests
 		RoomTemperatureRestoration.RequireRestored (RoomTemperatureRestoration.Capture (RoomTemperatureRestoration.Room (original.Gateway.Hub, 9)), RoomTemperatureRestoration.Room (session.State.Gateway.Hub, 9));
 		}
 	[Test]
+	public async Task UpperTemperatureLimitStartsWithLowerAndRestores ()
+		{
+		var session = new Session ();
+		session.State = Edit (session.State, domain =>
+			{
+			domain["Room"]![0]!["CurrentSetPoint"] = 300;
+			domain["Room"]![0]!["ScheduledSetPoint"] = 300;
+			}) with { HomeTarget = 30 };
+		var result = await Run (session);
+		Assert.That (result.Passed && result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs, Is.EqualTo (new[] { RoomTemperatureAction.Lower, RoomTemperatureAction.Raise }));
+		Assert.That (session.State.HomeTarget, Is.EqualTo (30));
+		}
+
+	[TestCase (40)]
+	[TestCase (310)]
+	public async Task OutsideSupportedTargetRangeSendsNoInputs (int target)
+		{
+		var session = new Session ();
+		session.State = Edit (session.State, domain =>
+			{
+			domain["Room"]![0]!["CurrentSetPoint"] = target;
+			domain["Room"]![0]!["ScheduledSetPoint"] = target;
+			}) with { HomeTarget = target / 10d };
+		Assert.That ((await Run (session)).Passed, Is.False);
+		Assert.That (session.Inputs, Is.Empty);
+		Assert.That (session.Restores, Is.Empty);
+		}
+
+	[Test]
 	public async Task AbsentInactiveManualTargetRemainsAbsent ()
 		{
 		var session = new Session (absent: true);

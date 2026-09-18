@@ -65,8 +65,8 @@ public sealed partial class GatewayUiTests
 			// Validate every original before any pending edit; unsupported values cannot be restored through the bounded setter.
 			if (exerciseSetpoints && Enumerable.Range (1, 10).Where (slot => originalEditor.GetProperty ("editSlot" + slot + "Visible").GetBoolean ())
 				.Select (slot => originalEditor.GetProperty ("editSlot" + slot + "Temperature").GetDecimal ())
-				.Any (value => value < 5m || value > 35m || value % 0.5m != 0m))
-				throw new InvalidDataException ("Boundary testing requires restorable original temperatures within 5-35 degrees in half-degree steps.");
+				.Any (value => value < 5m || value > 30m || value % 0.5m != 0m))
+				throw new InvalidDataException ("Boundary testing requires restorable original temperatures within 5-30 degrees in half-degree steps.");
 			string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + (exerciseSetpoints ? ".editor-boundaries" : ".editor-scroll");
 			string evidence = Path.Combine (_session!.Context.EvidenceDirectory, check + ".records");
 			Directory.CreateDirectory (evidence);

@@ -1,5 +1,14 @@
 # Wiser submission pilot status
 
+## Temperature units and limits - 2026-09-18 (local candidate work)
+
+The driver now keeps hub models and schedule data in Celsius and converts at the UI boundary. Room readings, target commands and all ten editor slots use the selected units. Published ranges match the library's physical 5-30 C limits: 41-86 F, with half-degree Celsius or 0.9-degree Fahrenheit steps. Changing display units preserves pending schedule temperatures. Boost configuration explicitly uses a Celsius difference from 1 to 5 degrees; non-finite input is rejected and finite out-of-range input is bounded.
+
+Offline regressions cover initial and changed units, the SDK extension property-command path, raw Celsius writes, rejected inputs, pending schedule preservation and Boost configuration. The desktop driver suite passes 180 tests with three live cases skipped. The control suite passes 387 tests. The net472 driver/test build and Android control fixture build pass without warnings. An initial extension-command regression supplied a numeric value where the SDK requires text; the corrected fixture uses the actual UI input format and passes. No live heating operation was used for this work.
+
+These changes are not in installed candidate 1.3.10 or a published release. The help source has changed but its final PDF has not yet been rebuilt or reviewed. A new immutable package and corresponding processor/Android validation are still required; existing candidate evidence must not be reused as acceptance of changed bytes. Off-sentinel display behavior remains a separate review item before final acceptance.
+
+
 ## Editor checks and temperature-unit finding - 18 September 2026
 
 The unchanged 1.3.10 candidate passed three additional filtered Android cases: pending editor bounds on all four displayed rows, and recovery from deliberate day/time edit interruptions. Original editor values, complete schedules and guarded room settings matched the final observations. Home, original inventory, producer files, temporary-child removal, private-settings removal and reservation release were verified. The retained upper-limit screenshot shows 35.0° with the outward button disabled. No hub Save was sent. This establishes the current four-slot Celsius editor behavior only, not physical setpoint bounds or complete official-plan acceptance.

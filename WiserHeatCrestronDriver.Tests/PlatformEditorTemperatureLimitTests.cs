@@ -21,6 +21,7 @@ public sealed partial class PlatformDiscoveryTests
 	[TestCase (4.99)]
 	[TestCase (35.5)]
 	[TestCase (35.01)]
+	[TestCase (30.01)]
 	public async Task ScheduleEditor_InvalidTemperatureCommandPreservesPendingValues (double value)
 		{
 		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Ten slots\",\"Monday\":" + EditorDay (10) + "}]";
@@ -43,10 +44,10 @@ public sealed partial class PlatformDiscoveryTests
 		}
 
 	[TestCase (5.0, 5.0)]
-	[TestCase (35.0, 35.0)]
+	[TestCase (30.0, 30.0)]
 	[TestCase (5.24, 5.0)]
 	[TestCase (5.25, 5.5)]
-	[TestCase (34.75, 35.0)]
+	[TestCase (29.75, 30.0)]
 	public async Task ScheduleEditor_BoundaryTemperatureCommandIsAcceptedAndCancelRestores (double value, double expected)
 		{
 		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Ten slots\",\"Monday\":" + EditorDay (10) + "}]";

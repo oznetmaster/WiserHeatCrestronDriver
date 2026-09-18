@@ -67,7 +67,7 @@
       },
       {
         "kind": "bullet",
-        "text": "Choose Celsius or Fahrenheit, the room Boost Delta (1 to 10), and Boost Duration Minutes (5 to 1440). The defaults are Celsius, a delta of 2, and 60 minutes."
+        "text": "Choose Celsius or Fahrenheit for displayed temperatures. Room and schedule targets support 5 to 30 C (41 to 86 F), in steps equivalent to 0.5 C (0.9 F). Boost Increase is always configured in Celsius: 1 to 5 C, equivalent to 1.8 to 9 F. Boost Duration Minutes supports 5 to 1440. The defaults are Celsius display, a 2 C boost increase, and 60 minutes."
       },
       {
         "kind": "bullet",

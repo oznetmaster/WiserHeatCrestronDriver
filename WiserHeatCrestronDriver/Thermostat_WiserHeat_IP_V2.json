@@ -52,15 +52,15 @@
       },
       {
         "Id": "BoostDelta",
-        "Title": "Boost Delta",
-        "Description": "Temperature increase applied when boost is triggered.",
+        "Title": "Boost Increase (Celsius)",
+        "Description": "Temperature increase in Celsius when boost is triggered, independent of display units. 1-5 C equals 1.8-9 F.",
         "UsageContext": "Generic.Prompt",
         "Required": true,
         "Persistent": true,
         "ValueType": "Number",
         "DefaultValue": 2,
         "MinValue": 1,
-        "MaxValue": 10
+        "MaxValue": 5
       },
       {
         "Id": "BoostDurationMinutes",

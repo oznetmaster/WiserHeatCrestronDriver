@@ -144,11 +144,11 @@ public sealed class ScheduleEditorRenderingTests
 		Assert.Throws<InvalidDataException> (() => Check (page));
 		}
 	[TestCase (5, "minus", true)]
-	[TestCase (35, "plus", true)]
+	[TestCase (30, "plus", true)]
 	[TestCase (5, "plus", false)]
-	[TestCase (35, "minus", false)]
+	[TestCase (30, "minus", false)]
 	[TestCase (5.5, "minus", false)]
-	[TestCase (34.5, "plus", false)]
+	[TestCase (29.5, "plus", false)]
 	public void OnlyOutwardEndpointButtonMayBeDisabled (decimal temperature, string action, bool accepted)
 		{
 		var page = Page (1);

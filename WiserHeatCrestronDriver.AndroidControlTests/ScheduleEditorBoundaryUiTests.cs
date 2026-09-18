@@ -87,11 +87,11 @@ public sealed partial class GatewayUiTests
 				}, token);
 			await Observe (expected, label);
 			}
-		foreach (decimal limit in new[] { 5m, 35m })
+		foreach (decimal limit in new[] { 5m, 30m })
 			{
 			string label = phase + "-" + limit.ToString (CultureInfo.InvariantCulture);
 			await Prepare (limit, label + "-prepare");
-			bool outwardPlus = limit == 35m;
+			bool outwardPlus = limit == 30m;
 			var outward = CrestronHomePages.Resource (outwardPlus ? "customdeviceraiselowerwithtext_plus" : "customdeviceraiselowerwithtext_minus")
 				with { SiblingText = "SETPOINT " + slot.ToString (CultureInfo.InvariantCulture) };
 			bool enabled = false;
@@ -114,6 +114,6 @@ public sealed partial class GatewayUiTests
 			await Tap (outwardPlus, limit, label + "-return");
 			}
 		await Prepare (originalEditor.GetProperty (property).GetDecimal (), phase + "-restore-pending");
-		await record (phase + "-coverage", new { Slot = slot, Lower = 5m, Upper = 35m, BothDirections = true, PendingValueRestored = true, HubSaveSent = false });
+		await record (phase + "-coverage", new { Slot = slot, Lower = 5m, Upper = 30m, BothDirections = true, PendingValueRestored = true, HubSaveSent = false });
 		}
 	}

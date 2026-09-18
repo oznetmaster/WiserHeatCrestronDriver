@@ -1,5 +1,14 @@
 # Development and validation history
 
+## Temperature units and limits - 2026-09-18 (local candidate work)
+
+The driver now keeps hub models and schedule data in Celsius and converts at the UI boundary. Room readings, target commands and all ten editor slots use the selected units. Published ranges match the library's physical 5-30 C limits: 41-86 F, with half-degree Celsius or 0.9-degree Fahrenheit steps. Changing display units preserves pending schedule temperatures. Boost configuration explicitly uses a Celsius difference from 1 to 5 degrees; non-finite input is rejected and finite out-of-range input is bounded.
+
+Offline regressions cover initial and changed units, the SDK extension property-command path, raw Celsius writes, rejected inputs, pending schedule preservation and Boost configuration. The desktop driver suite passes 180 tests with three live cases skipped. The control suite passes 387 tests. The net472 driver/test build and Android control fixture build pass without warnings. An initial extension-command regression supplied a numeric value where the SDK requires text; the corrected fixture uses the actual UI input format and passes. No live heating operation was used for this work.
+
+These changes are not in installed candidate 1.3.10 or a published release. The help source has changed but its final PDF has not yet been rebuilt or reviewed. A new immutable package and corresponding processor/Android validation are still required; existing candidate evidence must not be reused as acceptance of changed bytes. Off-sentinel display behavior remains a separate review item before final acceptance.
+
+
 ## Candidate editor limits and interruption recovery - 2026-09-18 (no driver release)
 
 Three existing Android cases passed against unchanged Release candidate 1.3.10 with TestAdapter 1.11.1 and DevTools 1.8.0. All four displayed schedule rows exercised the pending editor's 5–35°C limits and half-degree return steps. Separate deliberate interruptions after changing the day and time both restored the original editor, hub schedules and room settings. Home restoration, frozen producer files, original device inventory, removal of the temporary thermostat and released reservations were verified. No schedule was saved to the hub.

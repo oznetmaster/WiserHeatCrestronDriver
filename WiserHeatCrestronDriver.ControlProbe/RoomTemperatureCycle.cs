@@ -100,7 +100,9 @@ public static class RoomTemperatureCycle
 			if (!Restored (plan, current) || current.Activity != original.Activity || current.HomeTarget != original.HomeTarget)
 				throw new InvalidDataException ("Starting state changed before input.");
 			int start = Room (original).GetProperty ("CurrentSetPoint").GetInt32 ();
-			int delta = start <= 345 ? 5 : -5;
+			if (start is < 50 or > 300)
+				throw new InvalidDataException ("Native temperature testing requires a restorable target within 5–30°C.");
+			int delta = start <= 295 ? 5 : -5;
 			RoomTemperatureAction[] actions = boost ? [RoomTemperatureAction.BoostOn, RoomTemperatureAction.BoostOff]
 				: delta > 0 ? [RoomTemperatureAction.Raise, RoomTemperatureAction.Lower] : [RoomTemperatureAction.Lower, RoomTemperatureAction.Raise];
 			foreach (var action in actions)

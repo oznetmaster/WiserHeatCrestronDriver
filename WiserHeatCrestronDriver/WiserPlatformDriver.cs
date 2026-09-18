@@ -484,7 +484,11 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				_temperatureUnits = units.Value.GetValue<string> () ?? _temperatureUnits;
 
 			if (values.TryGetValue ("BoostDelta", out DriverEntityValue? boostDelta) && boostDelta.HasValue)
-				_boostDelta = ReadDoubleValue (boostDelta.Value, _boostDelta);
+				{
+				double requested = ReadDoubleValue (boostDelta.Value, _boostDelta);
+				if (!double.IsNaN (requested) && !double.IsInfinity (requested))
+					_boostDelta = Math.Max (1, Math.Min (5, requested));
+				}
 
 			if (values.TryGetValue ("BoostDurationMinutes", out DriverEntityValue? boostMinutes) && boostMinutes.HasValue)
 				_boostDurationMinutes = ReadIntValue (boostMinutes.Value, _boostDurationMinutes);
@@ -847,9 +851,9 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			}
 		try
 			{
-			WiserUnits units = string.Equals (_temperatureUnits, "Fahrenheit", StringComparison.OrdinalIgnoreCase)
-				? WiserUnits.Imperial : WiserUnits.Metric;
-			newApi = ApiFactory (_hubIpAddress, _hubSecret, units)
+			// Hub models and raw schedule dictionaries share a Celsius representation.
+			// Room entities convert only values crossing the user interface boundary.
+			newApi = ApiFactory (_hubIpAddress, _hubSecret, WiserUnits.Metric)
 				?? throw new InvalidOperationException ("Wiser API client creation returned null.");
 			await newApi.InitializeAsync (CancellationToken.None).ConfigureAwait (false);
 			lock (_entitiesLock)
