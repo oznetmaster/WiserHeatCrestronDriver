@@ -1,5 +1,12 @@
 # Wiser submission pilot status
 
+## Off-state preservation - 2026-09-18 (local candidate work)
+
+Off heating targets and schedule slots retain their control marker when display units change. The UI shows Off instead of a negative temperature; an explicit button labelled with the minimum target starts heating or changes only the selected pending slot. Editing another slot or a time preserves Off, and Cancel restores pending Off slots. Regressions cover Celsius/Fahrenheit, all ten slots, stale resume actions, saved payloads and bindings to real properties, commands and translations.
+
+The complete desktop suite passes 187 cases with three live cases skipped against an isolated local package of the corrected library, and the matching net472 build passes without warnings. The library correction prevents an intermediate scheduled target when leaving Off. The UI still needs visual verification and candidate-bound processor/Android testing. No live commands, new candidate deployment or updated help PDF are claimed by these results.
+
+
 ## Temperature units and limits - 2026-09-18 (local candidate work)
 
 The driver now keeps hub models and schedule data in Celsius and converts at the UI boundary. Room readings, target commands and all ten editor slots use the selected units. Published ranges match the library's physical 5-30 C limits: 41-86 F, with half-degree Celsius or 0.9-degree Fahrenheit steps. Changing display units preserves pending schedule temperatures. Boost configuration explicitly uses a Celsius difference from 1 to 5 degrees; non-finite input is rejected and finite out-of-range input is bounded.

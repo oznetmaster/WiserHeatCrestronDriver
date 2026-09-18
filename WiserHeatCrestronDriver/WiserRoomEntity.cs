@@ -21,7 +21,7 @@ using WiserHeatApiV2;
 
 namespace WiserHeat.CrestronDriver;
 
-internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
+internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 	{
 	private int _frameworkReady;
 	private readonly DriverControllerLogger _logger;
@@ -73,7 +73,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		_room = room;
 		DeviceLabel = room.Name ?? controllerId;
 		TemperatureUnits = TemperatureDisplay.NormalizeUnits (platform.TemperatureUnits);
-		TargetTemperature = TemperatureDisplay.FromCelsius (room.CurrentTargetTemperature, TemperatureUnits);
+		TargetTemperature = TemperatureDisplay.SetpointFromCelsius (room.CurrentTargetTemperature, TemperatureUnits);
 		CurrentTemperature = TemperatureDisplay.FromCelsius (room.CurrentTemperature, TemperatureUnits);
 		IsBoostActive = IsRoomBoostActive (room);
 		BoostStateLabel = IsBoostActive ? "^BoostOnLabel" : "^BoostOffLabel";
@@ -124,6 +124,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		AddCommand (this, ExtensionSetPropertyValueExecutor.CommandName, setPropertyValue);
 		UpdateScheduleSelectionDefinition (ScheduleValues);
 		UpdateTemperatureDefinitions ();
+		AddOffSlotProperties ();
 
 		_suppressPropertyNotifications = false;
 		NotifyEditStateChanged ();
@@ -166,7 +167,15 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 	public double TargetTemperature
 		{
 		get;
-		private set => SetAndNotify ("targetTemperature", value, ref field);
+		private set
+			{
+			SetAndNotify ("targetTemperature", value, ref field);
+			if (!_suppressPropertyNotifications)
+				{
+				NotifyPropertyChanged ("isHeatingOff", new DriverEntityValue (IsHeatingOff));
+				NotifyPropertyChanged ("hasHeatingTarget", new DriverEntityValue (HasHeatingTarget));
+				}
+			}
 		}
 
 	[EntityCommand (Id = "setTargetTemperature", FriendlyName = "Set Target Temperature")]
@@ -816,6 +825,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		string units = TemperatureDisplay.NormalizeUnits (temperatureUnits);
 		bool unitsChanged = units != TemperatureUnits;
 		TemperatureUnits = units;
+		NotifyPropertyChanged ("minimumHeatingLabel", new DriverEntityValue (MinimumHeatingLabel));
 		if (unitsChanged)
 			{
 			UpdateTemperatureDefinitions ();
@@ -829,7 +839,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 		DeviceLabel = _room.Name ?? DeviceLabel;
 		CurrentTemperature = TemperatureDisplay.FromCelsius (_room.CurrentTemperature, TemperatureUnits);
-		TargetTemperature = TemperatureDisplay.FromCelsius (_room.CurrentTargetTemperature, TemperatureUnits);
+		TargetTemperature = TemperatureDisplay.SetpointFromCelsius (_room.CurrentTargetTemperature, TemperatureUnits);
 		IsBoostActive = IsRoomBoostActive (_room);
 		BoostStateLabel = IsBoostActive ? "^BoostOnLabel" : "^BoostOffLabel";
 		BoostActionLabel = IsBoostActive ? "^BoostOffActionLabel" : "^BoostOnActionLabel";
@@ -1314,7 +1324,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			{
 			_editSlotVisible[i] = true;
 			_editSlotTimes[i] = slots[i].Time;
-			_editSlotTemperatures[i] = TemperatureDisplay.FromCelsius (slots[i].Temperature, TemperatureUnits);
+			_editSlotTemperatures[i] = TemperatureDisplay.SetpointFromCelsius (slots[i].Temperature, TemperatureUnits);
 			_editSlotErrors[i] = string.Empty;
 			}
 		}
@@ -1379,6 +1389,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 		slot.Temperature = celsius;
 		_editSlotTemperatures[slotIndex] = parsed;
 		NotifyPropertyChanged (GetEditSlotTemperaturePropertyId (slotIndex), new DriverEntityValue (parsed));
+		NotifyOffSlotState (slotIndex);
 		string slotErrorPropertyId = GetEditSlotErrorPropertyId (slotIndex);
 		string previousSlotError = _editSlotErrors[slotIndex] ?? string.Empty;
 		_editSlotErrors[slotIndex] = string.Empty;
@@ -1509,6 +1520,7 @@ internal sealed class WiserRoomEntity : ReflectedAttributeDriverEntity
 			NotifyPropertyChanged (GetEditSlotTimePropertyId (i), new DriverEntityValue (_editSlotTimes[i] ?? string.Empty));
 			NotifyPropertyChanged (GetEditSlotErrorPropertyId (i), new DriverEntityValue (_editSlotErrors[i] ?? string.Empty));
 			NotifyPropertyChanged (GetEditSlotTemperaturePropertyId (i), new DriverEntityValue (_editSlotTemperatures[i]));
+			NotifyOffSlotState (i);
 			}
 		}
 

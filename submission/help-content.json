@@ -119,7 +119,7 @@
       },
       {
         "kind": "paragraph",
-        "text": "Each managed thermostat tile appears in its assigned room. Open it to view current temperature, adjust the heating target, start or stop a boost, or open Schedule. This is a heat-only interface; cooling and automatic heating/cooling changeover are not offered."
+        "text": "Each managed thermostat tile appears in its assigned room. Open it to view current temperature, adjust the heating target, start or stop a boost, or open Schedule. This is a heat-only interface; cooling and automatic heating/cooling changeover are not offered. An Off heating target is shown as Off rather than a negative temperature. The Set to 5°C (41°F) button deliberately resumes heating at the minimum target; adjust the normal thermostat control afterwards if needed."
       },
       {
         "kind": "heading2",
@@ -149,7 +149,7 @@
       },
       {
         "kind": "paragraph",
-        "text": "Choose a day, then adjust the displayed time and setpoint slots. Day and time selectors open choice dialogs. Save Day writes the selected day. Save All applies that day's entries to all days of the selected shared schedule. Cancel returns without saving the current edits. The page shows the schedule's shared impact and validation errors."
+        "text": "Choose a day, then adjust the displayed time and setpoint slots. Day and time selectors open choice dialogs. An existing Off slot stays Off when its time or other slots are edited. Set to 5°C (41°F) changes only that pending slot to a heating temperature, which can then be adjusted normally. Save Day writes the selected day. Save All applies that day's entries to all days of the selected shared schedule. Cancel returns without saving the current edits. The page shows the schedule's shared impact and validation errors."
       },
       {
         "kind": "heading2",

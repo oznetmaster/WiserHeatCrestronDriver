@@ -14,6 +14,7 @@ internal static class TemperatureDisplay
 	internal static bool IsFahrenheit (string? units) => string.Equals (units, "Fahrenheit", StringComparison.OrdinalIgnoreCase);
 	internal static string NormalizeUnits (string? units) => IsFahrenheit (units) ? "Fahrenheit" : "Celsius";
 	internal static double FromCelsius (double value, string? units) => IsFahrenheit (units) ? Math.Round (value * 9 / 5 + 32, 1) : value;
+	internal static double SetpointFromCelsius (double value, string? units) => value == WiserHeatApiV2.Constants.TEMP_OFF ? value : FromCelsius (value, units);
 	internal static double Step (string? units) => IsFahrenheit (units) ? 0.9 : StepCelsius;
 
 	internal static bool TrySetpoint (double displayed, string? units, out double celsius)

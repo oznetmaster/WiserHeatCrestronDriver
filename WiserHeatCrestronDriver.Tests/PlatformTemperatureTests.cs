@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Runtime.Serialization.Json;
 using System.Text;
@@ -24,6 +25,109 @@ namespace WiserHeatCrestronDriver.Tests;
 
 public sealed partial class PlatformDiscoveryTests
 	{
+	[Test]
+	public async Task OffControls_BindToPublishedVisibilityAndExplicitCommands ()
+		{
+		await Refresh ("""[{"id":4,"Name":"Synthetic","Mode":"Manual","CurrentSetPoint":-200}]""");
+		var state = Entities["room_4"].GetState ();
+		var ui = XDocument.Load (Path.Combine (TestSupport.DataDirectory, "room", "uidefinitions", "UiDefinition.xml"));
+		XElement Control (string id) => ui.Descendants ().Single (element => (string)element.Attribute ("id") == id);
+		Assert.That ((string)Control ("RoomThermostat").Attribute ("heatmodeenabled"), Is.EqualTo ("{hasHeatingTarget}"));
+		Assert.That ((string)Control ("HeatingOffStatus").Attribute ("visible"), Is.EqualTo ("{isHeatingOff}"));
+		Assert.That (state.PropertyValues["hasHeatingTarget"].GetValue<bool> (), Is.False);
+		Assert.That (state.Definition.Commands.Keys, Does.Contain ("resumeHeating"));
+		for (int slot = 1; slot <= 10; slot++)
+			{
+			Assert.That ((string)Control ("EditSlot" + slot + "Temperature").Attribute ("visible"), Is.EqualTo ("{editSlot" + slot + "HasTemperature}"));
+			var off = Control ("EditSlot" + slot + "Off");
+			Assert.That ((string)off.Attribute ("visible"), Is.EqualTo ("{editSlot" + slot + "IsOff}"));
+			Assert.That ((string)off.Attribute ("buttonaction"), Is.EqualTo ("command:resumeEditSlot" + slot));
+			Assert.That (state.Definition.Commands.Keys, Does.Contain ("resumeEditSlot" + slot));
+			Assert.That (state.Definition.Properties.Keys, Does.Contain ("editSlot" + slot + "IsOff").And.Contain ("editSlot" + slot + "HasTemperature"));
+			}
+		Assert.That (TemperatureCommand (File.ReadAllText (Path.Combine (TestSupport.DataDirectory, "Translations", "en-US.json"))).Element ("HeatingOffLabel").Value, Is.EqualTo ("Off"));
+		}
+
+	[TestCase ("Celsius", "Set to 5°C", 5)]
+	[TestCase ("Fahrenheit", "Set to 41°F", 41)]
+	public async Task OffTarget_RemainsOffUntilTheExplicitResumeAction (string units, string label, double minimum)
+		{
+		Set ("_temperatureUnits", units);
+		_transport.AllowRoomCommands = true;
+		await Refresh ("""[{"id":4,"Name":"Synthetic","Mode":"Manual","CalculatedTemperature":200,"CurrentSetPoint":-200}]""");
+		var room = Entities["room_4"];
+		Assert.That (room.TargetTemperature, Is.EqualTo (Constants.TEMP_OFF));
+		Assert.That (room.IsHeatingOff, Is.True);
+		Assert.That (room.HasHeatingTarget, Is.False);
+		Assert.That (room.MinimumHeatingLabel, Is.EqualTo (label));
+		Assert.That (_transport.RoomCommands, Is.Zero);
+		room.ResumeHeating ();
+		await TestSupport.Complete (WaitForCompletion (room));
+		Assert.That ((int)TemperatureCommand (_transport.LastRoomWrite).Element ("RequestOverride").Element ("SetPoint"), Is.EqualTo (50));
+		_transport.Rooms = """[{"id":4,"Name":"Synthetic","Mode":"Manual","CalculatedTemperature":200,"CurrentSetPoint":50}]""";
+		await _driver.RefreshSystemStateAsync (true);
+		Assert.That (room.TargetTemperature, Is.EqualTo (minimum));
+		Assert.That (room.HasHeatingTarget, Is.True);
+		int writesBeforeStaleAction = _transport.RoomCommands;
+		room.ResumeHeating ();
+		Assert.That (_transport.RoomCommands, Is.EqualTo (writesBeforeStaleAction), "A stale Off button must not reset an active target.");
+		}
+
+	[TestCase ("Celsius")]
+	[TestCase ("Fahrenheit")]
+	public async Task OffScheduleSlots_RemainOffAcrossUnitTimeAndOtherSlotEdits (string units)
+		{
+		Set ("_temperatureUnits", units);
+		_transport.AllowScheduleWrites = true;
+		_transport.HeatingSchedules = """[{"id":7,"Name":"Synthetic","Monday":{"Time":[600,2200],"DegreesC":[-200,170]}}]""";
+		await Refresh ("""[{"id":4,"Name":"Synthetic","Mode":"Auto","ScheduleId":7,"CurrentSetPoint":-200}]""");
+		var room = Entities["room_4"];
+		room.OpenEditSchedule ();
+		room.SetEditSelectedDay ("Monday");
+		Assert.That (room.EditSlot1Temperature, Is.EqualTo (Constants.TEMP_OFF));
+		Assert.That (room.GetState ().PropertyValues["editSlot1IsOff"].GetValue<bool> (), Is.True);
+		Assert.That (room.GetState ().PropertyValues["editSlot1HasTemperature"].GetValue<bool> (), Is.False);
+		string newUnits = units == "Celsius" ? "Fahrenheit" : "Celsius";
+		room.UpdateFromRoom (_api.Rooms.GetById (4), newUnits);
+		room.SetEditSlot1Time ("06:30");
+		room.SetEditSlot2Temperature (newUnits == "Celsius" ? 21 : 69.8);
+		Assert.That (room.EditSlot1Temperature, Is.EqualTo (Constants.TEMP_OFF));
+		room.SaveEditScheduleDay ();
+		await TestSupport.Complete (WaitForCompletion (room));
+		var monday = TemperatureCommand (_transport.LastScheduleWrite).Element ("Monday");
+		Assert.That (monday.Element ("DegreesC").Elements ().Select (value => (int)value), Is.EqualTo (new[] { -200, 210 }));
+		Assert.That (monday.Element ("Time").Elements ().Select (value => (int)value), Is.EqualTo (new[] { 630, 2200 }));
+		}
+
+	[TestCase ("Celsius", 5)]
+	[TestCase ("Fahrenheit", 41)]
+	public async Task OffScheduleSlots_ResumeOnlyTheSelectedPendingSlotAndCancelRestores (string units, double minimum)
+		{
+		Set ("_temperatureUnits", units);
+		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Synthetic\",\"Monday\":{\"Time\":[0,100,200,300,400,500,600,700,800,900],\"DegreesC\":[-200,-200,-200,-200,-200,-200,-200,-200,-200,-200]}}]";
+		await Refresh ("""[{"id":4,"Name":"Synthetic","Mode":"Auto","ScheduleId":7,"CurrentSetPoint":-200}]""");
+		var room = Entities["room_4"];
+		room.OpenEditSchedule ();
+		room.SetEditSelectedDay ("Monday");
+		for (int slot = 1; slot <= 10; slot++)
+			{
+			var completion = new TaskCompletionSource<bool> (TaskCreationOptions.RunContinuationsAsynchronously);
+			room.ExecuteCommand ("resumeEditSlot" + slot, new Dictionary<string, DriverEntityValue> (), result => completion.TrySetResult (result.Failed));
+			await TestSupport.Complete (completion.Task);
+			Assert.That (await completion.Task, Is.False);
+			var state = room.GetState ().PropertyValues;
+			for (int index = 1; index <= 10; index++)
+				{
+				Assert.That (state["editSlot" + index + "Temperature"].GetValue<double> (), Is.EqualTo (index == slot ? minimum : Constants.TEMP_OFF));
+				Assert.That (state["editSlot" + index + "IsOff"].GetValue<bool> (), Is.EqualTo (index != slot));
+				}
+			room.CancelEditSchedule ();
+			Assert.That (room.GetState ().PropertyValues["editSlot" + slot + "IsOff"].GetValue<bool> (), Is.True);
+			room.OpenEditSchedule ();
+			}
+		Assert.That (_transport.ScheduleWrites + _transport.RoomCommands, Is.Zero);
+		}
+
 	[TestCase ("Celsius", 2.5, 2.5, 25)]
 	[TestCase ("Fahrenheit", 2.5, 2.5, 25)]
 	[TestCase ("Fahrenheit", 10, 5, 50)]
