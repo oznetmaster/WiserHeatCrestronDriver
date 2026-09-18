@@ -136,3 +136,9 @@ The blank Extension self-test draft was rendered and inspected. Its checkboxes c
 - Review applicability and the completed official form, supply and authorize the signature, and validate supported upload/email delivery with retained receipts and uncertain-outcome reconciliation.
 
 Ordinary driver development and GitHub releases remain independent of optional portal submission. None of the incomplete items above should be presented as passed because a shared tool or another fixture has passed its own tests.
+
+## Gateway Away and hot-water preparation
+
+The opt-in Away UI cycle and its isolation tests are implemented. Offline verification and saved-response replay have passed; no actual Away transition has yet been validated by this fixture. Its physical scope is whole-house heating, so it requires authorization beyond an individual room-control test. A successful result must establish both UI transitions, independent hub state, unchanged guarded settings and observed navigation/cleanup on the exact candidate.
+
+Hot-water state capture and compensation planning are implemented and checked offline. The original scheduled/manual/override policy and latent manual state are distinguished from a button's On/Off display. The opt-in hot-water UI cycle is now implemented, including journaled compensation transport and fault-injection tests. Actual hub acceptance of compensation and live UI validation remain pending. Preserving a timed override's original absolute deadline remains unverified. Neither preparation closes the gateway control/feedback/timing acceptance requirements.

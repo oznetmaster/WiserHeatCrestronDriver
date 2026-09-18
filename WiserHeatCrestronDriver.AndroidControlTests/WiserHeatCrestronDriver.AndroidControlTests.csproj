@@ -29,5 +29,8 @@
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleChoiceScan.cs" Link="ScheduleChoiceScan.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/SuccessfulRefreshSequence.cs" Link="SuccessfulRefreshSequence.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleMembershipIsolation.cs" Link="ScheduleMembershipIsolation.cs" />
+    <Compile Include="../WiserHeatCrestronDriver.ControlProbe/GatewayAwayCycle.cs" Link="GatewayAwayCycle.cs" />
+    <Compile Include="../WiserHeatCrestronDriver.ControlProbe/HotWaterRestoration.cs" Link="HotWaterRestoration.cs" />
+    <Compile Include="../WiserHeatCrestronDriver.ControlProbe/HotWaterControlCycle.cs" Link="HotWaterControlCycle.cs" />
   </ItemGroup>
 </Project>

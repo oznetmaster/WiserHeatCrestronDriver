@@ -11,6 +11,14 @@ See the [product changelog](CHANGELOG.md) for shipped changes. This document pre
 
 <!-- development-history -->
 
+## Gateway control fixture preparation - 2026-09-18 (no driver release)
+
+- Added an opt-in Android Away-mode cycle with independent hub observations, guarded room/schedule/override preservation, response timing and observed Home restoration. It supports either initial Away state and never replays an uncertain input. Whole-house authorization and actual hardware validation remain separate prerequisites.
+- Added hot-water restoration planning that distinguishes schedule control, manual mode and manual overrides. Offline checks reject a button returning to its original value with the wrong control policy, and reject timed overrides until absolute-deadline restoration is verified. Saved hub-response replay checks use the actual hot-water array layout.
+- Connected the hot-water restoration contract to a complete opt-in Android cycle. Both button states, independent hub feedback, bounded compensation and observed Home restoration are required. Fault tests cover ignored cancellation, lost replies, cancellation and changes outside the test; physical acceptance remains pending.
+- These are test and submission preparations, not final-candidate acceptance or a driver release. See [validation status](submission/ValidationStatus.md).
+
+
 ## Schedule membership fixture and capacity preflight - 2026-09-18 (no driver release)
 
 - Added an opt-in fixture for a temporary unassigned schedule appearing and disappearing in an already-open selector. Recovery checks require durable intents, prohibit uncertain-write replay and protect schedules that are changed or assigned externally.

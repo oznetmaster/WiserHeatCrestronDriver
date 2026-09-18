@@ -157,3 +157,28 @@ The actual selector is opened before one complete seven-day schedule is created 
 Lost replies are independently reconciled without replay and the run remains failed. Unsafe external edits or assignments prevent automatic deletion and retain the reservation for reconciliation. Cleanup verifies complete original state and Home without editor compensation. Ordinary tests remain offline unless a workflow and this flag are supplied. The fixture is not proof that a particular hub accepts the complete creation payload; actual successful runs are listed in [validation status](../submission/ValidationStatus.md). Rejection of a deliberately supplied stale/deleted ID is a separate requirement, not established by list disappearance.
 
 The [UK/Ireland system guide](https://www.productinfo.schneider-electric.com/wiser_home/wiser-home-sug-uk/English/System%20User%20Guide_Wiser_Home_UK%20%28Bookmap%29.pdf) lists a maximum of 16 climate schedules per hub. Free capacity is a hardware prerequisite for this case, not a reason to mark an unexecuted add/remove check as passed.
+
+
+### Whole-house Away control
+
+`GatewayAwayChangesHubStateAndRestoresOriginal` requires `AllowGatewayAwayControl`, private `ControlHubSettingsPath` and one bound `Rooms` child to verify that the selected gateway is connected to the intended physical hub. Away mode affects the household, not just that binding's room; obtain permission for that scope before enabling the flag.
+
+The fixture captures the original Away state, schedules, guarded room settings and hot-water overrides. It supports either starting Away state. One observed labelled UI action changes Away mode, then a distinct action restores its original value. Fresh independent hub reads, a later successful driver refresh, enabled controls and the actual Android row must agree. Timing and before/after captures are saved as private evidence. Dynamic temperatures and relay feedback may legitimately change; this is not a promise to restore historic sensor readings. Existing override values and absolute deadlines must remain unchanged. Unsupported system overrides are rejected before input.
+
+Lost input replies are never replayed. A lost reply remains a failed test even if independent observations confirm restoration. If the transition cannot be established, the driver restarts or unrelated guarded settings change, the run retains its reservations for reconciliation. Completion also requires observed navigation back to Home. The gateway exposes no per-command completion counter, so these checks establish one issued tap per transition and correlated state feedback, not a claim about internal execution counts. Hardware acceptance is recorded separately in [validation status](../submission/ValidationStatus.md).
+
+
+### Hot-water restoration preparation
+
+The control-probe project contains a read-only `HotWaterRestoration` planner and comparator. It distinguishes scheduled control, manual mode and manual overrides, including the stored inactive override state. Returning a hot-water button to its previous On/Off value does not establish restoration: a new manual override must not remain in place of the original schedule. A legitimate later schedule event may change the current relay state without changing the restored control policy.
+
+The candidate compensation requests use the client library's existing Manual/None request shapes. Their acceptance and resulting fields must be independently validated on a hub before a live hot-water UI fixture can claim restoration. Timed overrides are rejected before producing a plan because restoring their original absolute deadline is not yet verified; the test must not silently replace them with a fresh duration. This preparation does not establish hot-water hardware acceptance and does not send requests itself.
+
+
+### Hot-water UI cycle
+
+`GatewayHotWaterChangesBothStatesAndRestoresOriginalPolicy` is an opt-in `LiveControl` case. Enable `AllowGatewayHotWaterControl` only with permission to operate the household hot water. Supply private `ControlHubSettingsPath` and one `Rooms` binding to verify the gateway's physical hub. This changes hot water, not the binding child's room temperature.
+
+The fixture captures the current settled relay/target state and scheduled/manual/override policy before input. It issues one observed UI action to change state and one to return to the original state, recording UI captures, fresh independent hub readings and observation timings. Restoration is checked separately: direct Manual/None compensation requests may be required to restore the captured latent manual target and schedule control. Each exact request must match the captured plan, has its own flushed intent and is attempted at most once. A compensation whose effect is already independently observed is not sent again. Natural schedule progression is allowed while preserving the original control policy.
+
+An uncertain reply remains a failed test even when original state is subsequently confirmed. Failed observation, a restarted driver or unrelated guarded changes prevent blind compensation and retain reservations. Final success requires the original policy, guarded settings, actual UI and observed Home restoration. Existing timed overrides are rejected before any input; timed behavior will be tested through a separately owned temporary override, rather than resetting a user's timer. The source fixture and synthetic fault tests do not establish actual hardware acceptance; see [validation status](../submission/ValidationStatus.md).

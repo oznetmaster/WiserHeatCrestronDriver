@@ -1,0 +1,162 @@
+// Copyright (c) 2026 Neil Colvin.
+// Licensed under the MIT License with Commons Clause. See LICENSE in the repository root.
+
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+using NUnit.Framework;
+
+namespace WiserHeatCrestronDriver.ControlProbe.Tests;
+
+[TestFixture]
+public sealed class HotWaterControlCycleTests
+	{
+	private sealed class Session (bool on = false, bool stored = false, string policy = "Schedule") : IHotWaterControlSession
+		{
+		public readonly JsonNode Domain = JsonSerializer.SerializeToNode (new
+			{
+			System = new { OverrideType = "None", AwayModeAffectsHotWater = true },
+			HotWater = new[] { new { id = 2, DeviceId = 0, ScheduleId = 1000, Mode = policy == "ManualMode" ? "Manual" : "Auto",
+				HotWaterDescription = policy == "Schedule" ? "FromSchedule" : policy == "ManualMode" ? "FromManualMode" : "FromManualOverride",
+				OverrideWaterHeatingState = stored ? "On" : "Off", WaterHeatingState = on ? "On" : "Off",
+				HotWaterRelayState = on ? "On" : "Off", ScheduledWaterHeatingState = on ? "On" : "Off" } },
+			Room = new[] { new { id = 9, Mode = "Auto", Name = "Room", ScheduleId = 10, ManualSetPoint = 170 } }
+			})!;
+		private readonly JsonElement _schedules = JsonSerializer.SerializeToElement (new { Heating = Array.Empty<object> (), OnOff = Array.Empty<object> () });
+		private string _lifetime = Guid.NewGuid ().ToString ();
+		private DateTimeOffset _refresh = DateTimeOffset.UtcNow;
+		public List<bool> Inputs = [];
+		public List<int> Restores = [];
+		public List<string> Records = [];
+		public string? Behavior;
+		public string? FailRecord;
+		public CancellationTokenSource? CancelAfterFirst;
+		private JsonNode Water => Domain["HotWater"]![0]!;
+		public Task<HotWaterControlSnapshot> ReadAsync (CancellationToken token)
+			{
+			token.ThrowIfCancellationRequested ();
+			bool active = Water["WaterHeatingState"]!.GetValue<string> () == "On";
+			return Task.FromResult (new HotWaterControlSnapshot ("fake-hub", _lifetime, _refresh,
+				new (_schedules, JsonSerializer.SerializeToElement (Domain)), Behavior == "ui-stale" && Inputs.Count > 0 ? !active : active, true));
+			}
+		public Task RecordAsync (string phase, object value)
+			{
+			if (FailRecord == phase) throw new IOException ("journal failed");
+			Records.Add (phase); return Task.CompletedTask;
+			}
+		private void Manual (bool enabled)
+			{
+			string state = enabled ? "On" : "Off";
+			Water["OverrideType"] = "Manual"; Water["OverrideWaterHeatingState"] = state;
+			Water["WaterHeatingState"] = state; Water["HotWaterRelayState"] = state;
+			Water["HotWaterDescription"] = "FromManualOverride";
+			if (Behavior == "own-deadline") Water["OverrideTimeoutUnixTime"] = DateTimeOffset.UtcNow.AddHours (1).ToUnixTimeSeconds ();
+			_refresh = _refresh.AddSeconds (1);
+			}
+		public Task SetHotWaterAsync (bool enabled, CancellationToken token)
+			{
+			token.ThrowIfCancellationRequested (); Inputs.Add (enabled);
+			if (Behavior == "not-delivered") throw new IOException ("input uncertain");
+			Manual (enabled);
+			if (Behavior == "foreign-room") Domain["Room"]![0]!["ManualSetPoint"] = 200;
+			if (Behavior == "foreign-water") Water["AwayModeSuppressed"] = true;
+			if (Behavior == "away-change") Domain["System"]!["OverrideType"] = "Away";
+			if (Behavior == "restart") _lifetime = Guid.NewGuid ().ToString ();
+			if (Inputs.Count == 1 && CancelAfterFirst != null) { CancelAfterFirst.Cancel (); token.ThrowIfCancellationRequested (); }
+			if (Behavior == "lost-first" && Inputs.Count == 1 || Behavior == "lost-second" && Inputs.Count == 2) throw new IOException ("reply lost");
+			return Task.CompletedTask;
+			}
+		public Task RestoreAsync (int index, int controllerId, JsonElement request, CancellationToken token)
+			{
+			token.ThrowIfCancellationRequested ();
+			Assert.That (controllerId, Is.EqualTo (2));
+			Assert.That (Restores, Does.Not.Contain (index), "Uncertain compensation must never be replayed.");
+			Assert.That (Records, Does.Contain ("restore-" + index + "-intent"));
+			Restores.Add (index);
+			var value = request.GetProperty ("RequestOverride");
+			if (value.GetProperty ("Type").GetString () == "Manual") Manual (value.GetProperty ("SetPoint").GetInt32 () == 110);
+			else if (Behavior != "cancel-ignored")
+				{
+				Water["OverrideType"] = "None"; Water.AsObject ().Remove ("OverrideTimeoutUnixTime");
+				bool auto = Water["Mode"]!.GetValue<string> () == "Auto";
+				Water["HotWaterDescription"] = auto ? "FromSchedule" : "FromManualMode";
+				string state = Water[auto ? "ScheduledWaterHeatingState" : "OverrideWaterHeatingState"]!.GetValue<string> ();
+				Water["WaterHeatingState"] = state; Water["HotWaterRelayState"] = state;
+				_refresh = _refresh.AddSeconds (1);
+				}
+			if (Behavior == "lost-compensation") throw new IOException ("compensation reply lost");
+			return Task.CompletedTask;
+			}
+		}
+	private static Task<HotWaterControlResult> Run (Session session, CancellationToken token = default) =>
+		HotWaterControlCycle.RunAsync (session, TimeSpan.FromMilliseconds (300), token);
+
+	[TestCase (false, false, "Schedule", 1), TestCase (false, true, "Schedule", 2)]
+	[TestCase (true, false, "Schedule", 2), TestCase (true, true, "Schedule", 1)]
+	[TestCase (false, false, "ManualMode", 1), TestCase (true, true, "ManualMode", 1)]
+	[TestCase (false, false, "ManualOverride", 0), TestCase (true, true, "ManualOverride", 0)]
+	public async Task BothUiStatesAndOriginalPolicyAreRestored (bool on, bool stored, string policy, int writes)
+		{
+		var session = new Session (on, stored, policy);
+		var original = await session.ReadAsync (default); var plan = HotWaterRestoration.Capture (original.Hub.Domain);
+		var result = await Run (session);
+		Assert.That (result.Passed && result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs, Is.EqualTo (new[] { !on, on }));
+		Assert.That (session.Restores.Count, Is.EqualTo (writes));
+		var final = await session.ReadAsync (default);
+		HotWaterRestoration.RequireRestored (plan, final.Hub.Domain);
+		HotWaterControlCycle.RequireGuarded (original, final);
+		}
+	[TestCase ("lost-first", 1), TestCase ("lost-second", 2), TestCase ("lost-compensation", 2)]
+	public async Task LostRepliesRemainFailedAfterIndependentRestoration (string behavior, int inputs)
+		{
+		var session = new Session { Behavior = behavior }; var result = await Run (session);
+		Assert.That (result.Passed, Is.False); Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs.Count, Is.EqualTo (inputs));
+		}
+	[TestCase ("foreign-water"), TestCase ("not-delivered"), TestCase ("foreign-room"), TestCase ("away-change"), TestCase ("restart"), TestCase ("ui-stale")]
+	public async Task UncertainOrForeignStateIsNotBlindlyOverwritten (string behavior)
+		{
+		var session = new Session { Behavior = behavior }; var result = await Run (session);
+		Assert.That (result.Passed || result.RestorationConfirmed, Is.False);
+		Assert.That (session.Inputs.Count, Is.EqualTo (1)); Assert.That (session.Restores, Is.Empty);
+		}
+	[Test]
+	public async Task IgnoredCancelDoesNotPassBecauseButtonReturnedToOff ()
+		{
+		var session = new Session { Behavior = "cancel-ignored" }; var result = await Run (session);
+		Assert.That (result.Passed || result.RestorationConfirmed, Is.False);
+		Assert.That (session.Restores, Is.EqualTo (new[] { 1 }));
+		}
+	[Test]
+	public async Task DeadlineCreatedByAnOwnedOverrideMustBeCleared ()
+		{
+		var session = new Session { Behavior = "own-deadline" }; var result = await Run (session);
+		Assert.That (result.Passed && result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Domain["HotWater"]![0]!["OverrideTimeoutUnixTime"], Is.Null);
+		}
+	[Test]
+	public async Task CancellationAfterDeliveryUsesIndependentRestoration ()
+		{
+		using var source = new CancellationTokenSource ();
+		var session = new Session { CancelAfterFirst = source }; var result = await Run (session, source.Token);
+		Assert.That (result.Passed, Is.False); Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs.Count, Is.EqualTo (1));
+		}
+	[TestCase ("original", 0, true), TestCase ("ui-1-intent", 0, true), TestCase ("restore-1-intent", 2, false), TestCase ("restored", 2, false)]
+	public async Task IntentAndRestorationEvidenceAreRequired (string phase, int inputs, bool restored)
+		{
+		var session = new Session { FailRecord = phase }; var result = await Run (session);
+		Assert.That (result.Passed, Is.False); Assert.That (result.RestorationConfirmed, Is.EqualTo (restored));
+		Assert.That (session.Inputs.Count, Is.EqualTo (inputs));
+		}
+	[Test]
+	public async Task ExistingTimerIsLeftUntouched ()
+		{
+		var session = new Session ();
+		session.Domain["HotWater"]![0]!["OverrideTimeoutUnixTime"] = DateTimeOffset.UtcNow.AddHours (1).ToUnixTimeSeconds ();
+		var result = await Run (session);
+		Assert.That (result.Passed, Is.False); Assert.That (result.RestorationConfirmed, Is.True);
+		Assert.That (session.Inputs, Is.Empty); Assert.That (session.Restores, Is.Empty);
+		}
+	}
