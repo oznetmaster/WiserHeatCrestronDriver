@@ -40,13 +40,24 @@ public sealed partial class GatewayUiTests
 			get; init;
 			}
 		public ControlRoomBinding[] ControlRooms { get; init; } = [];
+		public bool AllowScheduleManualStartingStateCases { get; init; }
 		}
 	private sealed record HubSettings (string HubHost, string Secret);
 
 	[Test, Category ("LiveControl")]
-	public async Task RoomScheduleControlChangesHubModeAndRestoresSchedule ()
+	public Task RoomScheduleControlChangesHubModeAndRestoresSchedule () => RunRoomScheduleControlAsync (ScheduleManualTargetRequirement.Any);
+
+	[TestCase (ScheduleManualTargetRequirement.EqualToCurrent)]
+	[TestCase (ScheduleManualTargetRequirement.DifferentFromCurrent)]
+	[TestCase (ScheduleManualTargetRequirement.Absent)]
+	[Category ("LiveControl")]
+	public Task RoomScheduleControlVerifiesStartingStateAndRestoresSchedule (ScheduleManualTargetRequirement startingState) => RunRoomScheduleControlAsync (startingState);
+
+	private async Task RunRoomScheduleControlAsync (ScheduleManualTargetRequirement startingState)
 		{
 		Assert.That (_nameRestored && _roomStatePreserved, Is.True, "An earlier restoration needs reconciliation.");
+		if (startingState != ScheduleManualTargetRequirement.Any && !_settings!.AllowScheduleManualStartingStateCases)
+			Assert.Ignore ("Enable AllowScheduleManualStartingStateCases and select the exact case matching the bound room's saved manual target. Absent also requires AllowManualTargetInitialization.");
 		var controls = _settings!.ControlRooms;
 		if (controls == null || controls.Length == 0 || controls.Any (c => c == null || c.DeviceId <= 0 || string.IsNullOrWhiteSpace (c.HubRoomName)) ||
 			 controls.Select (c => c.DeviceId).Distinct ().Count () != controls.Length ||
@@ -67,11 +78,13 @@ public sealed partial class GatewayUiTests
 			using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (5));
 			var original = await ReadRoomAsync (binding, timeout.Token);
 			string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + ".control";
+			if (startingState != ScheduleManualTargetRequirement.Any)
+				check += "-" + startingState;
 			await _navigation!.InspectRoomExtensionPagesAsync (check, binding.RoomName, original.Name!, binding.PageTitle, async (pages, token) =>
 			{
 				await pages.OpenPageAsync (Text ("Open"), "Schedule", CrestronHomePages.Resource ("customdevices_toolbarClose"), token);
 				var cycle = new RoomControlSession (this, hub, http, host, binding, control, original, check);
-				var result = await ScheduleControlCycle.RunAsync (cycle, TimeSpan.FromSeconds (45), token, control.AllowManualTargetInitialization);
+				var result = await ScheduleControlCycle.RunAsync (cycle, TimeSpan.FromSeconds (45), token, control.AllowManualTargetInitialization, startingState);
 				_roomStatePreserved = result.RestorationConfirmed;
 				await cycle.SaveResultAsync (result);
 				Assert.That (result.Passed, Is.True, result.Detail);

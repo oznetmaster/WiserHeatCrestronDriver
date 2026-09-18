@@ -1,5 +1,11 @@
 # Development and validation history
 
+## Explicit manual-target acceptance cases - 18 September 2026
+
+The Android control project now exposes separate equal, different and absent saved-manual-target cases. Each requires its declared starting state before input; a mismatched binding or schedule boundary cannot silently satisfy another scope. The existing mode/restoration cycle remains responsible for preserving the saved target. The absent case still requires explicit permission for a potentially retained inactive value and distinguishes that outcome from exact restoration. No unsupported write or deletion of the hub's saved target is used to manufacture a case.
+
+All 47 offline mode-cycle checks passed, including twelve new starting-state cases. Android discovery exposes the three physical cases. This prepares candidate testing; it is not evidence that those physical variants passed. No production source or frozen candidate package changed, and the ongoing endurance observation was not disturbed.
+
 ## Candidate 1.3.11 editor and saved-schedule validation - 18 September 2026
 
 Eight further cases passed against the unchanged candidate. Five editor cases covered every current row, both 5/30 C boundaries, Cancel and restoration after deliberate day/time interruptions. Three save cases verified actual Save Day/Save All and refusal to overwrite independently changed hub schedules through either stale-save button. The evidence audit confirmed original persistent schedules and guarded room settings, editor state, Home, both temporary-child removals and released reservations. Each run retained 178 producer files; 77 editor and 31 save capture pairs matched their hashes. Reviewed screenshots showed readable boundary controls and the complete conflict recovery message. No production code, package or public release changed. Other layouts, native thermostat bounds, multi-instance and outage scopes remain separate acceptance work.

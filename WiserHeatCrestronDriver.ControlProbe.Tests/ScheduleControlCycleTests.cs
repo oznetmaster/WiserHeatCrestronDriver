@@ -20,6 +20,7 @@ public sealed class ScheduleControlCycleTests
 		public List<(bool Enabled, bool Recovery)> Inputs { get; } = [];
 		public List<string> Phases { get; } = [];
 		public List<int> ManualWrites { get; } = [];
+		public Action<Session>? BeforeRead { get; init; }
 		public int? InitializedTarget { get; init; }
 		public bool RemoveManualOnRestore { get; init; }
 		public bool ChangeScheduleOnRestore { get; init; }
@@ -70,6 +71,7 @@ public sealed class ScheduleControlCycleTests
 		public Task<ScheduleControlSnapshot> ReadAsync (CancellationToken token)
 			{
 			token.ThrowIfCancellationRequested ();
+			BeforeRead?.Invoke (this);
 			return Task.FromResult (State);
 			}
 		public Task RecordAsync (string phase, ScheduleControlSnapshot snapshot)
@@ -137,6 +139,85 @@ public sealed class ScheduleControlCycleTests
 
 	private static Task<ScheduleControlResult> Run (Session session, CancellationToken token = default) =>
 		 ScheduleControlCycle.RunAsync (session, TimeSpan.FromSeconds (5), token);
+
+	private static void SetSavedTarget (Session session, int? target)
+		{
+		var room = JsonNode.Parse (session.State.Room.GetRawText ())!.AsObject ();
+		if (target.HasValue) room["ManualSetPoint"] = target.Value;
+		else room.Remove ("ManualSetPoint");
+		session.State = session.State with { Room = JsonSerializer.SerializeToElement (room) };
+		}
+
+	[TestCase (ScheduleManualTargetRequirement.EqualToCurrent, 220)]
+	[TestCase (ScheduleManualTargetRequirement.DifferentFromCurrent, 200)]
+	[TestCase (ScheduleManualTargetRequirement.Absent, null)]
+	public async Task SelectedStartingStateIsObservedAndItsRestorationScopeIsReported (ScheduleManualTargetRequirement required, int? manual)
+		{
+		var session = new Session ();
+		SetSavedTarget (session, manual);
+		var result = await ScheduleControlCycle.RunAsync (session, TimeSpan.FromSeconds (5), default, allowManualTargetInitialization: true, requiredManualTarget: required);
+		Assert.That (result.Passed && result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (result.RequiredManualTargetState, Is.EqualTo (required.ToString ()));
+		Assert.That (result.ExactRestorationConfirmed, Is.EqualTo (manual.HasValue));
+		Assert.That (result.ManualTargetInitialized, Is.EqualTo (!manual.HasValue));
+		Assert.That (session.Phases, Does.Contain ("starting-state-verified-" + required));
+		Assert.That (session.Inputs, Has.Count.EqualTo (2));
+		Assert.That (ScheduleObservation.ManualTarget (session.State.Room), Is.EqualTo (manual ?? 220));
+		}
+
+	[TestCase (ScheduleManualTargetRequirement.EqualToCurrent, 200)]
+	[TestCase (ScheduleManualTargetRequirement.EqualToCurrent, null)]
+	[TestCase (ScheduleManualTargetRequirement.DifferentFromCurrent, 220)]
+	[TestCase (ScheduleManualTargetRequirement.DifferentFromCurrent, null)]
+	[TestCase (ScheduleManualTargetRequirement.Absent, 200)]
+	[TestCase (ScheduleManualTargetRequirement.Absent, 220)]
+	public async Task WrongStartingStateNeverSendsAModeOrTemperatureCommand (ScheduleManualTargetRequirement required, int? manual)
+		{
+		var session = new Session ();
+		SetSavedTarget (session, manual);
+		var result = await ScheduleControlCycle.RunAsync (session, TimeSpan.FromSeconds (5), default, true, required);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True);
+		Assert.That (result.Detail, Does.Contain ("does not match"));
+		Assert.That (session.Inputs, Is.Empty);
+		Assert.That (session.ManualWrites, Is.Empty);
+		}
+
+	[Test]
+	public async Task SelectedAbsentStateStillRequiresExplicitInitializationPermission ()
+		{
+		var session = new Session ();
+		SetSavedTarget (session, null);
+		var result = await ScheduleControlCycle.RunAsync (session, TimeSpan.FromSeconds (5), default, false, ScheduleManualTargetRequirement.Absent);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (session.Inputs, Is.Empty);
+		Assert.That (session.ManualWrites, Is.Empty);
+		}
+
+	[Test]
+	public async Task ScheduleBoundaryCannotTurnADifferentCaseIntoAnEqualCaseBeforeInput ()
+		{
+		int reads = 0;
+		var session = new Session
+			{
+			BeforeRead = value =>
+				{
+				if (++reads != 2) return;
+				var room = JsonNode.Parse (value.State.Room.GetRawText ())!;
+				room["CurrentSetPoint"] = 200;
+				room["ScheduledSetPoint"] = 200;
+				value.State = value.State with { Room = JsonSerializer.SerializeToElement (room) };
+				}
+			};
+		var result = await ScheduleControlCycle.RunAsync (session, TimeSpan.FromSeconds (5), default, false, ScheduleManualTargetRequirement.DifferentFromCurrent);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (session.Inputs, Is.Empty);
+		Assert.That (session.ManualWrites, Is.Empty);
+		}
+
+	[Test]
+	public void UnknownStartingStateIsRejected () => Assert.ThrowsAsync<ArgumentOutOfRangeException> (() =>
+		ScheduleControlCycle.RunAsync (new Session (), TimeSpan.FromSeconds (5), default, false, (ScheduleManualTargetRequirement)99));
 
 	[Test]
 	public async Task NormalCycle_UsesBothUiActionsAndConfirmsIndependentRestoration ()

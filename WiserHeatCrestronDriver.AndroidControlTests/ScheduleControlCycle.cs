@@ -5,12 +5,18 @@ using System.Text.Json;
 
 namespace WiserHeatCrestronDriver.ControlProbe;
 
+public enum ScheduleManualTargetRequirement
+	{
+	Any, EqualToCurrent, DifferentFromCurrent, Absent
+	}
+
 public sealed record ScheduleActivity (string Epoch, long Completed, int Pending);
 public sealed record ScheduleControlSnapshot (string PhysicalIdentity, ScheduleActivity Activity, JsonElement Room, bool HomeEnabled);
 public sealed record ScheduleControlResult (bool Passed, bool RestorationConfirmed, string Detail)
 	{
 	public bool ManualTargetInitialized { get; init; }
 	public bool ExactRestorationConfirmed => RestorationConfirmed && !ManualTargetInitialized;
+	public string RequiredManualTargetState { get; init; } = nameof (ScheduleManualTargetRequirement.Any);
 	}
 
 public interface IScheduleControlSession
@@ -25,10 +31,12 @@ public interface IScheduleControlSession
 public static class ScheduleControlCycle
 	{
 	public static async Task<ScheduleControlResult> RunAsync (IScheduleControlSession session, TimeSpan timeout, CancellationToken token,
-		 bool allowManualTargetInitialization = false)
+		 bool allowManualTargetInitialization = false, ScheduleManualTargetRequirement requiredManualTarget = ScheduleManualTargetRequirement.Any)
 		{
 		if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromMinutes (5))
 			throw new ArgumentOutOfRangeException (nameof (timeout));
+		if (!Enum.IsDefined (requiredManualTarget))
+			throw new ArgumentOutOfRangeException (nameof (requiredManualTarget));
 		ScheduleControlSnapshot? original = null;
 		bool attempted = false, passed = false, restored = true;
 		bool initialized = false;
@@ -44,12 +52,31 @@ public static class ScheduleControlCycle
 			if (string.IsNullOrWhiteSpace (original.PhysicalIdentity) || !original.HomeEnabled)
 				throw new InvalidDataException ("The hub and Home must agree on the scheduled starting state.");
 			await session.RecordAsync ("original", original);
+			int? savedTarget = ScheduleObservation.ManualTarget (original.Room);
+			int currentTarget = original.Room.GetProperty ("CurrentSetPoint").GetInt32 ();
+			bool matches = requiredManualTarget switch
+				{
+				ScheduleManualTargetRequirement.Any => true,
+				ScheduleManualTargetRequirement.EqualToCurrent => savedTarget == currentTarget,
+				ScheduleManualTargetRequirement.DifferentFromCurrent => savedTarget.HasValue && savedTarget != currentTarget,
+				ScheduleManualTargetRequirement.Absent => !savedTarget.HasValue,
+				_ => false
+				};
+			if (!matches)
+				return new (false, true, "Required saved manual target state is " + requiredManualTarget + "; the observed room does not match. No control was sent.")
+					{ RequiredManualTargetState = requiredManualTarget.ToString () };
+			if (requiredManualTarget != ScheduleManualTargetRequirement.Any)
+				await session.RecordAsync ("starting-state-verified-" + requiredManualTarget, original);
 			if (ScheduleObservation.ManualTarget (original.Room) == null)
 				await session.RecordAsync ("manual-initialization-accepted", original);
 			var stable = await session.ReadAsync (deadline.Token);
 			RequireStable (stable, original, 0);
 			if (!ScheduleObservation.Read (original.Room, stable.Room, allowManualTargetInitialization) || !stable.HomeEnabled)
 				throw new InvalidDataException ("Starting state changed before the test.");
+			// A schedule boundary may change the active target while preserving Auto policy.
+			// Do not claim an equal/different starting-state case after that boundary.
+			if (requiredManualTarget != ScheduleManualTargetRequirement.Any && stable.Room.GetProperty ("CurrentSetPoint").GetInt32 () != currentTarget)
+				throw new InvalidDataException ("The active target changed before the selected starting-state case.");
 			await session.RecordAsync ("disable-intent", stable);
 			deadline.Token.ThrowIfCancellationRequested ();
 			attempted = true;
@@ -120,7 +147,7 @@ public static class ScheduleControlCycle
 					}
 				}
 			}
-		return new (passed && restored, restored, detail) { ManualTargetInitialized = initialized };
+		return new (passed && restored, restored, detail) { ManualTargetInitialized = initialized, RequiredManualTargetState = requiredManualTarget.ToString () };
 		}
 
 	private static void RequireIdle (ScheduleActivity activity)

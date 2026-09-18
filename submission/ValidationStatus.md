@@ -29,6 +29,8 @@ Producer hashes and source digests are retained before execution and compared af
 
 ## Remaining acceptance work
 
+The control project now has explicit equal/different/absent saved-manual-target cases, with offline validation of their preconditions and restoration handling. They require separately selected physical runs after the current observation period; their existence does not expand the candidate's completed evidence above. A room must actually meet the selected starting condition, and the absent case retains its separate initialization permission and restoration limitation.
+
 1. Finish candidate-bound control and rendered-UI coverage: exercise manual starting states, remaining Off/resume variants, physical bounds, editor actions, save conflicts, repeated/busy/error behavior and conditional configurations. Verify labels/icons/layout and meaningful physical feedback, including the thermostat gauge; text assertions alone do not prove its calibration. The Off row's repeated long thermostat title ellipsizes at the tested viewport; the full identity remains visible above, and the Off state/action are readable.
 2. Complete Configure/Setup, configuration persistence and removal coverage. Resolve the official multiple-instance requirement for a platform driver with independent bindings; two room children do not automatically prove two platform instances.
 3. Validate controlled outages and recovery using appropriate physical-device isolation. A processor reboot does not prove a physical power-outage test.

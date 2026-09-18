@@ -4,6 +4,12 @@ This separately selected NUnit project includes the existing Android inspections
 
 The original `WiserHeatCrestronDriver.AndroidTests` project remains read-only apart from its optional restored name challenge. Selecting that project never includes these control cases. Neither project connects to Android or a processor during ordinary desktop test runs; all fixtures skip without the workflow context.
 
+## Explicit saved-manual starting states
+
+`RoomScheduleControlVerifiesStartingStateAndRestoresSchedule` has three separately selectable cases: `EqualToCurrent`, `DifferentFromCurrent`, and `Absent`. Enable `AllowScheduleManualStartingStateCases` in the private UI settings and select the exact case for the explicitly bound room. The fixture independently verifies the saved manual target against the current scheduled target before sending any control. A mismatched starting state fails without changing the room; it does not count as coverage of another variant. A schedule transition between capture and input also stops the selected case.
+
+These cases use the existing Auto → Manual → Auto cycle and its restoration. They do not manufacture a starting state by writing the hub's read-only `ManualSetPoint`, erase a saved target, or silently substitute a room. Choose a room with the required state, or separately prepare and restore it through supported controls. The absent case additionally requires that room's `AllowManualTargetInitialization` permission, because the hub may retain an inactive initialized target; its result must not claim exact original-state restoration. Each variant has its own evidence directory and records its requested starting-state scope. Ordinary desktop runs remain offline. Physical candidate validation is still pending for the new explicit cases.
+
 ## Native thermostat controls
 
 For writable native controls, select `NativeThermostatInputsChangeHubAndRestorePolicy` and enable `AllowNativeThermostatControl` in the private settings. Its two cases exercise a temperature increase/decrease and Boost On/Off. They require exactly one `ControlRooms` binding, its matching `Rooms` binding and `ControlHubSettingsPath`. The room must start with an ordinary Auto or Manual policy and no active override. Saved manual state, including an absent value in Auto mode, must be preserved. Celsius and Fahrenheit displays are compared with the hub's raw Celsius values; changing units during a case stops it.
