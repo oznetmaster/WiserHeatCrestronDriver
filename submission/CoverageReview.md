@@ -1,5 +1,23 @@
 # Coverage source review
 
+## Submission candidate 1.3.9 review - 18 September 2026
+
+The current blueprint pins the candidate based on released driver 1.3.8 source `c63d2b15b51a8ac791074356e8cee4b9623fec98`, with submission version `1.3.009.0000` and illustrated help. The package and dependency inventory now participate in the source review. This is a reviewed coverage proposal, not an approved execution policy or completed self-test.
+
+| Reviewed change | Required candidate evidence |
+| --- | --- |
+| Standard SDK dispatch and stable child registration replace the experimental rebind workaround. Existing children recover after a successful refresh. | Initial child configuration, including a prompt-free step; stable identity across reads; native heat-only thermostat rendering under the SDK Hvac category; recovery after a successful reconnect and no false recovery after failure. |
+| Schedule selection waits for confirmed assignment; enabling Auto without an assignment requires that confirmation first. | Accepted, rejected, missing and unconfirmed assignment cases, independent hub ID/mode read-back, readable error state and original assignment/mode restoration. |
+| The editor preserves pending changes during polling and rejects stale saves using fresh pre-save and post-save observations. | Both Save Day and Save All after external schedule edits and reassignment; failed reads, rejected writes and ignored writes; pending-state preservation, complete recovery message and Cancel/reopen. Restore every affected shared schedule and room setting. |
+| Temperature inputs enforce finite supported bounds and publish individual day/time/slot updates. | Actual inputs, bounds, formatting and visibility for every supported one-to-eight-event day layout, including growth and shrinkage. Retain synthetic protection for defensive slots nine and ten, and runtime absence evidence on this eight-event hub. |
+| Room command completion propagates failed read-back. WiserHeatAPIv2 1.1.1 propagates schedule-write results. | Independent post-command state, unsuccessful confirmation on failed read-back, recovery from busy state and no automatic command replay. Library and processor regressions support this requirement but do not replace final UI evidence. |
+| Lifetime and successful-refresh properties provide monitoring observations. | Bind the exact instance lifetime, verify strictly advancing successful hub reads, and retain failures, missing samples and restarts. Cached reads cannot stand in for functional endurance. |
+| New submission basename, version, help and dependency notices. | Match package/DLL/metadata/PDF names, GUID and version; verify exact embedded help/notices. Preserve approved figures, template parts and readable layout. Install and test those exact package bytes. |
+
+The blueprint adds separate assignment-confirmation, stale-save, schedule-enable-prerequisite and command-read-back scopes, including their two-instance counterparts. All producer bindings remain unresolved. Response budgets, physical outage instrumentation, two-instance interpretation, complete candidate controls and the 24-hour run still need execution and evidence. No historical Debug result is relabelled as a candidate pass.
+
+The initial candidate build completed with ManifestUtil 29 and verified its embedded PDF and notices. All eleven packaged help pages were visually reviewed. The canonical document preview omitted the original template logo; independent inspection of the actual packaged PDF confirmed that it retains the logo and that the other ten pages render identically. This preview difference does not justify changing the supplied template or the package.
+
 ## Schedule membership and hub capacity - 18 September 2026
 
 The first normal add/remove fixture attempt on exact Debug 1.3.007.0029 returned HTTP 400, "Could not create new schedule", before any new schedule was observed. The hub already held 16 heating schedules. Schneider's [UK/Ireland system guide](https://www.productinfo.schneider-electric.com/wiser_home/wiser-home-sug-uk/English/System%20User%20Guide_Wiser_Home_UK%20%28Bookmap%29.pdf) documents a maximum of 16 climate schedules per hub. This full-capacity attempt cannot establish whether the complete seven-day creation payload is accepted when space is available.

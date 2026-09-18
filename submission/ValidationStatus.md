@@ -1,5 +1,13 @@
 # Wiser submission pilot status
 
+## Submission package preparation - 18 September 2026
+
+Driver 1.3.8 and WiserHeatAPIv2 1.1.1 have been published. The separate 1.3.9 submission candidate preserves those runtime fixes and adds the approved illustrated help, matching submission filenames and dependency notices. It has not yet been published or accepted by Crestron.
+
+The opt-in Release package built successfully with official ManifestUtil 29. Post-build checks verified the exact embedded PDF, third-party notices, GUID, version and matching package/DLL/metadata/help names. All eleven help pages were visually reviewed, and the seven approved figure files and unaffected official-template parts were preserved. This establishes package preparation only.
+
+The [coverage review](CoverageReview.md) now accounts for confirmed command results, child registration/recovery, stale-edit protection, supported schedule layouts and fresh-read monitoring. A new draft policy, form mapping and execution contract can be generated from the updated blueprint. They contain no passing observations: producers and timing budgets still need binding and the exact candidate still needs hardware/UI acceptance, outages, multiple-instance checks and the 24-hour endurance run. Signature and final delivery remain separate pending steps.
+
 ## Command-result patch candidate - 18 September 2026
 
 The gated update installed Debug `1.3.008.0001` with published WiserHeatAPIv2 1.1.1. Desktop tests, processor unit/lifecycle suites, three read-only live-hub checks and three installed-state checks passed. All 22 room-command and schedule-assignment result cases passed under the processor runtime. The temporary test instance and its package files were removed and the processor reservation released. Home may retain a cached catalog entry until its next planned reboot.

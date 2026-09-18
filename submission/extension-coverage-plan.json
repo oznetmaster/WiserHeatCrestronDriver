@@ -37,27 +37,37 @@
     },
     {
       "path": "WiserHeatCrestronDriver/Thermostat_WiserHeat_IP_V2.json",
-      "sha256": "7c3697f31ac29d846476dd8d9c7081b83dd8f5b58f17d18a4e5c7c0758003991",
+      "sha256": "5ad71b9990c373509cef086ac8099c4cc0221eec144595804801fc1a3537e3a1",
       "surface": null
     },
     {
       "path": "WiserHeatCrestronDriver/WiserDriverEntryPoint.cs",
-      "sha256": "ab6869e3fc323f2d4a051b8e59d8db737c24d43273b40ad0694d0812ef7d0c74",
+      "sha256": "66601c544e6d501dd164f7e2abaacda11e08242629cc00070cec99d5f1889967",
       "surface": null
     },
     {
       "path": "WiserHeatCrestronDriver/WiserPlatformDriver.cs",
-      "sha256": "ff695340fec4c9114facc3515a0ebd9883241b61143fe297536f6f725c6c9ed6",
+      "sha256": "d75bba4ed67d50191aaa9c18fefb1c09ed1794e7f6409036da40bd06166ff4c5",
       "surface": null
     },
     {
       "path": "WiserHeatCrestronDriver/WiserRoomEntity.cs",
-      "sha256": "ba9236df1600f2d70b50cc28f402d9e2acdb2c48db5f6d4875d4a51a4f2a8562",
+      "sha256": "85fb1d3a1dc1cb4e9e1f4a3c824dcd69b298bec5aa06b53fd901bccac27fc394",
       "surface": null
     },
     {
       "path": "WiserHeatCrestronDriver/WiserWorkQueue.cs",
       "sha256": "0aa95284cc68adaa2d06e869209464c817cce71ecf7559d5a683de620914585d",
+      "surface": null
+    },
+    {
+      "path": "WiserHeatCrestronDriver/WiserHeatCrestronDriver.csproj",
+      "sha256": "eda640373df2b8d3457f2f9428e46a6607e46ca66d9098790a921e29c652d9e9",
+      "surface": null
+    },
+    {
+      "path": "submission/dependency-notices.json",
+      "sha256": "1818166dcd8ea0966e2aba7dde6d108685db5ba259e7adb904fa15d42a7d4b3c",
       "surface": null
     }
   ],
@@ -147,7 +157,7 @@
             "$managed-rooms"
           ],
           "method": "combined",
-          "expectation": "Verify successful installation, exact candidate GUID/version, selected room assignment and stable managed-child identities against the configuration API and app.",
+          "expectation": "Verify successful installation, exact candidate GUID/version, selected room assignment and stable managed-child identities against the configuration API and app. Commission each child through the actual initial configuration step even when it has no prompts. Repeated state reads must preserve its controller identity and readiness; successful reconnect must recover existing children, while failed reads must not falsely revive them. Check native heat-only thermostat rendering under the SDK Hvac category.",
           "minimumSeconds": 0,
           "responseLimitSeconds": null,
           "restore": false
@@ -569,6 +579,29 @@
           "minimumSeconds": 0,
           "responseLimitSeconds": null,
           "restore": true
+        },
+        {
+          "id": "stale-save-and-confirmation",
+          "targets": [
+            "room/EditSchedulePage/SaveEditScheduleDayBtn",
+            "room/EditSchedulePage/SaveEditScheduleAllDaysBtn"
+          ],
+          "method": "combined",
+          "expectation": "Retain a pending edit across repeated successful polling, independently change the shared schedule or room assignment, then attempt Save Day/Save All. The newer hub data must survive, pending fields must remain, and the complete recovery instruction must be readable. Cancel/reopen must show current hub data. Also exercise failed pre-save reads, rejected writes and failed/mismatching post-save confirmation without reporting success. Restore all schedules and room settings.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "schedule-enable-prerequisite",
+          "targets": [
+            "room/SchedulePage/EnableScheduleButton"
+          ],
+          "method": "combined",
+          "expectation": "For a room without an assignment, entering Auto requires an accepted and independently confirmed schedule assignment first. Rejected, unconfirmed or missing assignments must leave mode unchanged. Exercise existing manual targets equal to and different from current target, and the missing-manual-target variant only under its explicit initialization/restoration policy. Restore original mode, targets and assignment; report any retained inactive initialized value rather than claiming exact restoration.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
         }
       ]
     },
@@ -621,6 +654,17 @@
           ],
           "method": "combined",
           "expectation": "On an isolated, explicitly bound test schedule, verify that changed hub schedule labels and available choices are republished to the already-open Home selector without reloading the driver. Verify the selected ID remains correctly associated with its label, unchanged lists do not disrupt selection, and unavailable/deleted choices cannot assign an unintended schedule. Independently verify hub assignment and restore all affected schedule definitions and room assignments. Initial list inspection alone does not satisfy this check.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "confirmed-assignment",
+          "targets": [
+            "room/SchedulePage/ScheduleSelector"
+          ],
+          "method": "combined",
+          "expectation": "A selected schedule is published only after acceptance and fresh independent hub confirmation of the assigned ID. Exercise rejected assignment, failed read-back, and an unavailable/deleted ID; retain error and pending/observed UI state. No command is automatically replayed. Restore every affected assignment and schedule.",
           "minimumSeconds": 0,
           "responseLimitSeconds": null,
           "restore": true
@@ -741,6 +785,17 @@
           "minimumSeconds": 0,
           "responseLimitSeconds": null,
           "restore": true
+        },
+        {
+          "id": "command-readback-failure",
+          "targets": [
+            "room/MainPage/RoomThermostat"
+          ],
+          "method": "combined",
+          "expectation": "After a state-changing thermostat command, verify fresh hub feedback before successful completion. A failed post-command read must not report confirmed success or leave controls permanently busy. Reconcile actual hub state before any further action; never replay an uncertain command automatically. Restore and verify target, mode and override state.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
         }
       ]
     },
@@ -847,7 +902,7 @@
             "room/layout/SchedulePage"
           ],
           "method": "combined",
-          "expectation": "Repeat applicable control checks on this page/dialog in every reachable conditional state. Retain a per-control result matrix tied to the explicit target inventory, including all ten possible schedule slots and shared-schedule impact/error text.",
+          "expectation": "Repeat applicable control checks on this page/dialog in every reachable conditional state. Retain a per-control result matrix tied to the explicit target inventory, including every supported one-to-eight-event day layout, growth/shrinkage and hidden surplus controls, plus shared-schedule impact/error text. The model has ten defensive slots; slots nine and ten require synthetic bounds coverage and runtime absence evidence on this eight-event hub, not fabricated physical support.",
           "minimumSeconds": 0,
           "responseLimitSeconds": null,
           "restore": true
@@ -1338,7 +1393,57 @@
             "$instance-two.room.schedulepage.scheduleselector"
           ],
           "method": "combined",
-          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Repeat applicable control checks on this page/dialog in every reachable conditional state. Retain a per-control result matrix tied to the explicit target inventory, including all ten possible schedule slots and shared-schedule impact/error text. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "expectation": "After confirming how Crestron applies the two-instance requirement to this platform driver, bind two independent test instances and repeat: Repeat applicable control checks on this page/dialog in every reachable conditional state. Retain a per-control result matrix tied to the explicit target inventory, including every supported one-to-eight-event day layout, growth/shrinkage and hidden surplus controls, plus shared-schedule impact/error text. The model has ten defensive slots; slots nine and ten require synthetic bounds coverage and runtime absence evidence on this eight-event hub, not fabricated physical support. Independently verify the other instance/device remains unchanged and restore both. Child-room isolation is separately useful evidence, but must not automatically be substituted for two gateway instances; the interpretation and required device bindings remain unresolved.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-09-confirmed-assignment",
+          "targets": [
+            "$instance-one.room.schedulepage.scheduleselector",
+            "$instance-two.room.schedulepage.scheduleselector"
+          ],
+          "method": "combined",
+          "expectation": "After resolving the two-instance interpretation and binding independent devices, repeat: A selected schedule is published only after acceptance and fresh independent hub confirmation of the assigned ID. Exercise rejected assignment, failed read-back, and an unavailable/deleted ID; retain error and pending/observed UI state. No command is automatically replayed. Restore every affected assignment and schedule. Independently verify the other instance/device is unchanged and restore both. Two managed children are not automatically equivalent to two gateway instances.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-07-stale-save-and-confirmation",
+          "targets": [
+            "$instance-one.room.editschedulepage.saveeditscheduledaybtn",
+            "$instance-one.room.editschedulepage.saveeditschedulealldaysbtn",
+            "$instance-two.room.editschedulepage.saveeditscheduledaybtn",
+            "$instance-two.room.editschedulepage.saveeditschedulealldaysbtn"
+          ],
+          "method": "combined",
+          "expectation": "After resolving the two-instance interpretation and binding independent devices, repeat: Retain a pending edit across repeated successful polling, independently change the shared schedule or room assignment, then attempt Save Day/Save All. The newer hub data must survive, pending fields must remain, and the complete recovery instruction must be readable. Cancel/reopen must show current hub data. Also exercise failed pre-save reads, rejected writes and failed/mismatching post-save confirmation without reporting success. Restore all schedules and room settings. Independently verify the other instance/device is unchanged and restore both. Two managed children are not automatically equivalent to two gateway instances.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-07-schedule-enable-prerequisite",
+          "targets": [
+            "$instance-one.room.schedulepage.enableschedulebutton",
+            "$instance-two.room.schedulepage.enableschedulebutton"
+          ],
+          "method": "combined",
+          "expectation": "After resolving the two-instance interpretation and binding independent devices, repeat: For a room without an assignment, entering Auto requires an accepted and independently confirmed schedule assignment first. Rejected, unconfirmed or missing assignments must leave mode unchanged. Exercise existing manual targets equal to and different from current target, and the missing-manual-target variant only under its explicit initialization/restoration policy. Restore original mode, targets and assignment; report any retained inactive initialized value rather than claiming exact restoration. Independently verify the other instance/device is unchanged and restore both. Two managed children are not automatically equivalent to two gateway instances.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": true
+        },
+        {
+          "id": "repeat-13-command-readback-failure",
+          "targets": [
+            "$instance-one.room.mainpage.roomthermostat",
+            "$instance-two.room.mainpage.roomthermostat"
+          ],
+          "method": "combined",
+          "expectation": "After resolving the two-instance interpretation and binding independent devices, repeat: After a state-changing thermostat command, verify fresh hub feedback before successful completion. A failed post-command read must not report confirmed success or leave controls permanently busy. Reconcile actual hub state before any further action; never replay an uncertain command automatically. Restore and verify target, mode and override state. Independently verify the other instance/device is unchanged and restore both. Two managed children are not automatically equivalent to two gateway instances.",
           "minimumSeconds": 0,
           "responseLimitSeconds": null,
           "restore": true
@@ -1408,7 +1513,7 @@
             "$endurance"
           ],
           "method": "endurance",
-          "expectation": "Observe the same Release candidate continuously for at least 24 hours. Use a reviewed periodic sampling schedule covering all applicable functions, log missing samples, connection state and latency/feedback against baseline, verify final functionality and no degradation, then restore state. Elapsed timestamps alone do not satisfy this requirement.",
+          "expectation": "Observe the same Release candidate continuously for at least 24 hours. Use a reviewed periodic sampling schedule covering all applicable functions, log missing samples, connection state and latency/feedback against baseline, verify final functionality and no degradation, then restore state. Elapsed timestamps alone do not satisfy this requirement. Bind the installed driver lifetime ID and successful hub-refresh marker to the candidate. Cached reads or failed/stale refreshes must not renew the marker. A changed lifetime, missed observation or processor restart must be recorded and handled according to the reviewed continuity policy, never hidden by elapsed wall-clock time.",
           "minimumSeconds": 86400,
           "responseLimitSeconds": null,
           "restore": true
