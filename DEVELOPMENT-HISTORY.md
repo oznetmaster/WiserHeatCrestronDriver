@@ -11,6 +11,12 @@ See the [product changelog](CHANGELOG.md) for shipped changes. This document pre
 
 <!-- development-history -->
 
+## Schedule membership fixture and capacity preflight - 2026-09-18 (no driver release)
+
+- Added an opt-in fixture for a temporary unassigned schedule appearing and disappearing in an already-open selector. Recovery checks require durable intents, prohibit uncertain-write replay and protect schedules that are changed or assigned externally.
+- The first hardware attempt was rejected with the hub at its documented 16-climate-schedule limit. Separate reconciliation confirmed unchanged hub state and cleaned the temporary Home child and reservations; the test remains failed. Capacity is now checked before attempting creation. A successful live add/remove result still requires a free schedule slot; see [validation status](submission/ValidationStatus.md).
+
+
 ## Unchanged schedule-choice refresh validation - 2026-09-18 (no driver release)
 
 - Added an opt-in read-only Android fixture that keeps the schedule selector open through two observed successful hub refreshes. It verifies the entire option list, original selection, independent hub state and driver lifetime, then confirms navigation and temporary-device cleanup.

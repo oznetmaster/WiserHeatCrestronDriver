@@ -1,5 +1,13 @@
 # Wiser submission pilot status
 
+## Schedule membership and hub capacity - 18 September 2026
+
+The first normal add/remove fixture attempt on exact Debug 1.3.007.0029 returned HTTP 400, "Could not create new schedule", before any new schedule was observed. The hub already held 16 heating schedules. Schneider's [UK/Ireland system guide](https://www.productinfo.schneider-electric.com/wiser_home/wiser-home-sug-uk/English/System%20User%20Guide_Wiser_Home_UK%20%28Bookmap%29.pdf) documents a maximum of 16 climate schedules per hub. This full-capacity attempt cannot establish whether the complete seven-day creation payload is accepted when space is available.
+
+The failed run and its original unconfirmed-restoration receipt are retained. A separate reconciliation independently checked the unchanged complete persistent schedules and guarded room settings three times, verified editor/selection and Home, removed only the owned temporary Home child, restored the original inventory, removed private settings and released reservations. No existing schedule was deleted or heating control sent during reconciliation.
+
+The fixture now fails capacity preflight before opening the selector or sending a creation request. Offline regressions cover the limit, complete unassigned creation, uncertain replies without replay, required journals, cancelled/failed UI observations and external edits or assignments that prevent deletion. Actual successful creation, open-dialog addition/removal and stale-ID rejection remain unverified pending free capacity. Existing schedules are never removed automatically to satisfy a test prerequisite. The prior rename and unchanged-refresh successes do not replace this missing coverage.
+
 ## Open selector across unchanged refreshes - 18 September 2026
 
 The normal OpenScheduleChoicesSurviveRepeatedUnchangedHubRefreshes case passed on exact Debug1.3.007.0029 using public TestAdapter1.11.0. After observing the complete initial list, it witnessed two strictly advancing successful hub-read markers from the same installed driver lifetime. All16 choices and the original selected ID remained correct after both refreshes, with the selection dialog continuously open.
