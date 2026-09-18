@@ -8,5 +8,6 @@
   "LocationId": 0,
   "Name": "REPLACE_WITH_EXISTING_GATEWAY_NAME",
   "CatalogueId": "REPLACE_WITH_EXISTING_CANDIDATE_CATALOGUE_ID",
-  "PackagePath": "C:\\PrivateSubmission\\Candidate.pkg"
+  "PackagePath": "C:\\PrivateSubmission\\Candidate.pkg",
+  "Rooms": []
 }

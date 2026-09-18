@@ -27,11 +27,19 @@ public interface IScheduleControlSession
 	Task SetManualTargetAsync (int target, CancellationToken token);
 	}
 
+public interface IScheduleControlObserver
+	{
+	Task BeforeInputAsync (ScheduleControlSnapshot state, CancellationToken token);
+	Task AfterInputAsync (ScheduleControlSnapshot state, CancellationToken token);
+	Task AfterRestorationAsync (ScheduleControlSnapshot state, CancellationToken token);
+	}
+
 /// <summary>One observed mode change and one restoration, with no command replay after uncertainty.</summary>
 public static class ScheduleControlCycle
 	{
 	public static async Task<ScheduleControlResult> RunAsync (IScheduleControlSession session, TimeSpan timeout, CancellationToken token,
-		 bool allowManualTargetInitialization = false, ScheduleManualTargetRequirement requiredManualTarget = ScheduleManualTargetRequirement.Any)
+		 bool allowManualTargetInitialization = false, ScheduleManualTargetRequirement requiredManualTarget = ScheduleManualTargetRequirement.Any,
+		 IScheduleControlObserver? observer = null)
 		{
 		if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromMinutes (5))
 			throw new ArgumentOutOfRangeException (nameof (timeout));
@@ -69,13 +77,16 @@ public static class ScheduleControlCycle
 				await session.RecordAsync ("starting-state-verified-" + requiredManualTarget, original);
 			if (ScheduleObservation.ManualTarget (original.Room) == null)
 				await session.RecordAsync ("manual-initialization-accepted", original);
+			if (observer != null)
+				await observer.BeforeInputAsync (original, deadline.Token);
+			// Peer convergence may take time. Revalidate physical state after waiting.
 			var stable = await session.ReadAsync (deadline.Token);
 			RequireStable (stable, original, 0);
 			if (!ScheduleObservation.Read (original.Room, stable.Room, allowManualTargetInitialization) || !stable.HomeEnabled)
 				throw new InvalidDataException ("Starting state changed before the test.");
 			// A schedule boundary may change the active target while preserving Auto policy.
 			// Do not claim an equal/different starting-state case after that boundary.
-			if (requiredManualTarget != ScheduleManualTargetRequirement.Any && stable.Room.GetProperty ("CurrentSetPoint").GetInt32 () != currentTarget)
+			if ((requiredManualTarget != ScheduleManualTargetRequirement.Any || observer != null) && stable.Room.GetProperty ("CurrentSetPoint").GetInt32 () != currentTarget)
 				throw new InvalidDataException ("The active target changed before the selected starting-state case.");
 			await session.RecordAsync ("disable-intent", stable);
 			deadline.Token.ThrowIfCancellationRequested ();
@@ -85,6 +96,8 @@ public static class ScheduleControlCycle
 			await session.SetAsync (false, false, deadline.Token);
 			var manual = await WaitForStateAsync (session, original, 1, false, deadline.Token, allowManualTargetInitialization, transition: true);
 			await session.RecordAsync ("manual-observed", manual);
+			if (observer != null)
+				await observer.AfterInputAsync (manual, deadline.Token);
 			passed = true;
 			}
 		catch (NotSupportedException) when (!attempted)
@@ -133,6 +146,17 @@ public static class ScheduleControlCycle
 						detail = initialized
 							 ? "Auto mode and the original schedule settings are restored. The hub retained an inactive initialized manual target, as explicitly permitted; exact original-state restoration is not claimed."
 							 : "The UI changed schedule mode; independent hub and Home observations confirm restoration.";
+					if (observer != null)
+						{
+						try { await observer.AfterRestorationAsync (after, cleanup.Token); }
+						catch
+							{
+							detail = passed ? "Physical restoration confirmed, but peer verification failed. The test remains failed."
+								: detail + " Physical restoration confirmed; peer verification also failed.";
+							passed = false;
+							try { await session.RecordAsync ("restored-peer-failed", after); } catch { }
+							}
+						}
 					}
 				catch
 					{

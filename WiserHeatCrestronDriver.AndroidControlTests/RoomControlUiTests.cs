@@ -53,9 +53,20 @@ public sealed partial class GatewayUiTests
 	[Category ("LiveControl")]
 	public Task RoomScheduleControlVerifiesStartingStateAndRestoresSchedule (ScheduleManualTargetRequirement startingState) => RunRoomScheduleControlAsync (startingState);
 
-	private async Task RunRoomScheduleControlAsync (ScheduleManualTargetRequirement startingState)
+	[Test, Category ("LiveControl"), Category ("MultipleInstance")]
+	public Task RoomScheduleControlUpdatesBothInstancesAndRestoresSchedule () => RunRoomScheduleControlAsync (ScheduleManualTargetRequirement.Any, true);
+
+	[TestCase (ScheduleManualTargetRequirement.EqualToCurrent)]
+	[TestCase (ScheduleManualTargetRequirement.DifferentFromCurrent)]
+	[TestCase (ScheduleManualTargetRequirement.Absent)]
+	[Category ("LiveControl"), Category ("MultipleInstance")]
+	public Task RoomScheduleControlVerifiesStartingStateOnBothInstances (ScheduleManualTargetRequirement startingState) => RunRoomScheduleControlAsync (startingState, true);
+
+	private async Task RunRoomScheduleControlAsync (ScheduleManualTargetRequirement startingState, bool requirePeer = false)
 		{
 		Assert.That (_nameRestored && _roomStatePreserved, Is.True, "An earlier restoration needs reconciliation.");
+		if (requirePeer && !_settings!.ObservePeerDuringRoomControls)
+			Assert.Ignore ("Enable ObservePeerDuringRoomControls for this required two-instance case.");
 		if (startingState != ScheduleManualTargetRequirement.Any && !_settings!.AllowScheduleManualStartingStateCases)
 			Assert.Ignore ("Enable AllowScheduleManualStartingStateCases and select the exact case matching the bound room's saved manual target. Absent also requires AllowManualTargetInitialization.");
 		var controls = _settings!.ControlRooms;
@@ -80,16 +91,30 @@ public sealed partial class GatewayUiTests
 			string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + ".control";
 			if (startingState != ScheduleManualTargetRequirement.Any)
 				check += "-" + startingState;
-			await _navigation!.InspectRoomExtensionPagesAsync (check, binding.RoomName, original.Name!, binding.PageTitle, async (pages, token) =>
-			{
-				await pages.OpenPageAsync (Text ("Open"), "Schedule", CrestronHomePages.Resource ("customdevices_toolbarClose"), token);
-				var cycle = new RoomControlSession (this, hub, http, host, binding, control, original, check);
-				var result = await ScheduleControlCycle.RunAsync (cycle, TimeSpan.FromSeconds (45), token, control.AllowManualTargetInitialization, startingState);
-				_roomStatePreserved = result.RestorationConfirmed;
-				await cycle.SaveResultAsync (result);
-				Assert.That (result.Passed, Is.True, result.Detail);
-			}, timeout.Token);
-			Assert.That (_navigation.HomeRestored, Is.True);
+			if (requirePeer) check += "-two-instances";
+			await using var peer = await GatewayPeerControlObserver.OpenForRoomAsync (this, settings, check, timeout.Token);
+			bool started = false;
+			ScheduleControlResult? result = null;
+			Exception? failure = null;
+			try
+				{
+				await _navigation!.InspectRoomExtensionPagesAsync (check, binding.RoomName, original.Name!, binding.PageTitle, async (pages, token) =>
+					{
+					await pages.OpenPageAsync (Text ("Open"), "Schedule", CrestronHomePages.Resource ("customdevices_toolbarClose"), token);
+					var cycle = new RoomControlSession (this, hub, http, host, binding, control, original, check);
+					started = true;
+					result = await ScheduleControlCycle.RunAsync (cycle, TimeSpan.FromSeconds (peer == null ? 45 : 90), token, control.AllowManualTargetInitialization, startingState, peer);
+					_roomStatePreserved = result.RestorationConfirmed;
+					await cycle.SaveResultAsync (result);
+					Assert.That (result.Passed, Is.True, result.Detail);
+					}, timeout.Token);
+				Assert.That (_navigation.HomeRestored, Is.True);
+				}
+			catch (Exception error) { failure = error; throw; }
+			finally
+				{
+				if (peer != null) await peer.CompleteAsync (!started || result?.RestorationConfirmed == true, failure != null || result?.Passed != true);
+				}
 			}
 		}
 

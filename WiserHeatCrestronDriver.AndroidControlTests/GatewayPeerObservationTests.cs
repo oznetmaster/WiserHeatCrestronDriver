@@ -23,7 +23,11 @@ public sealed partial class GatewayUiTests
 		public string? PeerObservationSettingsPath { get; init; }
 		}
 	private sealed record PeerObservationSettings (string Host, string UserName, string Password, string CertificateSha256,
-		string SshFingerprint, int DeviceId, int LocationId, string Name, string CatalogueId, string PackagePath);
+		string SshFingerprint, int DeviceId, int LocationId, string Name, string CatalogueId, string PackagePath)
+		{
+		public PeerRoomBinding[] Rooms { get; init; } = [];
+		}
+	private sealed record PeerRoomBinding (int DeviceId, int LocationId, string Name, int HubRoomId);
 	private PeerObservationSettings LoadPeerSettings (HubSettings hub)
 		{
 		if (string.IsNullOrWhiteSpace (_settings!.PeerObservationSettingsPath) || !Path.IsPathFullyQualified (_settings.PeerObservationSettingsPath))
@@ -157,7 +161,7 @@ public sealed partial class GatewayUiTests
 		Encoding.UTF8.GetBytes (JsonSerializer.Serialize (new[] { host.Trim ().ToLowerInvariant (), secret }))));
 
 	private async Task<GatewayInstanceObservation> ReadInstanceAsync (ConfigurationClient client, int id, string processorIdentity,
-		string sharedBinding, CancellationToken token)
+		string sharedBinding, CancellationToken token, bool requireGatewayControls = true)
 		{
 		AndroidWorkflowSession.VerifyContext (_session!.Context);
 		var before = await client.GetDeviceAsync (id, token) ?? throw new InvalidDataException ("Instance disappeared.");
@@ -173,8 +177,8 @@ public sealed partial class GatewayUiTests
 			Text ("cp.driverInformation:version") != _session.Context.DriverVersion || config.Version != _session.Context.DriverVersion ||
 			Text ("cp.driverInformation:developer") != "Neil Colvin" || Text ("cp.driverInformation:controlType") != "tcpClient" ||
 			Text ("cp.driverConfiguration:driverLoadingStatus") != "Loaded" || !device.PropertyValues["onlineIndicator:isOnline"].GetBoolean () ||
-			!device.PropertyValues["awayModeVisible"].GetBoolean () || !device.PropertyValues["hotWaterVisible"].GetBoolean () ||
-			!device.PropertyValues["awayModeActionEnabled"].GetBoolean () || !device.PropertyValues["hotWaterActionEnabled"].GetBoolean ())
+			requireGatewayControls && (!device.PropertyValues["awayModeVisible"].GetBoolean () || !device.PropertyValues["hotWaterVisible"].GetBoolean () ||
+			!device.PropertyValues["awayModeActionEnabled"].GetBoolean () || !device.PropertyValues["hotWaterActionEnabled"].GetBoolean ()))
 			throw new InvalidDataException ("Both gateways must remain loaded, online and idle with the observed capabilities enabled.");
 		return new (processorIdentity.ToUpperInvariant (), id, device.LocationId ?? 0, device.Name ?? "", _session.Context.DriverVersion,
 			_session.Context.PackageSha256.ToUpperInvariant (), configuration, sharedBinding, Guid.Parse (Text ("driverLifetimeId")),

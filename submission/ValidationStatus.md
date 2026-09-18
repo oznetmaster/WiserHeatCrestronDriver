@@ -1,12 +1,14 @@
 # Wiser submission pilot status
 
-Updated 18 September 2026. This page describes the current candidate only. Earlier package-specific results and failed attempts remain in [development and validation history](../DEVELOPMENT-HISTORY.md); they do not establish acceptance of different package bytes.
+Updated 19 September 2026. This page describes the current candidate only. Earlier package-specific results and failed attempts remain in [development and validation history](../DEVELOPMENT-HISTORY.md); they do not establish acceptance of different package bytes.
 
 ## Test-harness recovery validation
 
 Hot-water test cleanup now reads hub and processor state independently of Android. If the app becomes unavailable or its display is stale after an input, the test still fails, but guarded restoration of the captured hot-water policy can proceed. Identity, fresh-state, unrelated-setting and no-replay checks remain required. UI agreement is checked separately after physical restoration; a failed final UI check cannot turn the test green or erase the physical-restoration record. Offline recovery regressions passed and the Android control project builds cleanly. This is a test-harness change, not a driver change or a new physical acceptance result; the frozen candidate and endurance run remain unchanged.
 
 Away-mode cleanup likewise uses independent hub/processor observations. A failed first UI observation permits one guarded compensation to the captured original Away state. Normal successful runs still exercise both UI transitions. If the returning UI preflight fails before a tap is issued, compensation is allowed; an uncertain issued tap is observed rather than repeated. Final UI verification remains separate and can fail the test after physical restoration succeeds. This recovery behavior still needs physical acceptance after endurance; existing successful runs do not establish recovery from an unavailable app.
+
+Room Auto/Manual controls now have opt-in two-instance cases, including equal, different and absent saved manual targets. The peer's physical room, mode, schedule, converted target and unchanged command activity are checked under its own reservation. Peer loss cannot prevent independent physical restoration. This source implementation has offline regression coverage but still requires actual two-processor validation after endurance. It does not establish schedule-editor isolation or second-app UI behavior; see [two-instance testing](TwoInstanceTesting.md).
 
 ## Candidate and release identity
 

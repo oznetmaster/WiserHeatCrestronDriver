@@ -11,7 +11,7 @@ using WiserHeatCrestronDriver.ControlProbe;
 namespace WiserHeatCrestronDriver.ControlProbe.Tests;
 
 [TestFixture]
-public sealed class ScheduleControlCycleTests
+public sealed partial class ScheduleControlCycleTests
 	{
 	private sealed class Session : IScheduleControlSession
 		{

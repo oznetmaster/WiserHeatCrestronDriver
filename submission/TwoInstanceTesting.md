@@ -43,8 +43,29 @@ No peer observation is required before compensation. A failed peer check after a
 
 The peer observer sends no control commands. At completion it checks payload/configuration preservation and releases its own reservation only when physical restoration and those checks are confirmed. Otherwise it records the unresolved outcome and retains the reservation for reconciliation; disposal does not remove it. Existing failures are preserved if peer cleanup also fails. A preflight failure before a control cycle begins releases a successfully acquired peer reservation; an uncertain acquisition is never blindly removed.
 
+## Room Auto/Manual control
+
+The room mode sequence also supports required peer observations:
+
+```text
+WiserHeatCrestronDriver.AndroidTests.GatewayUiTests.RoomScheduleControlUpdatesBothInstancesAndRestoresSchedule
+WiserHeatCrestronDriver.AndroidTests.GatewayUiTests.RoomScheduleControlVerifiesStartingStateOnBothInstances(EqualToCurrent)
+WiserHeatCrestronDriver.AndroidTests.GatewayUiTests.RoomScheduleControlVerifiesStartingStateOnBothInstances(DifferentFromCurrent)
+WiserHeatCrestronDriver.AndroidTests.GatewayUiTests.RoomScheduleControlVerifiesStartingStateOnBothInstances(Absent)
+```
+
+Enable `ObservePeerDuringRoomControls`, provide the primary `ControlRooms` and `Rooms` bindings, and add an explicit `Rooms` array to the private peer settings. Each entry has `DeviceId`, `LocationId`, `Name` and `HubRoomId`: the first three identify the existing peer thermostat child; the last is the physical hub room ID. Both children must belong to their respective bound gateway and identify the same physical room. Device IDs are not interchangeable across processors. These cases do not create the peer child. A missing required opt-in is skipped and cannot satisfy the required-test gate.
+
+The three specific starting-state cases additionally require `AllowScheduleManualStartingStateCases`. Select only a case matching the independently observed room state. `Absent` also requires `AllowManualTargetInitialization`; it may leave an inactive manual temperature initialized by the hub, and does not claim exact restoration of an absent value. The original single-instance case names remain available and optionally observe the peer when enabled.
+
+The observer uses the same candidate, configuration, identity and reservation checks as the gateway cases. Room cases do not require enabling the unrelated Away/hot-water capabilities. Each room observation verifies the peer mode, assigned schedule and target in its own configured Celsius/Fahrenheit units. The peer's command epoch and completed count must stay unchanged and its pending count must be zero: shared feedback is expected, issuing commands from the peer is not. Reads are bracketed by a stable gateway refresh marker; after Manual and after restoration, a newer peer refresh is required. Device name, location, parent, online status and physical room identity are checked on every sample, with configuration fingerprints retained separately.
+
+The primary hub is read again after waiting for the peer, before any input. A changed command counter or active scheduled target stops the case. Peer observation is bounded to 30 seconds per phase; the room cycle permits 90 seconds with a peer, retaining an independent recovery deadline. These limits are test execution bounds, not evidence that a submission response-time requirement passed. Use retained command and observation records to assess that requirement.
+
+Peer failure after Manual causes guarded, independent restoration to Auto and the saved manual target. No peer callback runs before that compensation. Final peer failure leaves the test failed while preserving the physical-restoration result; original initialization limitations still apply. Completion rechecks peer child identity and command activity as well as candidate/configuration integrity before releasing its reservation. A failed integrity check retains the reservation for reconciliation.
+
 ## Remaining control scope
 
 After the baseline, repeat the applicable candidate control/UI checks with each gateway acting in turn. Independently observe the other gateway during those actions. Shared hub changes should propagate to both, while unrelated room settings, schedules and local configuration remain intact. Preserve and restore every affected shared setting; avoid simultaneous physical commands from the two processors. Pending editor state and instance/session lifetime need separate checks, as does removing an owned temporary instance while the other continues operating.
 
-Gateway peer observation is implemented but has not yet run on hardware. Peer observations for room/schedule controls, the second UI and temporary-instance removal/session effects remain to be integrated and executed. Do not infer them from a successful baseline or from earlier tests of different package versions. The private plan chooses actual processors, rooms and ownership; this document grants no authority to interrupt an active endurance run.
+Gateway peer observation is implemented but has not yet run on hardware. Room Auto/Manual peer observation is also implemented and offline-tested, but has not run on hardware. Peer observation of schedule editing/saving, the second UI and temporary-instance removal/session effects remains to be integrated and executed. Do not infer them from a successful baseline or from earlier tests of different package versions. The private plan chooses actual processors, rooms and ownership; this document grants no authority to interrupt an active endurance run.

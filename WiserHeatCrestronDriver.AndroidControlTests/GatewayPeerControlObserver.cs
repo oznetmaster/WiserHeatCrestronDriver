@@ -20,7 +20,7 @@ public sealed partial class GatewayUiTests
 		{
 		public bool ObservePeerDuringGatewayControls { get; init; }
 		}
-	private sealed class GatewayPeerControlObserver (GatewayUiTests fixture, HubSettings hub, string check) : IGatewayControlObserver, IAsyncDisposable
+	private sealed partial class GatewayPeerControlObserver (GatewayUiTests fixture, HubSettings hub, string check) : IGatewayControlObserver, IAsyncDisposable
 		{
 		private PeerObservationSettings _peer = null!;
 		private ConfigurationClient? _client;
@@ -33,12 +33,17 @@ public sealed partial class GatewayUiTests
 		private DateTimeOffset _after;
 		private int _sequence;
 		private bool _completed;
+		private bool _requireGatewayControls = true;
 		private Task Record (string phase, object value) => fixture.RecordPeerAsync (check + "." + phase, value);
 
 		public static async Task<GatewayPeerControlObserver?> OpenAsync (GatewayUiTests fixture, HubSettings hub, string check, CancellationToken token)
 			{
 			if (!fixture._settings!.ObservePeerDuringGatewayControls) return null;
-			var observer = new GatewayPeerControlObserver (fixture, hub, check);
+			return await OpenCoreAsync (fixture, hub, check, true, token);
+			}
+		private static async Task<GatewayPeerControlObserver> OpenCoreAsync (GatewayUiTests fixture, HubSettings hub, string check, bool requireGatewayControls, CancellationToken token)
+			{
+			var observer = new GatewayPeerControlObserver (fixture, hub, check) { _requireGatewayControls = requireGatewayControls };
 			try { await observer.InitializeAsync (token); return observer; }
 			catch
 				{
@@ -84,8 +89,8 @@ public sealed partial class GatewayUiTests
 			await Record ("original", new { First = _first, Second = _second });
 			}
 		private Task<GatewayInstanceObservation> ReadFirst (CancellationToken token) => fixture.ReadInstanceAsync (fixture._processor!,
-			fixture._session!.Context.InstalledDriverId, fixture._settings!.CertificateSha256, _binding, token);
-		private Task<GatewayInstanceObservation> ReadSecond (CancellationToken token) => fixture.ReadInstanceAsync (_client!, _peer.DeviceId, _peer.CertificateSha256, _binding, token);
+			fixture._session!.Context.InstalledDriverId, fixture._settings!.CertificateSha256, _binding, token, _requireGatewayControls);
+		private Task<GatewayInstanceObservation> ReadSecond (CancellationToken token) => fixture.ReadInstanceAsync (_client!, _peer.DeviceId, _peer.CertificateSha256, _binding, token, _requireGatewayControls);
 		private async Task VerifyPayloadAsync (string phase, CancellationToken token) => await Record (phase,
 			await DriverPayloadInspection.CompareAsync (_peer.Host, new NetworkCredential (_peer.UserName, _peer.Password), _peer.SshFingerprint,
 				_peer.PackagePath, fixture._session!.Context.PackageSha256, _peer.CatalogueId, TimeSpan.FromMinutes (2), token));
@@ -142,6 +147,12 @@ public sealed partial class GatewayUiTests
 				var second = await ReadSecond (cleanup.Token);
 				GatewayPairObservation.RequirePreserved (_first, first);
 				GatewayPairObservation.RequirePreserved (_second, second);
+				if (_originalRoom != null)
+					{
+					var room = await ReadPeerRoomAsync (cleanup.Token);
+					RoomPeerObservation.RequirePreserved (_originalRoom, room);
+					await Record ("room-identity-and-activity-preserved", room);
+					}
 				await Record ("configuration-preserved", new { First = first, Second = second });
 				await _lease.ReleaseAsync (cleanup.Token);
 				await Record ("reservation-released", new { Owner = _owner, _peer.Host });
