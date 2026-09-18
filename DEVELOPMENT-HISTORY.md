@@ -11,6 +11,10 @@ See the [product changelog](CHANGELOG.md) for shipped changes. This document pre
 
 <!-- development-history -->
 
+## Repeated Away-control validation - 2026-09-18 (no driver release)
+
+Added bounded one-to-three Away cycles with a shared original-state contract, separate cycle evidence and no continuation after failure or unconfirmed restoration. The Android fixture defaults to one cycle. Two cycles passed on unchanged Debug `1.3.007.0030`: all four hub/driver/UI transitions and the original guarded state were verified, followed by Home restoration, owned-child removal, preserved inventory and released reservations. An earlier attempt restored its first cycle but timed out establishing a management connection before the second input; its failed result is retained. The short Away observations now reuse the active gateway connection instead of opening a new login for each room read. All 363 control-probe tests passed, and all 21 Android cases remained unexecuted without explicit workflow settings. This validates sequential repetition, not rapid input, every busy/error state or final Release acceptance.
+
 ## Schedule membership and rejected selections - 2026-09-18 (no driver release)
 
 The open Android schedule selector passed temporary unassigned schedule addition and removal on Debug `1.3.007.0029`, after an explicitly approved capacity cleanup. Original hub settings and selection, Home, temporary-child removal, inventory and released reservations were verified. This result does not cover stale-ID rejection or the final Release candidate.

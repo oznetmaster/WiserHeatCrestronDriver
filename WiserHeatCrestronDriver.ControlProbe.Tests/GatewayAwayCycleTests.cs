@@ -67,6 +67,48 @@ public sealed class GatewayAwayCycleTests
 		Assert.That (GatewayAwayCycle.IsAway (session.State), Is.EqualTo (initial));
 		Assert.That (session.Records, Does.Contain ("changed").And.Contain ("restored"));
 		}
+	[TestCase (false), TestCase (true)]
+	public async Task RepeatedCyclesRestoreTheSameOriginalState (bool initial)
+		{
+		var session = new Session (initial);
+		var original = session.State;
+		int created = 0;
+		var result = await GatewayAwayRepetition.RunAsync (_ => { created++; return session; }, 2, TimeSpan.FromMilliseconds (160), CancellationToken.None);
+		Assert.That (result.Passed && result.RestorationConfirmed, Is.True);
+		Assert.That (created, Is.EqualTo (2));
+		Assert.That (session.Inputs, Is.EqualTo (new[] { !initial, initial, !initial, initial }));
+		GatewayAwayCycle.RequirePreserved (original, session.State);
+		}
+	[Test]
+	public async Task RestoredButFailedCycleDoesNotAuthorizeAnotherCycle ()
+		{
+		var session = new Session { Behavior = "lost-change" };
+		int created = 0;
+		var result = await GatewayAwayRepetition.RunAsync (_ => { created++; return session; }, 2, TimeSpan.FromMilliseconds (160), CancellationToken.None);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True);
+		Assert.That (created, Is.EqualTo (1));
+		Assert.That (session.Inputs.Count, Is.EqualTo (2));
+		}
+	[Test]
+	public async Task ChangedSettingsBetweenCyclesCannotBecomeANewBaseline ()
+		{
+		var session = new Session ();
+		var result = await GatewayAwayRepetition.RunAsync (cycle =>
+			{
+			if (cycle == 1) session.State = Change (session.State, n => n["System"]!["AwayModeSetPointLimit"] = 200);
+			return session;
+			}, 2, TimeSpan.FromMilliseconds (160), CancellationToken.None);
+		Assert.That (result.Passed || result.RestorationConfirmed, Is.False);
+		Assert.That (session.Inputs.Count, Is.EqualTo (2), "No further action may follow a foreign setting change.");
+		}
+	[TestCase (0), TestCase (4)]
+	public void InvalidRepetitionCountStopsBeforeCreatingASession (int cycles)
+		{
+		int created = 0;
+		Assert.ThrowsAsync<ArgumentOutOfRangeException> (async () => await GatewayAwayRepetition.RunAsync (_ => { created++; return new Session (); }, cycles, TimeSpan.FromSeconds (1), CancellationToken.None));
+		Assert.That (created, Is.Zero);
+		}
 	[TestCase ("lost-change"), TestCase ("lost-restore")]
 	public async Task LostRepliesFailEvenWhenIndependentRestorationSucceeds (string behavior)
 		{

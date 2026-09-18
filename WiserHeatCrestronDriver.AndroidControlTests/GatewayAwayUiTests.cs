@@ -19,6 +19,7 @@ public sealed partial class GatewayUiTests
 	private sealed partial record Settings
 		{
 		public bool AllowGatewayAwayControl { get; init; }
+		public int GatewayAwayCycles { get; init; } = 1;
 		}
 
 	[Test, Category ("LiveControl")]
@@ -33,7 +34,8 @@ public sealed partial class GatewayUiTests
 		if (string.IsNullOrWhiteSpace (hub.HubHost) || string.IsNullOrWhiteSpace (hub.Secret)) throw new InvalidDataException ("Incomplete private hub settings.");
 		using var http = new HttpClient (new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds (15) };
 		http.DefaultRequestHeaders.Add ("SECRET", hub.Secret);
-		using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (6));
+		if (_settings.GatewayAwayCycles is < 1 or > 3) throw new InvalidDataException ("GatewayAwayCycles must be between one and three.");
+		using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (3 * _settings.GatewayAwayCycles + 3));
 		var gateway = await ReadGatewayAsync (timeout.Token);
 		string check = "wiser.gateway-away";
 		var session = new GatewayAwaySession (this, hub, http, _settings.Rooms[0], gateway, check);
@@ -52,7 +54,9 @@ public sealed partial class GatewayUiTests
 					throw new InvalidDataException ("The selected text is not a unique gateway tile.");
 				}, timeout.Token);
 			await session.WaitForPageAsync (timeout.Token);
-			result = await GatewayAwayCycle.RunAsync (session, TimeSpan.FromSeconds (55), timeout.Token);
+			result = await GatewayAwayRepetition.RunAsync (cycle =>
+				new GatewayAwaySession (this, hub, http, _settings.Rooms[0], gateway, check + ".cycle-" + (cycle + 1)),
+				_settings.GatewayAwayCycles, TimeSpan.FromSeconds (55), timeout.Token);
 			_roomStatePreserved = result.RestorationConfirmed;
 			}
 		catch (Exception error) { failure = error; throw; }
@@ -132,7 +136,8 @@ public sealed partial class GatewayUiTests
 		public async Task<GatewayAwaySnapshot> ReadAsync (CancellationToken token)
 			{
 			AndroidWorkflowSession.VerifyContext (Session.Context);
-			var room = await fixture.ReadRoomAsync (binding, token);
+			// This short cycle already keeps the gateway connection active; reuse it for room identity reads.
+			var room = await fixture.ReadRoomAsync (fixture._processor!, binding, token);
 			string physical = hub.HubHost.Trim ().ToLowerInvariant ();
 			if (room.ParentDeviceId != gateway.Id || !room.PropertyValues["controlDeviceId"].GetString ()!.StartsWith (physical + "/room/", StringComparison.Ordinal))
 				throw new InvalidDataException ("The bound child does not verify the selected gateway's physical hub.");

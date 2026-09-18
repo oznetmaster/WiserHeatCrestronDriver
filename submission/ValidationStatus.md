@@ -1,5 +1,11 @@
 # Wiser submission pilot status
 
+## Repeated Away operation - 18 September 2026
+
+The two-cycle Android test passed against the exact installed Debug `1.3.007.0030` payload. Both Disabled -> Enabled -> Disabled cycles retained the same original guarded schedules, room settings and hot-water overrides. Independent hub and driver observations agreed with the visible labelled app row. All four transitions took approximately 14-15 seconds. Home restoration, owned-child removal, original inventory and reservation release passed. There was no driver rebuild or update for this test.
+
+The first repetition attempt passed and restored cycle one but failed to establish a management connection before cycle two sent any input. It remains a failed run with verified restoration and cleanup. A fresh run passed after the short Away observations were changed to reuse the already active gateway connection; this avoids a new login for every room observation. This evidence does not establish that the processor's SSH limit caused the earlier WebSocket handshake timeout. Sequential repetition is now verified for the observed starting state and display profile; rapid taps, busy/error-duration coverage, other starting policies and final immutable Release acceptance remain separate.
+
 ## Gateway Away and hot-water controls - 18 September 2026
 
 The normal Android Away fixture passed on exact Debug `1.3.007.0029`: Disabled -> Enabled -> Disabled, with independent hub and processor observations, guarded settings preservation and observed Home restoration. Its temporary child was removed and the original inventory and reservations were restored.
