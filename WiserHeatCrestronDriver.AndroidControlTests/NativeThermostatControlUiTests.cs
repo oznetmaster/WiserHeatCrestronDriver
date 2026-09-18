@@ -68,7 +68,13 @@ public sealed partial class GatewayUiTests
 		private static AndroidSelector Target => CrestronHomePages.Resource ("statusLabels_value") with { AncestorResourceId = CrestronHomePages.ResourcePrefix + "customdevice_thermostat_heatSetpoint" };
 		private static RoomTemperatureActivity Activity (DeviceInfo room) => JsonSerializer.Deserialize<RoomTemperatureActivity> (room.PropertyValues["controlStatus"].GetString ()!)
 			?? throw new InvalidDataException ("Room command activity is missing.");
-		private static string Formatted (double value) => value.ToString ("0.0", CultureInfo.InvariantCulture) + "°C";
+		private string TemperatureUnits => original.PropertyValues["temperatureUnits"].GetString () switch
+			{
+			"Celsius" => "Celsius",
+			"Fahrenheit" => "Fahrenheit",
+			_ => throw new InvalidDataException ("Native controls require explicit Celsius or Fahrenheit units.")
+			};
+		private string Formatted (double value) => value.ToString ("0.0", CultureInfo.InvariantCulture) + (TemperatureUnits == "Celsius" ? "°C" : "°F");
 		private bool DisplayMatches (AndroidHierarchy hierarchy, double target, bool boost)
 			{
 			var page = Page (hierarchy);
@@ -97,15 +103,18 @@ public sealed partial class GatewayUiTests
 			foreach (var room in new[] { before, after })
 				if (room.Id != original.Id || room.Name != original.Name || room.ParentDeviceId != original.ParentDeviceId || room.LocationId != original.LocationId ||
 					room.PropertyValues["controlDeviceId"].GetString () != physical + "/room/" + roomId.ToString (CultureInfo.InvariantCulture) ||
-					room.PropertyValues["temperatureUnits"].GetString () != "Celsius")
-					throw new InvalidDataException ("Native controls require the unchanged, explicitly bound Celsius thermostat.");
+					room.PropertyValues["temperatureUnits"].GetString () != TemperatureUnits)
+					throw new InvalidDataException ("Native controls require the unchanged, explicitly bound thermostat and temperature units.");
 			var hierarchy = await Session.Device.CaptureAsync (token);
 			double target = after.PropertyValues["targetTemperature"].GetDouble ();
 			bool boost = after.PropertyValues["isBoostActive"].GetBoolean ();
 			bool stable = Activity (before) == Activity (after) && before.PropertyValues["targetTemperature"].GetDouble () == target && before.PropertyValues["isBoostActive"].GetBoolean () == boost;
 			var state = new RoomTemperatureSnapshot (new (physical, gateway.PropertyValues["driverLifetimeId"].GetString ()!,
 				SuccessfulRefreshSequence.ParseTimestamp (gateway.PropertyValues["lastHubRefreshUtc"].GetString ()!), new (schedules, domain),
-				gateway.PropertyValues["awayModeIsEnabled"].GetBoolean (), true), roomId, Activity (after), target, boost, stable && DisplayMatches (hierarchy, target, boost));
+				gateway.PropertyValues["awayModeIsEnabled"].GetBoolean (), true), roomId, Activity (after), target, boost, stable && DisplayMatches (hierarchy, target, boost))
+				{
+				TemperatureUnits = TemperatureUnits
+				};
 			_original ??= state;
 			_plan ??= RoomTemperatureRestoration.Capture (physicalRoom);
 			return state;

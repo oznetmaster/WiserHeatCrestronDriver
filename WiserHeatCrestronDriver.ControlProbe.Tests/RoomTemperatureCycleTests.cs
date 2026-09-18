@@ -77,11 +77,12 @@ public sealed class RoomTemperatureCycleTests
 			Records.Add (phase);
 			return Task.CompletedTask;
 			}
+		private double Displayed (int raw) => State.TemperatureUnits == "Fahrenheit" ? raw * 0.18d + 32d : raw / 10d;
 		private void RestoreRoom ()
 			{
 			State = Edit (State, d => d["Room"]![0] = JsonNode.Parse (_originalRoom!.Value.GetRawText ())) with
 				{
-				HomeTarget = _originalRoom!.Value.GetProperty ("CurrentSetPoint").GetInt32 () / 10d,
+				HomeTarget = Displayed (_originalRoom!.Value.GetProperty ("CurrentSetPoint").GetInt32 ()),
 				HomeBoost = false
 				};
 			}
@@ -97,7 +98,7 @@ public sealed class RoomTemperatureCycleTests
 			else
 				{
 				bool boost = action == RoomTemperatureAction.BoostOn;
-				int target = (int)(State.HomeTarget * 10) + (boost ? 20 : action == RoomTemperatureAction.Raise ? 5 : -5);
+				int target = RoomTemperatureRestoration.Room (State.Gateway.Hub, 9).GetProperty ("CurrentSetPoint").GetInt32 () + (boost ? 20 : action == RoomTemperatureAction.Raise ? 5 : -5);
 				State = Edit (State, d =>
 					{
 						var room = d["Room"]![0]!;
@@ -111,7 +112,7 @@ public sealed class RoomTemperatureCycleTests
 							room["ManualSetPoint"] = target;
 					}) with
 					{
-					HomeTarget = target / 10d,
+					HomeTarget = Displayed (target),
 					HomeBoost = boost || !manual
 					};
 				}
@@ -126,6 +127,8 @@ public sealed class RoomTemperatureCycleTests
 					RefreshUtc = State.Gateway.RefreshUtc.AddSeconds (1)
 					}
 				};
+			if (Behavior == "units-change")
+				State = State with { TemperatureUnits = "Celsius", HomeTarget = RoomTemperatureRestoration.Room (State.Gateway.Hub, 9).GetProperty ("CurrentSetPoint").GetInt32 () / 10d };
 			if (Behavior == "foreign")
 				State = Edit (State, d => d["Room"]![1]!["ScheduleId"] = 99);
 			if (Behavior == "away")
@@ -195,6 +198,67 @@ public sealed class RoomTemperatureCycleTests
 		Assert.That (session.Restores.Count, Is.EqualTo (boost ? 0 : manual ? 2 : 1));
 		RoomTemperatureRestoration.RequireRestored (RoomTemperatureRestoration.Capture (RoomTemperatureRestoration.Room (original.Gateway.Hub, 9)), RoomTemperatureRestoration.Room (session.State.Gateway.Hub, 9));
 		}
+	[TestCase (false, false), TestCase (false, true), TestCase (true, false), TestCase (true, true)]
+	public async Task FahrenheitInputsMatchRawCelsiusAndRestoreOriginalPolicy (bool manual, bool boost)
+		{
+		var session = new Session (manual);
+		session.State = session.State with { TemperatureUnits = "Fahrenheit", HomeTarget = 64.4 };
+		var original = session.State;
+		var result = await Run (session, boost);
+		Assert.That (result.Passed && result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs.Count, Is.EqualTo (2));
+		Assert.That (session.State.HomeTarget, Is.EqualTo (64.4).Within (0.00001));
+		RoomTemperatureRestoration.RequireRestored (RoomTemperatureRestoration.Capture (RoomTemperatureRestoration.Room (original.Gateway.Hub, 9)), RoomTemperatureRestoration.Room (session.State.Gateway.Hub, 9));
+		}
+
+	[Test]
+	public async Task FahrenheitUpperLimitUsesLowerFirst ()
+		{
+		var session = new Session ();
+		session.State = Edit (session.State, d =>
+			{
+			d["Room"]![0]!["CurrentSetPoint"] = 300;
+			d["Room"]![0]!["ScheduledSetPoint"] = 300;
+			}) with { TemperatureUnits = "Fahrenheit", HomeTarget = 86 };
+		Assert.That ((await Run (session)).Passed, Is.True);
+		Assert.That (session.Inputs, Is.EqualTo (new[] { RoomTemperatureAction.Lower, RoomTemperatureAction.Raise }));
+		Assert.That (session.State.HomeTarget, Is.EqualTo (86));
+		}
+
+	[TestCase ("Kelvin", 18d)]
+	[TestCase ("Fahrenheit", 18d)]
+	public async Task UnknownOrMislabelledUnitsRejectInput (string units, double shown)
+		{
+		var session = new Session ();
+		session.State = session.State with { TemperatureUnits = units, HomeTarget = shown };
+		Assert.That ((await Run (session)).Passed, Is.False);
+		Assert.That (session.Inputs, Is.Empty);
+		}
+
+	[TestCase ("lost-input"), TestCase ("lost-restore")]
+	public async Task FahrenheitUncertainAcknowledgementsRestoreWithoutReplay (string behavior)
+		{
+		var session = new Session { Behavior = behavior };
+		session.State = session.State with { TemperatureUnits = "Fahrenheit", HomeTarget = 64.4 };
+		var result = await Run (session);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs.Count, Is.EqualTo (behavior == "lost-input" ? 1 : 2));
+		Assert.That (session.Restores, Is.EqualTo (new[] { 0 }));
+		Assert.That (session.State.HomeTarget, Is.EqualTo (64.4).Within (0.00001));
+		}
+
+	[Test]
+	public async Task UnitsChangedDuringInputPreventsAutomaticCompensation ()
+		{
+		var session = new Session { Behavior = "units-change" };
+		session.State = session.State with { TemperatureUnits = "Fahrenheit", HomeTarget = 64.4 };
+		var result = await Run (session);
+		Assert.That (result.Passed || result.RestorationConfirmed, Is.False);
+		Assert.That (session.Inputs.Count, Is.EqualTo (1));
+		Assert.That (session.Restores, Is.Empty);
+		}
+
 	[Test]
 	public async Task UpperTemperatureLimitStartsWithLowerAndRestores ()
 		{

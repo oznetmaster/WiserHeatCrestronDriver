@@ -12,7 +12,10 @@ public enum RoomTemperatureAction
 	}
 public sealed record RoomTemperatureActivity (string Epoch, long Completed, int Pending);
 public sealed record RoomTemperatureSnapshot (GatewayAwaySnapshot Gateway, int RoomId, RoomTemperatureActivity Activity,
-	double HomeTarget, bool HomeBoost, bool UiMatches);
+	double HomeTarget, bool HomeBoost, bool UiMatches)
+	{
+	public string TemperatureUnits { get; init; } = "Celsius";
+	}
 public sealed record RoomTemperatureResult (bool Passed, bool RestorationConfirmed, string Detail);
 
 public interface IRoomTemperatureSession
@@ -28,8 +31,14 @@ public static class RoomTemperatureCycle
 	{
 	private static JsonElement Room (RoomTemperatureSnapshot snapshot) => RoomTemperatureRestoration.Room (snapshot.Gateway.Hub, snapshot.RoomId);
 	private static bool Agrees (RoomTemperatureSnapshot snapshot) => snapshot.UiMatches && double.IsFinite (snapshot.HomeTarget) &&
-		Math.Abs (snapshot.HomeTarget * 10 - Room (snapshot).GetProperty ("CurrentSetPoint").GetInt32 ()) < 0.001 &&
+		Math.Abs (RawTarget (snapshot) - Room (snapshot).GetProperty ("CurrentSetPoint").GetInt32 ()) < 0.001 &&
 		snapshot.HomeBoost == (RoomTemperatureRestoration.Origin (Room (snapshot)) == "FromBoost");
+	private static double RawTarget (RoomTemperatureSnapshot snapshot) => snapshot.TemperatureUnits switch
+		{
+		"Celsius" => snapshot.HomeTarget * 10,
+		"Fahrenheit" => (snapshot.HomeTarget - 32) / 0.18d,
+		_ => double.NaN
+		};
 	private static bool Restored (RoomTemperatureRestorePlan plan, RoomTemperatureSnapshot snapshot)
 		{
 		try
@@ -55,9 +64,10 @@ public static class RoomTemperatureCycle
 		void Guard (RoomTemperatureSnapshot value)
 			{
 			RoomTemperatureRestoration.RequireGuarded (plan!, original!.Gateway, value.Gateway);
-			if (value.RoomId != original.RoomId || value.Activity.Epoch != original.Activity.Epoch || value.Activity.Pending < 0 ||
+			if (value.RoomId != original.RoomId || value.TemperatureUnits != original.TemperatureUnits ||
+				value.Activity.Epoch != original.Activity.Epoch || value.Activity.Pending < 0 ||
 				value.Activity.Completed < original.Activity.Completed || value.Activity.Completed > original.Activity.Completed + submitted)
-				throw new InvalidDataException ("Room identity, command lifetime or attribution changed.");
+				throw new InvalidDataException ("Room identity, temperature units, command lifetime or attribution changed.");
 			}
 		async Task<RoomTemperatureSnapshot> Wait (Func<RoomTemperatureSnapshot, bool> predicate, DateTimeOffset after, CancellationToken ct)
 			{

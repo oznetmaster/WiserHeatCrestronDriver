@@ -1,5 +1,19 @@
 # Development and validation history
 
+## Candidate 1.3.11 Fahrenheit controls and configuration restoration - 18 September 2026
+
+The unchanged candidate passed both selected native Fahrenheit temperature and Boost cases. A guarded configuration cycle changed only the display-unit setting, verified preservation of the other saved values, then independently restored the complete original Celsius configuration after physical-control restoration and temporary-child cleanup. The producer inventory contained 177 files. Original hub policy, Home, inventory, private-settings deletion and reservation release were audited. The two reviewed 1080x2400 screenshots show readable Fahrenheit values and controls; exact gauge calibration and other layouts remain separate.
+
+The preceding Celsius run passed Boost but failed its temperature case on a canceled Android capture after the second tap. Original hub policy and cleanup were independently confirmed without replaying the input; that failed result remains retained and is not treated as passed. Seventeen new offline configuration-cycle cases passed, covering uncertain replies, cancellation, journal failure, foreign changes and unconfirmed physical restoration. No driver code, package bytes or release changed.
+
+The current validation-status page now separates current-candidate evidence from historical runs and lists remaining acceptance work without stale competing current-state claims.
+
+## Native control fixture temperature units - 18 September 2026
+
+The native thermostat test tooling now compares Celsius or Fahrenheit display values with the hub's raw Celsius readings and requires temperature units to remain unchanged throughout input and restoration. Unknown or incorrectly labelled units prevent input; a unit change during a command stops automatic compensation for reconciliation. The Android fixture validates the configured units and checks the corresponding display suffix.
+
+Ten new offline regression cases first reproduced the limitation. All 397 control-tooling tests now pass, including scheduled/manual restoration, temperature limits, uncertain acknowledgements and unit changes. The Android control project builds without warnings or errors. This changes test tooling only: the installed 1.3.11 candidate is unchanged, and physical Fahrenheit and Off UI validation remain outstanding.
+
 ## Candidate 1.3.11 gates and read-only UI - 18 September 2026
 
 The unchanged candidate package passed 574 desktop tests, 186 Mono processor tests, three read-only hub tests and three installed-readiness checks. The existing submission gateway updated to 1.3.011.0000. The corrected Off-control fixture and Celsius/Fahrenheit command, range and preservation regressions passed on the processor. The failed first attempt remains separate evidence; it did not update the actual driver.
