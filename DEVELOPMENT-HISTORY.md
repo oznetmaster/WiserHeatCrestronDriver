@@ -1,5 +1,9 @@
 # Development and validation history
 
+## Candidate 1.3.11 Celsius temperature revalidation - 18 September 2026
+
+The previously interrupted Celsius native temperature case passed in a fresh filtered run using the same candidate. Pre-execution discovery confirmed exactly the intended case; Boost was not repeated. Original policy, Home, inventory, owned-child removal, private-input deletion and reservation release were audited against the complete retained producer inventory. The original failed capture remains historical evidence; its cause was not reproduced or attributed to a shared Android-library defect.
+
 ## Candidate 1.3.11 Off/resume and display-failure restoration - 18 September 2026
 
 The Celsius Off/resume case passed against the unchanged candidate. It prepared Off on the independently bound hub room, verified that native target controls were hidden and the explicit resume action was visible, used one Set to 5 C action, then restored and independently verified the original Auto policy. Home, temporary-child removal, inventory preservation, private-input deletion and reservation release were verified. The initial attempt caught a UI/configuration observation race and restored safely; that failure is retained separately. The corrected fixture waits for observations to agree without replaying input.
