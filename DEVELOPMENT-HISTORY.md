@@ -1,5 +1,11 @@
 # Development and validation history
 
+## Candidate 1.3.11 editor and saved-schedule validation - 18 September 2026
+
+Eight further cases passed against the unchanged candidate. Five editor cases covered every current row, both 5/30 C boundaries, Cancel and restoration after deliberate day/time interruptions. Three save cases verified actual Save Day/Save All and refusal to overwrite independently changed hub schedules through either stale-save button. The evidence audit confirmed original persistent schedules and guarded room settings, editor state, Home, both temporary-child removals and released reservations. Each run retained 178 producer files; 77 editor and 31 save capture pairs matched their hashes. Reviewed screenshots showed readable boundary controls and the complete conflict recovery message. No production code, package or public release changed. Other layouts, native thermostat bounds, multi-instance and outage scopes remain separate acceptance work.
+
+The candidate's 24-hour periodic functional collector started on the separate monitoring computer on 18 September at17:15:41UTC, reusing the validated service runtime. The first three scheduled observations passed. It binds the exact installed payload, driver lifetime and processor boot, and checks fresh successful refreshes plus independently observed gateway feedback. Completion must be supported by the actual journal and final applicable functionality checks; preparation or task registration does not establish endurance acceptance.
+
 ## Candidate 1.3.11 schedule mode validation - 18 September 2026
 
 The unchanged candidate passed an Auto → Manual → Auto cycle on the selected room. Its saved manual target was already present and equal to the scheduled target. Independent hub and Home observations, two completed driver commands and the original room policy were audited; no new manual target was initialized. The temporary child was removed, inventory and viewport preserved, private inputs deleted and reservations released. All 178 retained producer files and ten capture pairs matched their pins. Two rendered Schedule-page screenshots showed readable identity, status and the appropriate Enable/Disable action. Other manual-target variants, layouts and complete official-plan coverage remain separate work. No driver package or public release changed.
