@@ -13,6 +13,13 @@ public sealed class SuccessfulRefreshSequenceTests
 	private const string Lifetime = "ef64a66128b649a08d0930318f8577fa";
 	private const string First = "utc:2026-09-18T00:00:00.1234567+00:00";
 	[Test]
+	public void SnapshotTimestampUsesTheExactTaggedDriverFormat ()
+		{
+		var timestamp = SuccessfulRefreshSequence.ParseTimestamp (First);
+		Assert.That (timestamp.Offset, Is.EqualTo (TimeSpan.Zero));
+		Assert.That (timestamp.ToString ("O", System.Globalization.CultureInfo.InvariantCulture), Is.EqualTo (First[4..]));
+		}
+	[Test]
 	public void CachedReadsDoNotCountAsRefreshes ()
 		{
 		var sequence = new SuccessfulRefreshSequence (Lifetime, First);
@@ -40,6 +47,7 @@ public sealed class SuccessfulRefreshSequenceTests
 	 TestCase ("utc:2026-09-18T01:00:00.1234567+01:00"), TestCase ("utc:0001-01-01T00:00:00.0000000+00:00")]
 	public void MalformedMarkersCannotProveARefresh (string marker)
 		{
+		Assert.Throws<InvalidDataException> (() => SuccessfulRefreshSequence.ParseTimestamp (marker));
 		Assert.Throws<InvalidDataException> (() => new SuccessfulRefreshSequence (Lifetime, marker));
 		var sequence = new SuccessfulRefreshSequence (Lifetime, First);
 		Assert.Throws<InvalidDataException> (() => sequence.Observe (Lifetime, marker));

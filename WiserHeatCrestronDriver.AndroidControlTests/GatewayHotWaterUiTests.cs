@@ -153,7 +153,7 @@ public sealed partial class GatewayUiTests
 			bool agrees = string.Equals (row.Status, enabled ? "On" : "Off", StringComparison.OrdinalIgnoreCase) &&
 				row.Action == (enabled ? "Turn Off" : "Turn On");
 			var snapshot = new HotWaterControlSnapshot (physical, after.PropertyValues["driverLifetimeId"].GetString ()!,
-				DateTimeOffset.Parse (after.PropertyValues["lastHubRefreshUtc"].GetString ()!, CultureInfo.InvariantCulture),
+				SuccessfulRefreshSequence.ParseTimestamp (after.PropertyValues["lastHubRefreshUtc"].GetString ()!),
 				new (schedules, domain), enabled, agrees && row.Enabled && after.PropertyValues["hotWaterActionEnabled"].GetBoolean ());
 			_restorePlan ??= HotWaterRestoration.Capture (domain);
 			_original ??= snapshot;

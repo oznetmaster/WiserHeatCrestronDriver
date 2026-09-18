@@ -16,19 +16,19 @@ public sealed class SuccessfulRefreshSequence
 		if (!Guid.TryParseExact (lifetime, "N", out var id) || id == Guid.Empty)
 			throw new InvalidDataException ("A valid driver lifetime is required.");
 		_lifetime = lifetime;
-		_last = Parse (taggedUtc);
+		_last = ParseTimestamp (taggedUtc);
 		}
 	public bool Observe (string lifetime, string taggedUtc)
 		{
 		if (lifetime != _lifetime) throw new InvalidDataException ("The driver lifetime changed.");
-		var current = Parse (taggedUtc);
+		var current = ParseTimestamp (taggedUtc);
 		if (current < _last) throw new InvalidDataException ("The successful refresh marker moved backwards.");
 		if (current == _last) return false;
 		_last = current;
 		Advances++;
 		return true;
 		}
-	private static DateTimeOffset Parse (string value)
+	public static DateTimeOffset ParseTimestamp (string value)
 		{
 		if (value == null || !value.StartsWith ("utc:", StringComparison.Ordinal) ||
 			!DateTimeOffset.TryParseExact (value[4..], "O", CultureInfo.InvariantCulture, DateTimeStyles.None, out var result) ||

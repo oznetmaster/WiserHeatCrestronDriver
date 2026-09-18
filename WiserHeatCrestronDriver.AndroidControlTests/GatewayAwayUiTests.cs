@@ -149,7 +149,7 @@ public sealed partial class GatewayUiTests
 			bool agrees = string.Equals (row.Status, enabled ? "Enabled" : "Disabled", StringComparison.OrdinalIgnoreCase) &&
 				row.Action == (enabled ? "Disable Away" : "Enable Away");
 			return new (physical, after.PropertyValues["driverLifetimeId"].GetString ()!,
-				DateTimeOffset.Parse (after.PropertyValues["lastHubRefreshUtc"].GetString ()!, CultureInfo.InvariantCulture),
+				SuccessfulRefreshSequence.ParseTimestamp (after.PropertyValues["lastHubRefreshUtc"].GetString ()!),
 				new (schedules, domain), enabled, agrees && row.Enabled && after.PropertyValues["awayModeActionEnabled"].GetBoolean ());
 			}
 		public async Task SetAwayAsync (bool enabled, bool recovery, CancellationToken token)
