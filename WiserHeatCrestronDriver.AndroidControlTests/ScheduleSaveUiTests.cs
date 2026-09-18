@@ -79,7 +79,7 @@ public sealed partial class GatewayUiTests
 		}
 
 	private sealed partial class ScheduleSaveSession (GatewayUiTests fixture, HubSettings hub, HttpClient http,
-		ControlRoomBinding control, RoomBinding binding, DeviceInfo original, string check) : IScheduleConflictSession, IScheduleLayoutSession
+		ControlRoomBinding control, RoomBinding binding, DeviceInfo original, string check) : IScheduleConflictSession, IScheduleLayoutSession, IScheduleRenameSession
 		{
 		private readonly ScheduleActivity _initial = Activity (original);
 		private readonly JsonElement _originalEditor = ScheduleEditorObservation.Editor (original.PropertyValues);
@@ -115,7 +115,7 @@ public sealed partial class GatewayUiTests
 			await using var file = new FileStream (Path.Combine (directory, phase + ".json"), FileMode.CreateNew, FileAccess.Write, FileShare.Read);
 			await JsonSerializer.SerializeAsync (file, new { Session.Context.RunId, Session.Context.PackageSha256, Phase = phase, ObservedUtc = DateTimeOffset.UtcNow, Value = value });
 			file.Flush (true);
-			if (phase is "create-intent" or "existing-schedule-intent")
+			if (phase is "create-intent" or "existing-schedule-intent" or "rename-intent")
 				fixture._roomStatePreserved = false;
 			}
 		private void RequireIdentity (DeviceInfo device)

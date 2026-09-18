@@ -25,5 +25,7 @@
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleSaveIsolation.cs" Link="ScheduleSaveIsolation.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleSaveConflict.cs" Link="ScheduleSaveConflict.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleLayoutIsolation.cs" Link="ScheduleLayoutIsolation.cs" />
+    <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleRenameIsolation.cs" Link="ScheduleRenameIsolation.cs" />
+    <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleChoiceScan.cs" Link="ScheduleChoiceScan.cs" />
   </ItemGroup>
 </Project>

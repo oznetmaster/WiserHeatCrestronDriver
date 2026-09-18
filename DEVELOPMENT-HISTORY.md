@@ -11,6 +11,13 @@ See the [product changelog](CHANGELOG.md) for shipped changes. This document pre
 
 <!-- development-history -->
 
+## Live schedule-choice validation - 2026-09-18 (no driver release)
+
+- Added explicitly enabled Android cases for a schedule renamed while the Schedule page or selection dialog is already open. Independent hub and driver observations require the original selected ID, updated label, complete option list and full state restoration.
+- Corrected the test scanner to establish both list ends when a name change reorders options but preserves the visible anchor. The earlier failed attempt remains separate; the fresh two-case hardware run passed with cleanup. Offline regressions cover lost writes, unsafe restoration, missing options and incorrect selection.
+- See [validation status](submission/ValidationStatus.md) for candidate and visual limits. Added/deleted choices, unchanged-refresh stability and final submission acceptance remain separate.
+
+
 ## Mode-change recovery validation - 2026-09-18 (no driver release)
 
 - Added a separately enabled Android case that deliberately interrupts after Manual is independently observed, then requires exactly one configuration compensation back to Auto. The interrupted operation stays failed in its evidence; the recovery case passes only after verified restoration.

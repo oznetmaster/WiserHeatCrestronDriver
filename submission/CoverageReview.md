@@ -1,5 +1,13 @@
 # Coverage source review
 
+## Live schedule name changes - 18 September 2026
+
+Both open-page and already-open-dialog rename cases passed on exact Debug1.3.007.0029 using public TestAdapter1.11.0. Each changed only the name of an exclusively assigned schedule through the independent hub API. The running driver and app displayed the new label with the same selected ID; every schedule option was observed. No driver reload or dialog reopening was substituted for the update.
+
+An initial run passed the page case but failed the dialog case when a downward-only scan missed the renamed item. Restoration and cleanup passed; that run remains failed. The open list preserves its visible anchor when sorting changes. A fresh run established both list ends, found the renamed item above the original viewport, verified its selected state and covered every option. Offline regressions still reject genuinely missing, stale or incorrectly selected options.
+
+Independent audits confirmed original names, complete persistent schedules, guarded room settings, editor and Home restoration, original inventory, temporary-child removal and released reservations. The selected long name is abbreviated on the compact native selector button; the full label was visible in the page summary and option list. This result does not establish every visual profile, choice addition/removal, repeated unchanged-refresh behavior, final Release acceptance or endurance.
+
 ## Deliberate mode interruption and recovery - 18 September 2026
 
 `InterruptedManualModeTestRestoresAutoThroughConfiguration` passed on exact Debug `1.3.007.0029` with public TestAdapter 1.11.0. The fixture used the real Disable UI control, independently observed Manual on the hub and Home, then deliberately interrupted the observation phase. The existing configuration recovery sent one distinct `enableSchedule` command through `extension:doCommand`. The saved manual target was restored before Auto; the interrupted operation remained recorded as failed while its recovery was verified.
