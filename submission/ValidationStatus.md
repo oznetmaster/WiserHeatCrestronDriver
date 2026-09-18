@@ -2,6 +2,12 @@
 
 Updated 18 September 2026. This page describes the current candidate only. Earlier package-specific results and failed attempts remain in [development and validation history](../DEVELOPMENT-HISTORY.md); they do not establish acceptance of different package bytes.
 
+## Test-harness recovery validation
+
+Hot-water test cleanup now reads hub and processor state independently of Android. If the app becomes unavailable or its display is stale after an input, the test still fails, but guarded restoration of the captured hot-water policy can proceed. Identity, fresh-state, unrelated-setting and no-replay checks remain required. UI agreement is checked separately after physical restoration; a failed final UI check cannot turn the test green or erase the physical-restoration record. Offline recovery regressions passed and the Android control project builds cleanly. This is a test-harness change, not a driver change or a new physical acceptance result; the frozen candidate and endurance run remain unchanged.
+
+The analogous Away-mode path still depends on Android during recovery and needs review before further live gateway-control acceptance runs. Existing successful physical results retain their original scope; they do not establish recovery from an unavailable app.
+
 ## Candidate and release identity
 
 The installed submission candidate is **1.3.11** (processor version `1.3.011.0000`). Its immutable package is `NeilColvin_Thermostat_WiserHeat_IP_V2.pkg`, with SHA-256 `b84375d629ac5af2f65c1f6cde4dabf74a6302ff100caafd65d157ac1e6ab3cf`. It uses published WiserHeatAPIv2 1.1.2. The public driver release remains 1.3.8; this candidate has not been submitted to Crestron, and no certification or completed acceptance is claimed.

@@ -106,7 +106,7 @@ public sealed partial class GatewayUiTests
 		public async Task RecordAsync (string phase, object value)
 			{
 			AndroidWorkflowSession.VerifyContext (Session.Context);
-			if (phase == "restored" || phase.StartsWith ("ui-", StringComparison.Ordinal) && phase.EndsWith ("-observed", StringComparison.Ordinal))
+			if (phase.StartsWith ("ui-", StringComparison.Ordinal) && phase.EndsWith ("-observed", StringComparison.Ordinal))
 				{
 				using var captureTimeout = new CancellationTokenSource (TimeSpan.FromSeconds (25));
 				bool enabled = JsonSerializer.SerializeToElement (value).GetProperty ("Snapshot").GetProperty ("HomeOn").GetBoolean ();
@@ -135,6 +135,28 @@ public sealed partial class GatewayUiTests
 			}
 		public async Task<HotWaterControlSnapshot> ReadAsync (CancellationToken token)
 			{
+			var snapshot = await ReadForRecoveryAsync (token);
+			var hierarchy = await Session.Device.CaptureAsync (token);
+			Page (hierarchy);
+			var row = CrestronHomePages.ReadStatusAndButton (hierarchy, "Hot Water");
+			bool agrees = string.Equals (row.Status, snapshot.HomeOn ? "On" : "Off", StringComparison.OrdinalIgnoreCase) &&
+				row.Action == (snapshot.HomeOn ? "Turn Off" : "Turn On");
+			return snapshot with { ActionEnabled = snapshot.ActionEnabled && agrees && row.Enabled };
+			}
+		public async Task VerifyRestoredUiAsync (HotWaterControlSnapshot snapshot, CancellationToken token)
+			{
+			await Session.CaptureAsync (check + ".restored", hierarchy =>
+				{
+				Page (hierarchy);
+				var row = CrestronHomePages.ReadStatusAndButton (hierarchy, "Hot Water");
+				if (!row.Enabled || row.Action != (snapshot.HomeOn ? "Turn Off" : "Turn On") ||
+					!string.Equals (row.Status, snapshot.HomeOn ? "On" : "Off", StringComparison.OrdinalIgnoreCase))
+					throw new InvalidDataException ("Hot-water policy was restored, but the UI does not agree.");
+				}, token);
+			await RecordAsync ("restored-ui-observed", new { Snapshot = snapshot });
+			}
+		public async Task<HotWaterControlSnapshot> ReadForRecoveryAsync (CancellationToken token)
+			{
 			AndroidWorkflowSession.VerifyContext (Session.Context);
 			var room = await fixture.ReadRoomAsync (binding, token);
 			string physical = hub.HubHost.Trim ().ToLowerInvariant ();
@@ -146,15 +168,10 @@ public sealed partial class GatewayUiTests
 			var after = await fixture.ReadGatewayAsync (token);
 			if (after.Id != gateway.Id || after.Name != gateway.Name || before.PropertyValues["driverLifetimeId"].GetString () != after.PropertyValues["driverLifetimeId"].GetString () ||
 				!after.PropertyValues["hotWaterVisible"].GetBoolean ()) throw new InvalidDataException ("Gateway identity or configured hot-water capability changed.");
-			var hierarchy = await Session.Device.CaptureAsync (token);
-			Page (hierarchy);
-			var row = CrestronHomePages.ReadStatusAndButton (hierarchy, "Hot Water");
 			bool enabled = after.PropertyValues["hotWaterIsOn"].GetBoolean ();
-			bool agrees = string.Equals (row.Status, enabled ? "On" : "Off", StringComparison.OrdinalIgnoreCase) &&
-				row.Action == (enabled ? "Turn Off" : "Turn On");
 			var snapshot = new HotWaterControlSnapshot (physical, after.PropertyValues["driverLifetimeId"].GetString ()!,
 				SuccessfulRefreshSequence.ParseTimestamp (after.PropertyValues["lastHubRefreshUtc"].GetString ()!),
-				new (schedules, domain), enabled, agrees && row.Enabled && after.PropertyValues["hotWaterActionEnabled"].GetBoolean ());
+				new (schedules, domain), enabled, after.PropertyValues["hotWaterActionEnabled"].GetBoolean ());
 			_restorePlan ??= HotWaterRestoration.Capture (domain);
 			_original ??= snapshot;
 			return snapshot;
@@ -165,7 +182,7 @@ public sealed partial class GatewayUiTests
 			if (_restorePlan == null || _original == null || controllerId != _restorePlan.Id || index < 0 || index >= _restorePlan.Requests.Length ||
 				!JsonElement.DeepEquals (request, _restorePlan.Requests[index]) || _restoreAttempts.Contains (index))
 				throw new InvalidDataException ("Compensation must match the captured plan and may not be repeated.");
-			HotWaterControlCycle.RequireGuarded (_original, await ReadAsync (token));
+			HotWaterControlCycle.RequireGuarded (_original, await ReadForRecoveryAsync (token));
 			await RecordAsync ("restore-http-" + index + "-intent", new { ControllerId = controllerId, Request = request });
 			token.ThrowIfCancellationRequested ();
 			_restoreAttempts.Add (index);

@@ -31,14 +31,31 @@ public sealed class HotWaterControlCycleTests
 		public string? Behavior;
 		public bool SparseHubResponses;
 		public string? FailRecord;
+		public bool UiUnavailable;
+		public bool RestoredUiUnavailable;
+		public int UiRestorationChecks;
 		public CancellationTokenSource? CancelAfterFirst;
 		private JsonNode Water => Domain["HotWater"]![0]!;
 		public Task<HotWaterControlSnapshot> ReadAsync (CancellationToken token)
 			{
+			if (UiUnavailable && Inputs.Count > 0) throw new IOException ("Android observation unavailable after input");
+			return ReadSnapshotAsync (token, includeUi: true);
+			}
+		public Task<HotWaterControlSnapshot> ReadForRecoveryAsync (CancellationToken token) => ReadSnapshotAsync (token, includeUi: false);
+		public Task VerifyRestoredUiAsync (HotWaterControlSnapshot snapshot, CancellationToken token)
+			{
+			token.ThrowIfCancellationRequested ();
+			UiRestorationChecks++;
+			if (UiUnavailable || RestoredUiUnavailable || Behavior == "ui-stale") throw new IOException ("Restored UI unavailable or stale");
+			return RecordAsync ("restored-ui-observed", new { Snapshot = snapshot });
+			}
+		private Task<HotWaterControlSnapshot> ReadSnapshotAsync (CancellationToken token, bool includeUi)
+			{
 			token.ThrowIfCancellationRequested ();
 			bool active = Water["WaterHeatingState"]!.GetValue<string> () == "On";
 			return Task.FromResult (new HotWaterControlSnapshot ("fake-hub", _lifetime, _refresh,
-				new (_schedules, JsonSerializer.SerializeToElement (Domain)), Behavior == "ui-stale" && Inputs.Count > 0 ? !active : active, true));
+				new (_schedules, JsonSerializer.SerializeToElement (Domain)),
+				(Behavior == "processor-stale" || includeUi && Behavior == "ui-stale") && Inputs.Count > 0 ? !active : active, true));
 			}
 		public Task RecordAsync (string phase, object value)
 			{
@@ -122,12 +139,50 @@ public sealed class HotWaterControlCycleTests
 		Assert.That (result.Passed, Is.False); Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
 		Assert.That (session.Inputs.Count, Is.EqualTo (inputs));
 		}
-	[TestCase ("foreign-water"), TestCase ("not-delivered"), TestCase ("foreign-room"), TestCase ("away-change"), TestCase ("restart"), TestCase ("ui-stale")]
+	[TestCase ("foreign-water"), TestCase ("not-delivered"), TestCase ("foreign-room"), TestCase ("away-change"), TestCase ("restart"), TestCase ("processor-stale")]
 	public async Task UncertainOrForeignStateIsNotBlindlyOverwritten (string behavior)
 		{
 		var session = new Session { Behavior = behavior }; var result = await Run (session);
 		Assert.That (result.Passed || result.RestorationConfirmed, Is.False);
 		Assert.That (session.Inputs.Count, Is.EqualTo (1)); Assert.That (session.Restores, Is.Empty);
+		}
+	[TestCase (false, "Schedule"), TestCase (true, "Schedule")]
+	[TestCase (false, "ManualMode"), TestCase (true, "ManualOverride")]
+	public async Task AndroidFailureDoesNotPreventGuardedPhysicalRestoration (bool on, string policy)
+		{
+		var session = new Session (on, on, policy) { UiUnavailable = true };
+		var original = await session.ReadForRecoveryAsync (default);
+		var plan = HotWaterRestoration.Capture (original.Hub.Domain);
+		var result = await Run (session);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs, Is.EqualTo (new[] { !on }));
+		Assert.That (session.UiRestorationChecks, Is.EqualTo (1));
+		var final = await session.ReadForRecoveryAsync (default);
+		HotWaterRestoration.RequireRestored (plan, final.Hub.Domain);
+		HotWaterControlCycle.RequireGuarded (original, final);
+		Assert.That (session.Records, Does.Contain ("restored-ui-failed"));
+		}
+	[TestCase ("ui-stale", false, 1), TestCase (null, true, 2)]
+	public async Task UiFailureRemainsFailedAfterPhysicalRecovery (string? behavior, bool finalUiUnavailable, int inputs)
+		{
+		var session = new Session { Behavior = behavior, RestoredUiUnavailable = finalUiUnavailable };
+		var result = await Run (session);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs.Count, Is.EqualTo (inputs));
+		Assert.That (session.Records, Does.Contain ("restored"));
+		Assert.That (session.Records, Does.Contain ("restored-ui-failed"));
+		}
+	[TestCase ("foreign-room"), TestCase ("foreign-water"), TestCase ("away-change"), TestCase ("restart"), TestCase ("not-delivered"), TestCase ("processor-stale")]
+	public async Task AndroidFailureDoesNotBypassPhysicalIdentityOrStateGuards (string behavior)
+		{
+		var session = new Session { Behavior = behavior, UiUnavailable = true };
+		var result = await Run (session);
+		Assert.That (result.Passed || result.RestorationConfirmed, Is.False);
+		Assert.That (session.Inputs.Count, Is.EqualTo (1));
+		Assert.That (session.Restores, Is.Empty);
+		Assert.That (session.UiRestorationChecks, Is.Zero);
 		}
 	[Test]
 	public async Task IgnoredCancelDoesNotPassBecauseButtonReturnedToOff ()

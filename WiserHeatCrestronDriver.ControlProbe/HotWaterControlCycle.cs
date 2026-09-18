@@ -13,6 +13,9 @@ public sealed record HotWaterControlResult (bool Passed, bool RestorationConfirm
 public interface IHotWaterControlSession
 	{
 	Task<HotWaterControlSnapshot> ReadAsync (CancellationToken token);
+	/// <summary>Reads independent hub and processor state without requiring the Android UI.</summary>
+	Task<HotWaterControlSnapshot> ReadForRecoveryAsync (CancellationToken token);
+	Task VerifyRestoredUiAsync (HotWaterControlSnapshot snapshot, CancellationToken token);
 	Task RecordAsync (string phase, object value);
 	Task SetHotWaterAsync (bool enabled, CancellationToken token);
 	Task RestoreAsync (int index, int controllerId, JsonElement request, CancellationToken token);
@@ -72,13 +75,13 @@ public static class HotWaterControlCycle
 		DateTimeOffset requestedAfter = default;
 		string detail = "Preflight failed before hot-water input.";
 		var elapsed = new Stopwatch ();
-		async Task<HotWaterControlSnapshot> Wait (Func<HotWaterControlSnapshot, bool> ready, DateTimeOffset after, CancellationToken cancellation)
+		async Task<HotWaterControlSnapshot> Wait (Func<HotWaterControlSnapshot, bool> ready, DateTimeOffset after, CancellationToken cancellation, bool recovery = false)
 			{
 			int matches = 0; var last = after;
 			while (true)
 				{
 				cancellation.ThrowIfCancellationRequested ();
-				var current = await session.ReadAsync (cancellation);
+				var current = recovery ? await session.ReadForRecoveryAsync (cancellation) : await session.ReadAsync (cancellation);
 				RequireGuarded (original!, current);
 				if (current.RefreshUtc < last) throw new InvalidDataException ("Gateway refresh evidence moved backwards.");
 				last = current.RefreshUtc;
@@ -127,7 +130,7 @@ public static class HotWaterControlCycle
 				try
 					{
 					// Establish delivery of the last issued input before compensating. Never replay it.
-					var current = await Wait (s => ManualTarget (s, requested), requestedAfter, cleanup.Token);
+					var current = await Wait (s => ManualTarget (s, requested), requestedAfter, cleanup.Token, recovery: true);
 					int index = 0;
 					foreach (var request in plan.Requests)
 						{
@@ -147,13 +150,19 @@ public static class HotWaterControlCycle
 							passed = false;
 							await session.RecordAsync ("restore-" + index + "-input-error", new { Exception = failure.ToString () });
 							}
-						current = await Wait (AlreadyDone, after, cleanup.Token);
+						current = await Wait (AlreadyDone, after, cleanup.Token, recovery: true);
 						await session.RecordAsync ("restore-" + index + "-observed", new { Snapshot = current, Seconds = elapsed.Elapsed.TotalSeconds });
 						index++;
 						}
-					var final = await Wait (s => Restored (plan, s), original.RefreshUtc, cleanup.Token);
+					var final = await Wait (s => Restored (plan, s), original.RefreshUtc, cleanup.Token, recovery: true);
 					await session.RecordAsync ("restored", new { Snapshot = final });
 					restored = true;
+					try { await session.VerifyRestoredUiAsync (final, cleanup.Token); }
+					catch (Exception failure)
+						{
+						passed = false;
+						try { await session.RecordAsync ("restored-ui-failed", new { Exception = failure.ToString () }); } catch { }
+						}
 					detail = passed ? "Both UI states and the original hot-water control policy were observed, with guarded hub settings preserved." : "The test failed; original hot-water policy was independently restored without replay.";
 					}
 				catch (Exception failure)
