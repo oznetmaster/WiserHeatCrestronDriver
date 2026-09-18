@@ -53,7 +53,7 @@ The driver is implemented using the **Crestron Home SDK V2 Entity Model**. It de
 
 This driver targets the [Drayton Wiser Heating system](https://www.draytoncontrols.co.uk/products/smart-heating/wiser), covered by Schneider Electric's [UK and Ireland system guide](https://productinfo.se.com/wiser_home/wiser-home-sug-uk/English/System%20User%20Guide_Wiser_Home_UK%20%28Bookmap%29_DD00620149.xml).
 
-Current live testing of the driver and its underlying library has been performed with a **Wiser v2 hub**. Earlier versions of the underlying library operated with a Wiser v1 hub, but the interface and library have since changed. The current driver and library have not been revalidated on v1 hardware, so v1 compatibility is unverified and is not guaranteed.
+Current live testing of the driver and its underlying library has been performed with a **[Drayton Wiser 2nd Generation HubR, 3 channel](https://wiser.draytoncontrols.co.uk/products/wiser-2nd-generation-hubr-3-channel)** (`CCTFR6313G2D`, v2). Earlier versions of the underlying library operated with a Wiser v1 hub, but the interface and library have since changed. The current driver and library have not been revalidated on v1 hardware, so v1 compatibility is unverified and is not guaranteed.
 
 Here, v1 and v2 identify the Wiser hub hardware generation.
 
