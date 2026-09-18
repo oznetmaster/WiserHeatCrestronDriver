@@ -1,5 +1,9 @@
 # Development and validation history
 
+## Processor fixture path correction - 18 September 2026
+
+The first 1.3.11 gate passed all 574 local tests, then stopped on one processor fixture: its translation lookup used `Translations`, whereas the packaged directory is `translations` on the case-sensitive processor filesystem. The fixture now uses the actual packaged path. The production candidate bytes are unchanged. The failed run did not attempt the actual driver update; its temporary instance was removed and its reservation released. Failed evidence remains retained, and a fresh gate run is required.
+
 ## Candidate 1.3.11 preparation - 18 September 2026
 
 The candidate uses published WiserHeatAPIv2 1.1.2, whose release passed hosted and processor checks. Its published net472 DLL and retained MIT notice were independently reviewed and pinned. The driver now displays Celsius/Fahrenheit within supported physical limits and preserves Off targets and schedule slots until an explicit minimum-temperature action is chosen. The source-bound coverage draft includes those controls; its 571 scoped assertions are a plan, not completed acceptance.

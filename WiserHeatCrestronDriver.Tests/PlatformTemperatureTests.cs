@@ -45,7 +45,7 @@ public sealed partial class PlatformDiscoveryTests
 			Assert.That (state.Definition.Commands.Keys, Does.Contain ("resumeEditSlot" + slot));
 			Assert.That (state.Definition.Properties.Keys, Does.Contain ("editSlot" + slot + "IsOff").And.Contain ("editSlot" + slot + "HasTemperature"));
 			}
-		Assert.That (TemperatureCommand (File.ReadAllText (Path.Combine (TestSupport.DataDirectory, "Translations", "en-US.json"))).Element ("HeatingOffLabel").Value, Is.EqualTo ("Off"));
+		Assert.That (TemperatureCommand (File.ReadAllText (Path.Combine (TestSupport.DataDirectory, "translations", "en-US.json"))).Element ("HeatingOffLabel").Value, Is.EqualTo ("Off"));
 		}
 
 	[TestCase ("Celsius", "Set to 5°C", 5)]
