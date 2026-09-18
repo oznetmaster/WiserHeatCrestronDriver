@@ -7,7 +7,7 @@ See the [changelog](CHANGELOG.md) for release history and the [release notes](RE
 
 The [Crestron submission help source](submission/README.md) is being prepared separately. It is a review draft and is not included in the current release or a completed portal submission.
 
-A **Crestron Home** platform driver that integrates a **Drayton Wiser Heating** hub and exposes discovered rooms as managed child thermostat devices.
+A **Crestron Home** platform driver that integrates a **Drayton Wiser Heating (UK and Ireland)** hub and exposes discovered rooms as managed child thermostat devices.
 
 Drayton, Wiser, and Schneider Electric are trademarks of Schneider Electric SE, its subsidiaries, or affiliated companies. This project is an independent, unofficial Crestron Home driver and is not affiliated with or endorsed by Schneider Electric or Crestron.
 
@@ -46,8 +46,18 @@ The driver is implemented using the **Crestron Home SDK V2 Entity Model**. It de
 | Requirement | Details |
 |---|---|
 | Crestron Home processor | Running a firmware version compatible with extension drivers |
-| Wiser hub | Local-network-accessible Drayton Wiser hub |
+| Wiser hub | Local-network-accessible Drayton Wiser hub; current testing uses v2 hardware |
 | Hub secret | Required for authenticating with the local Wiser API |
+
+### Wiser Hub Compatibility
+
+This driver targets the [Drayton Wiser Heating system](https://www.draytoncontrols.co.uk/products/smart-heating/wiser), covered by Schneider Electric's [UK and Ireland system guide](https://productinfo.se.com/wiser_home/wiser-home-sug-uk/English/System%20User%20Guide_Wiser_Home_UK%20%28Bookmap%29_DD00620149.xml).
+
+Current live testing of the driver and its underlying library has been performed with a **Wiser v2 hub**. Earlier versions of the underlying library operated with a Wiser v1 hub, but the interface and library have since changed. The current driver and library have not been revalidated on v1 hardware, so v1 compatibility is unverified and is not guaranteed.
+
+Here, v1 and v2 identify the Wiser hub hardware generation.
+
+Other regional systems and product families sold under the Wiser name have not been validated with this driver. In particular, local API compatibility with continental European Wiser Home hubs has not been established. A shared brand or app does not establish compatibility.
 
 ---
 
