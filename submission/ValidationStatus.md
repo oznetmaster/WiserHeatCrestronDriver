@@ -1,5 +1,15 @@
 # Wiser submission pilot status
 
+## Candidate 1.3.11 gates and read-only UI - 18 September 2026
+
+The unchanged candidate package passed 574 desktop tests, 186 Mono processor tests, three read-only hub tests and three installed-readiness checks. The existing submission gateway updated to 1.3.011.0000. The corrected Off-control fixture and Celsius/Fahrenheit command, range and preservation regressions passed on the processor. The failed first attempt remains separate evidence; it did not update the actual driver.
+
+The candidate then passed all three cases in the dedicated read-only Android project. The independent auditor verified 171 producer files and 25 captures against pins retained before execution, and the installed payload matched the archived package byte for byte. State, Home, original installed inventory, temporary-child removal, private-settings deletion and released reservations were verified. No heating command was sent by this read-only stage.
+
+The CI test package left by the first failed attempt was removed using its original ownership record and the exact replacement file hash, preserving installed and manually deployed drivers. A local cleanup helper initially stopped before deletion because its evidence subfolder was missing; resuming the same reservation completed verified cleanup. Home may retain a cached catalogue entry until a planned reboot.
+
+These checks establish bounded candidate behaviour, not completed submission acceptance. Native control tests, Fahrenheit/Off UI variants, remaining official-plan scopes, endurance and signed-form/delivery approval are still outstanding. Pre-execution pins were retained under the same local account; independent producer authentication is not claimed.
+
 ## Processor fixture path correction - 18 September 2026
 
 The first 1.3.11 gate passed all 574 local tests, then stopped on one processor fixture: its translation lookup used `Translations`, whereas the packaged directory is `translations` on the case-sensitive processor filesystem. The fixture now uses the actual packaged path. The production candidate bytes are unchanged. The failed run did not attempt the actual driver update; its temporary instance was removed and its reservation released. Failed evidence remains retained, and a fresh gate run is required.
