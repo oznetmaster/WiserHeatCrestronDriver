@@ -74,7 +74,7 @@ public sealed partial class GatewayUiTests
 			var page = Page (hierarchy);
 			var row = CrestronHomePages.ReadStatusAndButton (page, "Boost");
 			return page.RequireUnique (Target).Text == Formatted (target) && row.Enabled &&
-				string.Equals (row.Status, boost ? "On" : "Off", StringComparison.OrdinalIgnoreCase) && row.Action == (boost ? "Boost Off" : "Boost On");
+				string.Equals (row.Status, boost ? "Boost Active" : "Boost Off", StringComparison.OrdinalIgnoreCase) && row.Action == (boost ? "Boost Off" : "Boost On");
 			}
 		private async Task<JsonElement> ReadHub (string group, CancellationToken token)
 			{

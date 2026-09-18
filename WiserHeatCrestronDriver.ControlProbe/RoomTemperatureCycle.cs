@@ -83,6 +83,7 @@ public static class RoomTemperatureCycle
 		try
 			{
 			original = await session.ReadAsync (deadline.Token);
+			await session.RecordAsync ("preflight", new { Snapshot = original, Boost = boost });
 			plan = RoomTemperatureRestoration.Capture (Room (original));
 			if (!Guid.TryParseExact (original.Activity.Epoch, "N", out _) || original.Activity.Pending != 0 ||
 				original.Activity.Completed < 0 || original.Activity.Completed > long.MaxValue - 2 || !Restored (plan, original))
@@ -109,7 +110,9 @@ public static class RoomTemperatureCycle
 					? action == RoomTemperatureAction.BoostOn
 						? value => Agrees (value) && value.HomeBoost && Room (value).GetProperty ("OverrideTimeoutUnixTime").GetInt64 () > DateTimeOffset.UtcNow.ToUnixTimeSeconds ()
 						: value => Restored (plan, value)
-					: value => Agrees (value) && !value.HomeBoost && Room (value).GetProperty ("CurrentSetPoint").GetInt32 () == target;
+					: value => Agrees (value) && Room (value).GetProperty ("CurrentSetPoint").GetInt32 () == target &&
+						(plan.Scheduled ? Room (value).GetProperty ("OverrideType").GetString () == "Manual"
+							: RoomTemperatureRestoration.Origin (Room (value)) == "FromManualMode" && ScheduleObservation.ManualTarget (Room (value)) == target);
 				await session.RecordAsync ("input-" + (submitted + 1) + "-intent", new
 					{
 					Action = action,

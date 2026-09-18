@@ -102,7 +102,8 @@ public sealed class RoomTemperatureCycleTests
 					{
 						var room = d["Room"]![0]!;
 						room["CurrentSetPoint"] = target;
-						room["SetpointOrigin"] = boost ? "FromBoost" : manual ? "FromManualMode" : "FromManualOverride";
+						// The real hub also reports FromBoost for a Manual override of an Auto schedule.
+						room["SetpointOrigin"] = boost || !manual ? "FromBoost" : "FromManualMode";
 						room["OverrideType"] = boost ? "Boost" : "Manual";
 						room["OverrideSetpoint"] = target;
 						room["OverrideTimeoutUnixTime"] = DateTimeOffset.UtcNow.AddHours (1).ToUnixTimeSeconds ();
@@ -111,7 +112,7 @@ public sealed class RoomTemperatureCycleTests
 					}) with
 					{
 					HomeTarget = target / 10d,
-					HomeBoost = boost
+					HomeBoost = boost || !manual
 					};
 				}
 			State = State with
