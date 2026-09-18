@@ -1,0 +1,12 @@
+{
+  "Host": "192.0.2.2",
+  "UserName": "",
+  "Password": "",
+  "CertificateSha256": "REPLACE_WITH_VERIFIED_64_CHARACTER_SHA256",
+  "SshFingerprint": "REPLACE_WITH_VERIFIED_SSH_FINGERPRINT",
+  "DeviceId": 0,
+  "LocationId": 0,
+  "Name": "REPLACE_WITH_EXISTING_GATEWAY_NAME",
+  "CatalogueId": "REPLACE_WITH_EXISTING_CANDIDATE_CATALOGUE_ID",
+  "PackagePath": "C:\\PrivateSubmission\\Candidate.pkg"
+}

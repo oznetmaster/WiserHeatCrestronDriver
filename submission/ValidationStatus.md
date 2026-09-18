@@ -35,6 +35,8 @@ Producer hashes and source digests are retained before execution and compared af
 
 ## Remaining acceptance work
 
+The [two-instance baseline](TwoInstanceTesting.md) is now executable through the opt-in control fixture and released installed-tests workflow. Offline regressions validate distinct pinned identities, fresh shared-state convergence and preservation of each instance's configuration; the project builds and the case is discoverable. It has not run against the processors. Command isolation, the second UI, instance removal/session effects and full official multiple-instance acceptance remain outstanding.
+
 The control project now has explicit equal/different/absent saved-manual-target cases, with offline validation of their preconditions and restoration handling. They require separately selected physical runs after the current observation period; their existence does not expand the candidate's completed evidence above. A room must actually meet the selected starting condition, and the absent case retains its separate initialization permission and restoration limitation.
 
 1. Finish candidate-bound control and rendered-UI coverage: exercise manual starting states, remaining Off/resume variants, physical bounds, editor actions, save conflicts, repeated/busy/error behavior and conditional configurations. Verify labels/icons/layout and meaningful physical feedback, including the thermostat gauge; text assertions alone do not prove its calibration. The Off row's repeated long thermostat title ellipsizes at the tested viewport; the full identity remains visible above, and the Off state/action are readable.

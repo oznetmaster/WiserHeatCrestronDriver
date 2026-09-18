@@ -12,6 +12,8 @@ This is planned coverage, not a test result. Producer bindings, real Release can
 
 The planned multiple-instance test uses two actual gateway-driver instances on separate processors, both connected to the available physical hub. Record exact candidate identities, independent instance configuration and expected shared-device state propagation; disclose that only one physical hub was used. A clarification reply is not a prerequisite for progressing with this documented arrangement. Two thermostat rooms additionally test managed-child isolation, but are not counted as two gateway instances. Keep actual room names, device IDs, hub credentials, emulator settings and evidence in private local bindings. A dedicated test room is useful for temporary installation/removal fixtures but is not itself an independent physical thermostat or hub.
 
+The [two-instance test guide](TwoInstanceTesting.md) describes the executable read-only baseline, its private settings and evidence, and the remaining control/UI checks. Its offline validation is not physical acceptance evidence.
+
 Outage cases require independent control of the specified test equipment, with recorded loss/recovery timings. A Home reboot does not replace the physical power-outage test. Endurance requires periodic functional observation over at least 24 hours, not just elapsed timestamps. Unsupported-control proposals need retained absence evidence across the final candidate's runtime variants; they are never silently passed.
 
 Source changes require review of the coverage snapshot before updating its hashes. No ordinary driver behavior, build/deploy workflow or published version changes as a result of this planning file.
