@@ -2,6 +2,8 @@
 
 Updated 19 September 2026. The submission is not complete and has not been sent to Crestron. The results below apply to the frozen candidate; they do not imply certification or acceptance by Crestron.
 
+**Candidate superseded:** the later Fahrenheit endpoint run exposed an unintended Auto-to-Manual transition. Restoration and cleanup are complete. A reproduced driver fallback defect is fixed locally, and candidate **1.3.12** is being prepared. The observations below remain historical evidence for **1.3.11**, not acceptance or endurance evidence for the corrected package. See [development history](../DEVELOPMENT-HISTORY.md) for the failure, recovery and offline regression results.
+
 ## Candidate and test environment
 
 - Driver candidate: **1.3.11**, manifest **1.3.011.0000**.

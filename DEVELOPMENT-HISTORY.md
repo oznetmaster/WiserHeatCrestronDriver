@@ -1,5 +1,13 @@
 # Development and validation history
 
+## Auto-mode fallback fix and candidate 1.3.12 preparation - 19 September 2026
+
+The 1.3.11 Fahrenheit endpoint run failed after eleven downward inputs because Upstairs Hall changed from Auto to Manual. The room's original Auto policy, saved manual target and gateway Celsius configuration were independently restored; the owned test child was removed and reservations released. The failed evidence remains failed.
+
+Offline tests reproduced a driver defect: a temporarily empty global schedule index caused a setpoint request to switch an Auto room to Manual. The fix uses the room's control mode and assigned schedule, validates the schedule before cancelling an override, and checks command acceptance. Three regression cases failed before the fix and passed afterward. The full desktop driver suite passed 193 cases, with three real-hub cases deliberately skipped; the net472 build passed. The hardware failure is consistent with this path, but its exact refresh interleaving was not instrumented.
+
+This is a production change. Candidate 1.3.12 requires new processor acceptance and endurance evidence. The completed 1.3.11 endurance record is retained for that package only. This preparation is not a published release or a completed submission.
+
 ## Completed post-endurance and paired-instance checks - 19 September 2026
 
 The unchanged 1.3.11 candidate completed 480 periodic observations across 24 hours and 1 minute; the collection was preserved and independently reviewed. Subsequent read-only UI, feature configurations, repeated room mode, native setpoint/Off and corrected repeated Boost checks passed with restoration. The earlier failed Boost expectation is retained as failed test evidence; its correction changed test code only.
