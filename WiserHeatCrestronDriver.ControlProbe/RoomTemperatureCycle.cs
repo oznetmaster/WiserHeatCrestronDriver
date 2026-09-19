@@ -24,7 +24,7 @@ public interface IRoomTemperatureSession
 	Task<RoomTemperatureSnapshot> ReadRestorationAsync (CancellationToken token) => ReadAsync (token);
 	Task RecordAsync (string phase, object value);
 	Task InputAsync (RoomTemperatureAction action, CancellationToken token);
-	Task RestoreAsync (int index, RoomTemperatureRestorePlan plan, JsonElement request, CancellationToken token);
+	Task RestoreAsync (int index, RoomTemperatureRestorePlan plan, JsonElement request, RoomTemperatureSnapshot expected, CancellationToken token);
 	}
 
 /// <summary>Native setpoint, Boost, or prepared Off/resume controls, with independent policy restoration.</summary>
@@ -56,6 +56,23 @@ public static class RoomTemperatureCycle
 		RunCoreAsync (session, false, true, timeout, token);
 	public static Task<RoomTemperatureResult> RunBoundaryAsync (IRoomTemperatureSession session, bool maximum, TimeSpan timeout, CancellationToken token) =>
 		RunCoreAsync (session, false, false, timeout, token, maximum);
+	public static void RequireRestorationUnchanged (RoomTemperatureRestorePlan plan, RoomTemperatureSnapshot expected, RoomTemperatureSnapshot current)
+		{
+		RoomTemperatureRestoration.RequireGuarded (plan, expected.Gateway, current.Gateway);
+		if (expected.RoomId != plan.RoomId || current.RoomId != expected.RoomId || current.Activity != expected.Activity ||
+			current.TemperatureUnits != expected.TemperatureUnits || current.Gateway.RefreshUtc < expected.Gateway.RefreshUtc)
+			throw new InvalidDataException ("Room identity, units, command attribution or refresh changed before restoration.");
+		var before = Room (expected);
+		var after = Room (current);
+		foreach (string name in new[] { "OverrideType", "OverrideSetpoint", "OverrideTimeoutUnixTime", "ManualSetPoint" })
+			{
+			bool had = before.TryGetProperty (name, out var oldValue), has = after.TryGetProperty (name, out var newValue);
+			if (had != has || had && !JsonElement.DeepEquals (oldValue, newValue))
+				throw new InvalidDataException ("Room control policy changed after the last observation; automatic restoration was refused.");
+			}
+		if (RoomTemperatureRestoration.Origin (before) != RoomTemperatureRestoration.Origin (after))
+			throw new InvalidDataException ("Room control source changed before restoration.");
+		}
 	private static async Task<RoomTemperatureResult> RunCoreAsync (IRoomTemperatureSession session, bool boost, bool off, TimeSpan timeout, CancellationToken token, bool? maximum = null)
 		{
 		if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromMinutes (3))
@@ -224,7 +241,7 @@ public static class RoomTemperatureCycle
 							var after = current.Gateway.RefreshUtc;
 							try
 								{
-								await session.RestoreAsync (index, plan, request, cleanup.Token);
+								await session.RestoreAsync (index, plan, request, current, cleanup.Token);
 								}
 							catch (Exception failure)
 								{

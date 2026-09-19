@@ -96,6 +96,7 @@ public sealed class HotWaterControlCycleTests
 		public string? Behavior;
 		public bool SparseHubResponses;
 		public string? FailRecord;
+		public bool ChangeBeforeRestoration;
 		public bool UiUnavailable;
 		public bool RestoredUiUnavailable;
 		public int UiRestorationChecks;
@@ -125,6 +126,7 @@ public sealed class HotWaterControlCycleTests
 		public Task RecordAsync (string phase, object value)
 			{
 			if (FailRecord == phase) throw new IOException ("journal failed");
+			if (phase == "restore-0-intent" && ChangeBeforeRestoration) Manual (true);
 			Records.Add (phase); return Task.CompletedTask;
 			}
 		private void Manual (bool enabled)
@@ -150,9 +152,10 @@ public sealed class HotWaterControlCycleTests
 			if (Behavior == "lost-first" && Inputs.Count == 1 || Behavior == "lost-second" && Inputs.Count == 2) throw new IOException ("reply lost");
 			return Task.CompletedTask;
 			}
-		public Task RestoreAsync (int index, int controllerId, JsonElement request, CancellationToken token)
+		public async Task RestoreAsync (int index, int controllerId, JsonElement request, HotWaterControlSnapshot expected, CancellationToken token)
 			{
 			token.ThrowIfCancellationRequested ();
+			HotWaterControlCycle.RequireRestorationUnchanged (expected, await ReadForRecoveryAsync (token));
 			Assert.That (controllerId, Is.EqualTo (2));
 			Assert.That (Restores, Does.Not.Contain (index), "Uncertain compensation must never be replayed.");
 			Assert.That (Records, Does.Contain ("restore-" + index + "-intent"));
@@ -175,11 +178,21 @@ public sealed class HotWaterControlCycleTests
 				_refresh = _refresh.AddSeconds (1);
 				}
 			if (Behavior == "lost-compensation") throw new IOException ("compensation reply lost");
-			return Task.CompletedTask;
 			}
 		}
 	private static Task<HotWaterControlResult> Run (Session session, CancellationToken token = default) =>
 		HotWaterControlCycle.RunAsync (session, TimeSpan.FromMilliseconds (300), token);
+	[Test]
+	public async Task ExternalHotWaterChangeAfterFinalObservationIsNotOverwrittenByRestoration ()
+		{
+		var session = new Session () { ChangeBeforeRestoration = true };
+		var result = await Run (session);
+		Assert.That (result.Passed || result.RestorationConfirmed, Is.False);
+		Assert.That (session.Inputs, Is.EqualTo (new[] { true, false }));
+		Assert.That (session.Restores, Is.Empty, "A household change between observation and compensation must not be overwritten.");
+		Assert.That ((await session.ReadForRecoveryAsync (CancellationToken.None)).HomeOn, Is.True);
+		Assert.That (session.Records, Does.Contain ("recovery-required"));
+		}
 
 	[TestCase (false, false, "Schedule", 1), TestCase (false, true, "Schedule", 1)]
 	[TestCase (true, false, "Schedule", 1), TestCase (true, true, "Schedule", 1)]

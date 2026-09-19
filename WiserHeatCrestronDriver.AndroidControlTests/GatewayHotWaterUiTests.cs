@@ -188,14 +188,16 @@ public sealed partial class GatewayUiTests
 			_original ??= snapshot;
 			return snapshot;
 			}
-		public async Task RestoreAsync (int index, int controllerId, JsonElement request, CancellationToken token)
+		public async Task RestoreAsync (int index, int controllerId, JsonElement request, HotWaterControlSnapshot expected, CancellationToken token)
 			{
 			AndroidWorkflowSession.VerifyContext (Session.Context);
 			if (_restorePlan == null || _original == null || controllerId != _restorePlan.Id || index < 0 || index >= _restorePlan.Requests.Length ||
 				!JsonElement.DeepEquals (request, _restorePlan.Requests[index]) || _restoreAttempts.Contains (index))
 				throw new InvalidDataException ("Compensation must match the captured plan and may not be repeated.");
-			HotWaterControlCycle.RequireGuarded (_original, await ReadForRecoveryAsync (token));
-			await RecordAsync ("restore-http-" + index + "-intent", new { ControllerId = controllerId, Request = request });
+			var current = await ReadForRecoveryAsync (token);
+			HotWaterControlCycle.RequireGuarded (_original, current);
+			HotWaterControlCycle.RequireRestorationUnchanged (expected, current);
+			await RecordAsync ("restore-http-" + index + "-intent", new { ControllerId = controllerId, Request = request, Expected = expected, Snapshot = current });
 			token.ThrowIfCancellationRequested ();
 			_restoreAttempts.Add (index);
 			using var message = new HttpRequestMessage (HttpMethod.Patch, "http://" + hub.HubHost + "/data/v2/domain/HotWater/" + controllerId.ToString (CultureInfo.InvariantCulture))

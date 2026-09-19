@@ -18,6 +18,8 @@ For writable native controls, select `NativeThermostatInputsChangeHubAndRestoreP
 
 These cases preserve physical state using independent hub observations even if the screen cannot be read. Missing or inconsistent UI during a bounded observation can be read again; input commands are never automatically repeated. Unproven command delivery or foreign state prevents automatic compensation. Physical restoration does not turn a failed UI assertion into a pass. The workflow must retain its reservations when restoration remains unconfirmed.
 
+Native-temperature and hot-water compensation also compare a fresh read with the last observed control policy immediately before each restoration request. This includes the selected target's mutable override/manual fields, which the broader isolation guard deliberately permits the test to change. A different target, override, control source or command attribution prevents that request instead of overwriting a subsequent household change. The expected and current snapshots are retained with the restoration intent. The hub requests do not provide atomic compare-and-set: a change after that final read can still race the write, so these are scoped, coordinated live tests rather than a guarantee against arbitrary simultaneous household control.
+
 The Celsius Auto Off/resume case and both Fahrenheit native-control cases have passed on the submission candidate. Other starting-state/unit variants still require their own validation; compiling a fixture is not evidence that every variant passed.
 
 ## Read-only native thermostat temperatures

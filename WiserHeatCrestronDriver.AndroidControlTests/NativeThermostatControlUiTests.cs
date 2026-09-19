@@ -257,17 +257,21 @@ public sealed partial class GatewayUiTests
 			await Session.Device.TapAsync (selector, Guard, token);
 			_intent = null;
 			}
-		public async Task RestoreAsync (int index, RoomTemperatureRestorePlan plan, JsonElement request, CancellationToken token)
+		public async Task RestoreAsync (int index, RoomTemperatureRestorePlan plan, JsonElement request, RoomTemperatureSnapshot expected, CancellationToken token)
 			{
 			AndroidWorkflowSession.VerifyContext (Session.Context);
 			if (_plan == null || _original == null || plan.RoomId != _plan.RoomId || index < 0 || index >= _plan.Requests.Length ||
 				!JsonElement.DeepEquals (request, _plan.Requests[index]) || _restores.Contains (index))
 				throw new InvalidDataException ("Compensation must match the captured plan and must not be repeated.");
-			RoomTemperatureRestoration.RequireGuarded (_plan, _original.Gateway, (await ReadRestorationAsync (token)).Gateway);
+			var current = await ReadRestorationAsync (token);
+			RoomTemperatureRestoration.RequireGuarded (_plan, _original.Gateway, current.Gateway);
+			RoomTemperatureCycle.RequireRestorationUnchanged (_plan, expected, current);
 			await RecordAsync ("restore-http-" + index + "-intent", new
 				{
 				plan.RoomId,
-				Request = request
+				Request = request,
+				Expected = expected,
+				Snapshot = current
 				});
 			token.ThrowIfCancellationRequested ();
 			_restores.Add (index);

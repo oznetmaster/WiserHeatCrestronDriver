@@ -18,7 +18,7 @@ public interface IHotWaterControlSession
 	Task VerifyRestoredUiAsync (HotWaterControlSnapshot snapshot, CancellationToken token);
 	Task RecordAsync (string phase, object value);
 	Task SetHotWaterAsync (bool enabled, CancellationToken token);
-	Task RestoreAsync (int index, int controllerId, JsonElement request, CancellationToken token);
+	Task RestoreAsync (int index, int controllerId, JsonElement request, HotWaterControlSnapshot expected, CancellationToken token);
 	}
 
 /// <summary>Two observed UI transitions followed by independent restoration of the captured control policy.</summary>
@@ -58,6 +58,20 @@ public static class HotWaterControlCycle
 		return water.GetProperty ("HotWaterDescription").GetString () is "FromManualMode" or "FromManualOverride" &&
 			On (water, "OverrideWaterHeatingState") == desired && On (water, "WaterHeatingState") == desired &&
 			On (water, "HotWaterRelayState") == desired && snapshot.HomeOn == desired && snapshot.ActionEnabled;
+		}
+	public static void RequireRestorationUnchanged (HotWaterControlSnapshot expected, HotWaterControlSnapshot current)
+		{
+		RequireGuarded (expected, current);
+		if (current.RefreshUtc < expected.RefreshUtc)
+			throw new InvalidDataException ("Hot-water refresh evidence moved backwards before restoration.");
+		var before = Water (expected);
+		var after = Water (current);
+		foreach (string name in new[] { "OverrideType", "OverrideWaterHeatingState", "OverrideTimeoutUnixTime", "HotWaterDescription" })
+			{
+			bool had = before.TryGetProperty (name, out var oldValue), has = after.TryGetProperty (name, out var newValue);
+			if (had != has || had && !JsonElement.DeepEquals (oldValue, newValue))
+				throw new InvalidDataException ("Hot-water control policy changed after the last observation; automatic restoration was refused.");
+			}
 		}
 	private static bool Restored (HotWaterRestorePlan plan, HotWaterControlSnapshot snapshot)
 		{
@@ -154,7 +168,7 @@ public static class HotWaterControlCycle
 						await session.RecordAsync ("restore-" + index + "-intent", new { Request = request, Snapshot = current });
 						var after = current.RefreshUtc;
 						elapsed.Restart ();
-						try { await session.RestoreAsync (index, plan.Id, request, cleanup.Token); }
+						try { await session.RestoreAsync (index, plan.Id, request, current, cleanup.Token); }
 						catch (Exception failure)
 							{
 							passed = false;

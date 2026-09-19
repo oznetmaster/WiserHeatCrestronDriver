@@ -65,6 +65,7 @@ public sealed class RoomTemperatureCycleTests
 		public List<string> Records = [];
 		public string? Behavior;
 		public string? FailRecord;
+		public Action? BeforeRestoration;
 		public bool TransientUiMismatch;
 		private int _postInputReads;
 		public List<int> ConfirmationReadCounts = [];
@@ -87,6 +88,7 @@ public sealed class RoomTemperatureCycleTests
 			{
 			if (FailRecord == phase)
 				throw new IOException ("journal failed");
+			if (phase == "restore-0-intent") BeforeRestoration?.Invoke ();
 			Records.Add (phase);
 			if (phase.StartsWith ("input-", StringComparison.Ordinal) && phase.EndsWith ("-observed", StringComparison.Ordinal))
 				ConfirmationReadCounts.Add (_postInputReads);
@@ -185,9 +187,10 @@ public sealed class RoomTemperatureCycleTests
 			CancelAfterInput?.Cancel ();
 			return Task.CompletedTask;
 			}
-		public Task RestoreAsync (int index, RoomTemperatureRestorePlan plan, JsonElement request, CancellationToken token)
+		public Task RestoreAsync (int index, RoomTemperatureRestorePlan plan, JsonElement request, RoomTemperatureSnapshot expected, CancellationToken token)
 			{
 			token.ThrowIfCancellationRequested ();
+			RoomTemperatureCycle.RequireRestorationUnchanged (plan, expected, State);
 			Restores.Add (index);
 			Assert.That (Restores.Distinct ().Count (), Is.EqualTo (Restores.Count), "Never repeat compensation.");
 			Assert.That (JsonElement.DeepEquals (request, plan.Requests[index]), Is.True);
@@ -205,6 +208,22 @@ public sealed class RoomTemperatureCycleTests
 			}
 		}
 	private static Task<RoomTemperatureResult> Run (Session session, bool boost = false) => RoomTemperatureCycle.RunAsync (session, boost, TimeSpan.FromMilliseconds (250), CancellationToken.None);
+	[TestCase (false), TestCase (true)]
+	public async Task ExternalRoomTargetAfterFinalObservationIsNotOverwrittenByRestoration (bool manual)
+		{
+		var session = new Session (manual) { Behavior = "lost-input" };
+		session.BeforeRestoration = () => session.State = Edit (session.State, d =>
+			{
+			d["Room"]![0]![manual ? "ManualSetPoint" : "OverrideSetpoint"] = 220;
+			d["Room"]![0]!["CurrentSetPoint"] = 220;
+			}) with { HomeTarget = 22 };
+		var result = await Run (session);
+		Assert.That (result.Passed || result.RestorationConfirmed, Is.False);
+		Assert.That (session.Inputs, Has.Count.EqualTo (1));
+		Assert.That (session.Restores, Is.Empty, "Do not overwrite a household target changed after the compensation observation.");
+		Assert.That (RoomTemperatureRestoration.Room (session.State.Gateway.Hub, 9).GetProperty ("CurrentSetPoint").GetInt32 (), Is.EqualTo (220));
+		Assert.That (session.Records, Does.Contain ("recovery-required"));
+		}
 	[TestCase (false, false, false), TestCase (false, false, true), TestCase (false, true, false), TestCase (false, true, true)]
 	[TestCase (true, false, false), TestCase (true, false, true), TestCase (true, true, false), TestCase (true, true, true)]
 	public async Task BoundaryWalkUsesOnlyConfirmedHalfDegreeInputsAndRestoresPolicy (bool manual, bool fahrenheit, bool maximum)
