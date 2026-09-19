@@ -43,6 +43,8 @@ Producer hashes and source digests are retained before execution and compared af
 
 ## Remaining acceptance work
 
+The [gateway feature configuration cycle](GatewayFeatureConfiguration.md) is now executable through the reserved installed-test workflow. It exercises all four Away/hot-water visibility combinations and restores the original flags, with independent physical-policy preservation checks. Synthetic recovery tests passed; the rendered hardware cases remain outstanding. It changes test tooling only, not the frozen candidate.
+
 The draft coverage mapping now distinguishes selector buttons (item 9) from action-selector alerts (item 17). Inspection of both frozen-package UI definitions found twelve selector buttons and no action-selector alerts. Four retained gateway/room runtime snapshots structurally match the package; the [coverage review](CoverageReview.md) records that corroboration and its one-processor/configuration limits. Item 17 remains an absence-review proposal rather than a duplicate of the selector-button tests. This changes neither the frozen candidate nor the policy pinned to the ongoing endurance run, and does not mark any official checkbox passed.
 
 The [two-instance checks](TwoInstanceTesting.md) now include a read-only baseline and distinct Away/hot-water cases requiring peer observation. Offline regressions validate pinned identities, fresh shared-state convergence, configuration preservation and independent physical restoration despite peer failure. The project builds and the cases are discoverable; none has run against the processors. Hardware execution of room/schedule/pending-editor peer observations, the second UI, instance removal/session effects and full official multiple-instance acceptance remain outstanding.
