@@ -1609,10 +1609,32 @@
             "$endurance"
           ],
           "method": "endurance",
-          "expectation": "Observe the same Release candidate continuously for at least 24 hours. Use a reviewed periodic sampling schedule covering all applicable functions, log missing samples, connection state and latency/feedback against baseline, verify final functionality and no degradation, then restore state. Elapsed timestamps alone do not satisfy this requirement. Bind the installed driver lifetime ID and successful hub-refresh marker to the candidate. Cached reads or failed/stale refreshes must not renew the marker. A changed lifetime, missed observation or processor restart must be recorded and handled according to the reviewed continuity policy, never hidden by elapsed wall-clock time.",
+          "expectation": "Retain at least 24 hours of periodic functional observations of the same connected Release candidate. The read-only sampling plan must be reviewed before collection and exercise actual driver/device feedback, not reachability alone. Bind the installed payload, driver lifetime, processor boot identity and successful hub-refresh marker to the candidate; verify current independent hub feedback and retain sample timing and gaps. Cached reads or failed/stale refreshes must not renew the marker. Record changed lifetimes, missing observations and processor restarts under the original continuity policy without hiding them or backdating time. Preserve the original collection policy, journal and export. This scope covers only the sampled period; the separately mapped post-period functionality and performance checks are also mandatory for the official endurance item.",
           "minimumSeconds": 86400,
           "responseLimitSeconds": null,
+          "restore": false
+        },
+        {
+          "id": "post-period-functionality",
+          "targets": [
+            "$post-endurance-functions"
+          ],
+          "method": "combined",
+          "expectation": "After the retained 24-hour observation period, verify the same unchanged candidate is still connected and every applicable gateway, room, native thermostat and schedule function works. Bind these tests to the collected package and instance, record their real start/end times after the collection's last sample, and account for every applicable function using the reviewed acceptance coverage and actual test results. Capture original state, independently verify physical/UI results, and restore and verify all settings changed by final tests. Preserve producer, selection, restoration and cleanup records. The collection timer or read-only feedback alone cannot satisfy this scope; do not extend the periodic sample interval to include these later tests.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
           "restore": true
+        },
+        {
+          "id": "performance-comparison",
+          "targets": [
+            "$endurance-performance"
+          ],
+          "method": "combined",
+          "expectation": "Review actual pre-period, periodic and post-period observations for the unchanged candidate and confirm no performance degradation: commands remain prompt and independent physical/UI feedback remains accurate and prompt. Name the compared functions, operating conditions, baseline evidence, trigger/response definitions and reviewed acceptance budgets. Use measured command-to-observed-response intervals, excluding later screenshot/navigation work; a test's total elapsed time is not a command latency. Compare retained values rather than declaring success from a passing count, connection flag or elapsed duration. Account explicitly for missing or incomparable baseline measurements; they cannot support an unqualified no-degradation claim. This review performs no new device action; any new measurement must use the separately restored control-test scope.",
+          "minimumSeconds": 0,
+          "responseLimitSeconds": null,
+          "restore": false
         }
       ]
     },

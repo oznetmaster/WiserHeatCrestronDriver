@@ -14,7 +14,7 @@ The planned multiple-instance test uses two actual gateway-driver instances on s
 
 The [two-instance test guide](TwoInstanceTesting.md) describes the executable read-only baseline, its private settings and evidence, and the remaining control/UI checks. Its offline validation is not physical acceptance evidence.
 
-Outage cases require independent control of the specified test equipment, with recorded loss/recovery timings. A Home reboot does not replace the physical power-outage test. Endurance requires periodic functional observation over at least 24 hours, not just elapsed timestamps. Unsupported-control proposals need retained absence evidence across the final candidate's runtime variants; they are never silently passed.
+Outage cases require independent control of the specified test equipment, with recorded loss/recovery timings. A Home reboot does not replace the physical power-outage test. [Endurance evidence](EnduranceEvidence.md) requires the periodic observation, final functional checks and performance comparison as separate mandatory records for one official item. Unsupported-control proposals need retained absence evidence across the final candidate's runtime variants; they are never silently passed.
 
 Source changes require review of the coverage snapshot before updating its hashes. No ordinary driver behavior, build/deploy workflow or published version changes as a result of this planning file.
 

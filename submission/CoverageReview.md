@@ -1,8 +1,12 @@
 # Coverage source review
 
+## Endurance phases - 19 September 2026
+
+System item 3 now maps to three mandatory observations: the original periodic collection, final functionality with state restoration, and performance comparison. The earlier combined scope incorrectly attached a restoration event to read-only samples and attempted to put final tests within the periodic observation interval. The split retains the 24-hour minimum and every final-check obligation. It changes no other official item, candidate bytes or active collection policy. See [Endurance evidence](EnduranceEvidence.md) for the original-evidence and review boundaries. No passing observation or completed form is produced by this correction.
+
 ## Selector applicability and retained runtime review - 19 September 2026
 
-The current draft has 538 scoped assertions across all 35 official form items. It supersedes the 571-assertion draft below for future review; the earlier generated policy and evidence retain their original identities. No running endurance policy was changed.
+That selector-correction draft had 538 scoped assertions across all 35 official form items, before the endurance-phase separation above. It superseded the 571-assertion draft below for future review; the earlier generated policy and evidence retain their original identities. No running endurance policy was changed.
 
 The reduction corrects a control-type mismatch. The day, time and schedule controls are `selectorbutton` elements, covered by item 9. They are not the `actionselector` alerts covered by item 17. Both packaged UI definitions have empty alerts sections. The draft now requests an absence review for item 17 and its paired-instance repetition; the item-9 selector checks and other checks are unchanged. See [selector-button testing](ActionSelectorTesting.md) for the SDK distinction and frozen package identity.
 
