@@ -14,6 +14,8 @@ Save Day/Save All now have an opt-in peer-observation case for the exposed Monda
 
 Pending schedule selections now have a required-peer case that checks the other editor and independent persistent hub state after day, time and visible setpoint changes, reopening and restoration. It sends no peer commands and preserves primary cleanup when peer checks fail. Offline comparison coverage is not two-processor acceptance; the candidate remains unchanged.
 
+Complete [day/time action-selector fixtures](ActionSelectorTesting.md) now select every weekday and half-hour choice, with separate supported-row cases and optional mandatory peer observation. This addresses an explicit form requirement that sample selections did not cover. Offline checks and discovery pass; actual execution and timing bindings remain outstanding.
+
 ## Candidate and release identity
 
 The installed submission candidate is **1.3.11** (processor version `1.3.011.0000`). Its immutable package is `NeilColvin_Thermostat_WiserHeat_IP_V2.pkg`, with SHA-256 `b84375d629ac5af2f65c1f6cde4dabf74a6302ff100caafd65d157ac1e6ab3cf`. It uses published WiserHeatAPIv2 1.1.2. The public driver release remains 1.3.8; this candidate has not been submitted to Crestron, and no certification or completed acceptance is claimed.

@@ -88,6 +88,10 @@ Primary editor restoration runs before final peer checks, even if a peer observa
 
 This case has offline comparison tests and builds against the released tooling. It has not run on hardware. It observes the peer's exposed properties, not a second rendered app or a peer editor containing deliberately unsaved changes. It covers the primary controls actually exercised and recorded, not every hidden row, save conflict, instance removal or simultaneous input. Run the reverse direction with independently verified bindings after the first direction restores successfully.
 
+## Complete day/time selections
+
+The [action-selector cases](ActionSelectorTesting.md) exercise all seven days and all 48 time choices for each supported row, with optional mandatory peer observation. They remain prepared source fixtures, not hardware acceptance. They reuse pending-state isolation and add independent hub comparisons after every choice.
+
 ## Remaining control scope
 
 After the baseline, repeat the applicable candidate control/UI checks with each gateway acting in turn. Independently observe the other gateway during those actions. Shared hub changes should propagate to both, while unrelated room settings, schedules and local configuration remain intact. Preserve and restore every affected shared setting; avoid simultaneous physical commands from the two processors. Pending editor state and instance/session lifetime need separate checks, as does removing an owned temporary instance while the other continues operating.

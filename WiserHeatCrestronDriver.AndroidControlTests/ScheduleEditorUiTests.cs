@@ -43,7 +43,7 @@ public sealed partial class GatewayUiTests
 		record.Flush (true);
 		}
 
-	private async Task ExerciseEditorSelectionsAsync (string? interruption, bool requirePeer = false)
+	private async Task ExerciseEditorSelectionsAsync (string? interruption, bool requirePeer = false, int? choiceSlot = null)
 		{
 		Assert.That (_nameRestored && _roomStatePreserved, Is.True, "An earlier restoration needs reconciliation.");
 		if (requirePeer && !_settings!.ObservePeerDuringPendingEdits)
@@ -67,7 +67,7 @@ public sealed partial class GatewayUiTests
 		foreach (var control in _settings.ControlRooms)
 			{
 			var binding = _settings.Rooms.Single (room => room.DeviceId == control.DeviceId);
-			using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (18));
+			using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (choiceSlot.HasValue ? 60 : 18));
 			var before = await ReadRoomAsync (binding, timeout.Token);
 			var domain = await ReadHub ("domain", timeout.Token);
 			var physical = domain.GetProperty ("Room").EnumerateArray ().Single (room => room.GetProperty ("Name").GetString () == control.HubRoomName);
@@ -81,8 +81,13 @@ public sealed partial class GatewayUiTests
 			var schedules = await ReadHub ("schedules", timeout.Token);
 			var originalEditor = ScheduleEditorObservation.Editor (before.PropertyValues);
 			ScheduleEditorObservation.RequireMatchesHub (originalEditor, schedules, scheduleId);
+			if (choiceSlot is < 0 or > 8) throw new InvalidDataException ("Select DAY (0) or a supported time row (1-8).");
+			if (choiceSlot > 0 && !originalEditor.GetProperty ("editSlot" + choiceSlot.Value + "Visible").GetBoolean ())
+				Assert.Ignore ("The selected time row is absent in this layout; run the case with an applicable schedule layout.");
 			string originalDay = originalEditor.GetProperty ("editSelectedDay").GetString ()!;
 			string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + (interruption == null ? ".editor-cancel" : ".editor-interruption-" + interruption);
+			if (choiceSlot.HasValue) check += ".all-choices-" + choiceSlot.Value.ToString (CultureInfo.InvariantCulture);
+			if (requirePeer) check += ".two-instances";
 			string evidence = Path.Combine (_session!.Context.EvidenceDirectory, check + ".records");
 			Directory.CreateDirectory (evidence);
 			await using var peer = await GatewayPeerControlObserver.OpenForPendingAsync (this, hub, check, timeout.Token);
@@ -93,13 +98,13 @@ public sealed partial class GatewayUiTests
 				await JsonSerializer.SerializeAsync (file, new { _session.Context.RunId, _session.Context.PackageSha256, Phase = phase, ObservedUtc = DateTimeOffset.UtcNow, Value = value });
 				file.Flush (true);
 				if (peer != null && (phase is "changed-day" or "time-observed" or "reopened" ||
-					phase.StartsWith ("setpoint-", StringComparison.Ordinal) && phase.EndsWith ("-observed", StringComparison.Ordinal)))
+					(phase.StartsWith ("setpoint-", StringComparison.Ordinal) || phase.StartsWith ("choice-", StringComparison.Ordinal)) && phase.EndsWith ("-observed", StringComparison.Ordinal)))
 					await peer.ObservePendingAsync (phase, timeout.Token);
 				}
 			await Record ("original", new { Editor = originalEditor, Schedules = schedules, Rooms = ScheduleEditorObservation.RoomAssignments (domain), Activity = activity });
 			_roomStatePreserved = false;
 			Exception? failure = null;
-			string? alternateDay = null;
+			string? alternateDay = null, previousChoiceDay = null;
 			try
 				{
 				if (peer != null)
@@ -110,6 +115,12 @@ public sealed partial class GatewayUiTests
 					await pages.OpenPageAsync (Text ("Open"), "Schedule", CrestronHomePages.Resource ("customdevices_toolbarClose"), token);
 					await pages.OpenPageAsync (Text ("Edit"), "Edit Schedule", Text ("Cancel"), token);
 					string[] titles = [binding.PageTitle, "Schedule", "Edit Schedule"];
+					if (choiceSlot.HasValue)
+						{
+						await ExerciseAllEditorChoicesAsync (pages, check, binding, originalEditor, new (schedules, domain), scheduleId, choiceSlot.Value,
+							(from, to) => { previousChoiceDay = from; alternateDay = to; }, Record, async cancellation => new ScheduleHubSnapshot (await ReadHub ("schedules", cancellation), await ReadHub ("domain", cancellation)), token);
+						return;
+						}
 					await CaptureEditorValuesAsync (check, "controls-initial", titles, binding, Record, token);
 					string dayLabel = _dayLabels.Single (label => label.Trim () == originalDay);
 					string changedDay = await ChooseEditorOptionAsync (check + ".day", titles, "DAY", _dayLabels, dayLabel, null,
@@ -164,7 +175,7 @@ public sealed partial class GatewayUiTests
 						if (!JsonElement.DeepEquals (originalEditor, ScheduleEditorObservation.Editor (after.PropertyValues)))
 							{
 							string currentDay = after.PropertyValues["editSelectedDay"].GetString ()!;
-							if (currentDay != originalDay && currentDay != alternateDay)
+							if (currentDay != originalDay && currentDay != alternateDay && currentDay != previousChoiceDay)
 								throw new InvalidDataException ("An unrelated editor selection prevents restoration.");
 							await using var client = await ConfigurationClient.ConnectAsync (new () { Host = _settings.Host, CertificateSha256 = _settings.CertificateSha256 }, new NetworkCredential (_settings.UserName, _settings.Password), cleanup.Token);
 							if (currentDay != originalDay)
@@ -353,6 +364,7 @@ public sealed partial class GatewayUiTests
 			{
 			await session.Device.TapAsync (Text (label), Page, token);
 			await WaitPage (Selection, token);
+			if (desired != null) await FindEditorChoiceAsync (check, titles, allowed, original, desired, Selection, token);
 			string? choice = null;
 			await session.CaptureAsync (check + ".options", hierarchy =>
 				{
