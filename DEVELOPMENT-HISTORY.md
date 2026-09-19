@@ -1,5 +1,9 @@
 # Development and validation history
 
+## Submission build instructions - 19 September 2026
+
+The submission guide now uses the released DevTools 1.11.0 console and its bundled help-packaging targets. It no longer asks consuming developers to configure Python or obtain a tools source checkout. LibreOffice and the official pinned template remain documented prerequisites. This documentation correction does not rebuild or change the frozen driver candidate.
+
 ## Explicit manual-target acceptance cases - 18 September 2026
 
 The Android control project now exposes separate equal, different and absent saved-manual-target cases. Each requires its declared starting state before input; a mismatched binding or schedule boundary cannot silently satisfy another scope. The existing mode/restoration cycle remains responsible for preserving the saved target. The absent case still requires explicit permission for a potentially retained inactive value and distinguishes that outcome from exact restoration. No unsupported write or deletion of the hub's saved target is used to manufacture a case.
