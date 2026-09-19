@@ -11,7 +11,7 @@ using WiserHeatCrestronDriver.ControlProbe;
 namespace WiserHeatCrestronDriver.ControlProbe.Tests;
 
 [TestFixture, Parallelizable (ParallelScope.Children)]
-public sealed class ScheduleSaveIsolationTests
+public sealed partial class ScheduleSaveIsolationTests
 	{
 	private sealed class Session : IScheduleSaveIsolationSession
 		{
@@ -21,6 +21,7 @@ public sealed class ScheduleSaveIsolationTests
 		public List<string> Records { get; } = [];
 		public List<ScheduleSaveCase> Saves { get; } = [];
 		public string? LoseReply { get; init; }
+		public bool FailEditorRestoration { get; init; }
 		public string? Ignore { get; init; }
 		public string? FailRecord { get; init; }
 		public string? Interfere { get; init; }
@@ -110,6 +111,7 @@ public sealed class ScheduleSaveIsolationTests
 			{
 			token.ThrowIfCancellationRequested ();
 			Calls.Add ("editor");
+			if (FailEditorRestoration) throw new IOException ("Android editor unavailable");
 			return Task.CompletedTask;
 			}
 		}
@@ -232,7 +234,7 @@ public sealed class ScheduleSaveIsolationTests
 		var original = await session.ReadAsync (default);
 		var result = await Run (session);
 		Assert.That (result.Passed && result.RestorationConfirmed, Is.True, result.Detail);
-		Assert.That (session.Calls, Is.EqualTo (new[] { "create", "copy", "assign", "editor", "restore", "editor", "delete" }));
+		Assert.That (session.Calls, Is.EqualTo (new[] { "create", "copy", "assign", "restore", "delete", "editor" }));
 		Assert.That (session.Saves, Has.Count.EqualTo (2));
 		var day = session.Saves[0];
 		Assert.That (day.After.GetProperty ("Monday").GetProperty ("DegreesC")[0].GetInt32 (), Is.EqualTo (225));

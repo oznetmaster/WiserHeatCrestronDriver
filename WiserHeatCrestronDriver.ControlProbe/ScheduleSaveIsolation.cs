@@ -24,7 +24,7 @@ public static partial class ScheduleSaveIsolation
 	{
 	/// <summary>Explicitly exercise a room's existing, exclusively assigned schedule and restore its complete contents.</summary>
 	public static async Task<ScheduleSaveIsolationResult> RunExistingAsync (IScheduleSaveIsolationSession session, int roomId,
-		TimeSpan observationTimeout, CancellationToken token)
+		TimeSpan observationTimeout, CancellationToken token, IScheduleSaveObserver? observer = null)
 		{
 		if (roomId <= 0 || observationTimeout <= TimeSpan.Zero || observationTimeout > TimeSpan.FromMinutes (2))
 			throw new ArgumentException ("A room and bounded observation timeout are required.");
@@ -44,6 +44,7 @@ public static partial class ScheduleSaveIsolation
 				throw new InvalidDataException ("An existing schedule must be assigned exclusively to the selected room.");
 			source = Heating (original.Schedules).Single (s => Id (s) == scheduleId);
 			ValidateDays (source);
+			if (observer != null) await observer.BeforeChangesAsync (original, roomId, token);
 			RequireOriginal (original, await session.ReadAsync (token));
 			await session.RecordAsync ("original", new { RoomId = roomId, ExistingExclusiveScheduleId = scheduleId, Snapshot = original });
 			await session.RecordAsync ("existing-schedule-intent", new { RoomId = roomId, ScheduleId = scheduleId, Original = source });
@@ -59,6 +60,8 @@ public static partial class ScheduleSaveIsolation
 				var after = Edit (expected, "Monday", before + direction, allDays);
 				string phase = allDays ? "save-all" : "save-day";
 				var operation = new ScheduleSaveCase (scheduleId, "Monday", before, before + direction, allDays, expected, after);
+				if (observer != null) await observer.BeforeSaveAsync (await session.ReadAsync (token), operation, token);
+				RequireExisting (original, await session.ReadAsync (token), scheduleId, expected);
 				await session.RecordAsync (phase + "-intent", operation);
 				allowed.Add (after);
 				await session.ExerciseAsync (operation, token);
@@ -72,6 +75,12 @@ public static partial class ScheduleSaveIsolation
 					}, observationTimeout, token);
 				expected = after;
 				await session.RecordAsync (phase + "-observed", after);
+				if (observer != null)
+					{
+					var observed = await session.ReadAsync (token);
+					RequireExisting (original, observed, scheduleId, after);
+					await observer.AfterSaveAsync (observed, operation, token);
+					}
 				}
 			passed = true;
 			}
@@ -111,6 +120,14 @@ public static partial class ScheduleSaveIsolation
 							return Equal (contents, source);
 							}, observationTimeout, cleanup.Token);
 						}
+					var physical = await session.ReadAsync (cleanup.Token);
+					RequireOriginal (original, physical);
+					await session.RecordAsync ("hub-restored", physical);
+					if (!await ObserveRestorationAsync (session, observer, physical, roomId, cleanup.Token))
+						{
+						passed = false;
+						detail = "Peer verification failed after physical restoration. Inspect private evidence; the test remains failed.";
+						}
 					await session.RecordAsync ("editor-restore-intent", new { RoomId = roomId });
 					await session.RestoreEditorAsync (cleanup.Token);
 					var final = await session.ReadAsync (cleanup.Token);
@@ -141,7 +158,7 @@ public static partial class ScheduleSaveIsolation
 		}
 
 	public static async Task<ScheduleSaveIsolationResult> RunAsync (IScheduleSaveIsolationSession session, int roomId, Guid owner,
-		TimeSpan observationTimeout, CancellationToken token)
+		TimeSpan observationTimeout, CancellationToken token, IScheduleSaveObserver? observer = null)
 		{
 		if (owner == Guid.Empty || roomId <= 0 || observationTimeout <= TimeSpan.Zero || observationTimeout > TimeSpan.FromMinutes (2))
 			throw new ArgumentException ("A room, unique owner and bounded observation timeout are required.");
@@ -166,6 +183,7 @@ public static partial class ScheduleSaveIsolation
 			ValidateDays (source);
 			if (Heating (original.Schedules).Any (s => s.GetProperty ("Name").GetString () == name))
 				throw new InvalidDataException ("The owned schedule name already exists.");
+			if (observer != null) await observer.BeforeChangesAsync (original, roomId, token);
 			RequireOriginal (original, await session.ReadAsync (token));
 			await session.RecordAsync ("original", new { Owner = owner, RoomId = roomId, Name = name, Snapshot = original });
 			phase = "create";
@@ -201,12 +219,20 @@ public static partial class ScheduleSaveIsolation
 				int before = expected.Value.GetProperty ("Monday").GetProperty ("DegreesC")[0].GetInt32 ();
 				var after = Edit (expected.Value, "Monday", before + direction, allDays);
 				var operation = new ScheduleSaveCase (ownedId.Value, "Monday", before, before + direction, allDays, expected.Value, after);
+				if (observer != null) await observer.BeforeSaveAsync (await session.ReadAsync (token), operation, token);
+				RequireOwned (original, await session.ReadAsync (token), roomId, ownedId.Value, expected.Value, true);
 				allowed.Add (after);
 				await session.RecordAsync (phase + "-intent", operation);
 				await session.ExerciseAsync (operation, token);
 				expected = after;
 				await WaitAsync (session, snapshot => ObserveOwned (original, snapshot, roomId, ownedId.Value, after, true, allowed), observationTimeout, token);
 				await session.RecordAsync (phase + "-observed", after);
+				if (observer != null)
+					{
+					var observed = await session.ReadAsync (token);
+					RequireOwned (original, observed, roomId, ownedId.Value, after, true);
+					await observer.AfterSaveAsync (observed, operation, token);
+					}
 				}
 			passed = true;
 			}
@@ -246,10 +272,6 @@ public static partial class ScheduleSaveIsolation
 					RequireOwned (original, current, roomId, ownedId!.Value, owned, assigned);
 					if (assigned)
 						{
-						await session.RecordAsync ("editor-restore-intent", new { RoomId = roomId });
-						await session.RestoreEditorAsync (cleanup.Token);
-						current = await session.ReadAsync (cleanup.Token);
-						RequireOwned (original, current, roomId, ownedId.Value, owned, true);
 						int sourceId = Room (original, roomId).GetProperty ("ScheduleId").GetInt32 ();
 						var source = Heating (original.Schedules).Single (s => Id (s) == sourceId);
 						int[] users = original.Domain.GetProperty ("Room").EnumerateArray ()
@@ -259,8 +281,6 @@ public static partial class ScheduleSaveIsolation
 						catch { passed = false; detail = "Restoration response was uncertain; independently reconciled without replay. The test remains failed."; }
 						await WaitAsync (session, snapshot => ObserveOwned (original, snapshot, roomId, ownedId.Value, owned, false, [owned]), observationTimeout, cleanup.Token);
 						await session.RecordAsync ("assignment-restored", new { ScheduleId = sourceId, Rooms = users });
-						// Reload the editor only after the installed driver observes the restored assignment.
-						await session.RestoreEditorAsync (cleanup.Token);
 						}
 					RequireOwned (original, await session.ReadAsync (cleanup.Token), roomId, ownedId.Value, owned, false);
 					await session.RecordAsync ("delete-intent", new { ScheduleId = ownedId, Expected = owned });
@@ -276,6 +296,19 @@ public static partial class ScheduleSaveIsolation
 						RequireOriginal (original, snapshot);
 						return true;
 						}, observationTimeout, cleanup.Token);
+					var physical = await session.ReadAsync (cleanup.Token);
+					RequireOriginal (original, physical);
+					await session.RecordAsync ("hub-restored", physical);
+					if (!await ObserveRestorationAsync (session, observer, physical, roomId, cleanup.Token))
+						{
+						passed = false;
+						detail = "Peer verification failed after physical restoration. Inspect private evidence; the test remains failed.";
+						}
+					if (assigned)
+						{
+						await session.RecordAsync ("editor-restore-intent", new { RoomId = roomId });
+						await session.RestoreEditorAsync (cleanup.Token);
+						}
 					var final = await session.ReadAsync (cleanup.Token);
 					RequireOriginal (original, final);
 					await session.RecordAsync ("restored", new { Snapshot = final, TemporaryScheduleId = ownedId });
@@ -292,6 +325,18 @@ public static partial class ScheduleSaveIsolation
 				}
 			}
 		return new (passed && restored, restored, ownedId, detail);
+		}
+
+	private static async Task<bool> ObserveRestorationAsync (IScheduleSaveIsolationSession session, IScheduleSaveObserver? observer,
+		ScheduleHubSnapshot state, int roomId, CancellationToken token)
+		{
+		if (observer == null) return true;
+		try { await observer.AfterRestorationAsync (state, roomId, token); return true; }
+		catch (Exception failure)
+			{
+			try { await session.RecordAsync ("hub-restored-peer-failed", new { Type = failure.GetType ().FullName }); } catch { }
+			return false;
+			}
 		}
 
 	public static JsonElement Edit (JsonElement schedule, string day, int temperature, bool allDays)

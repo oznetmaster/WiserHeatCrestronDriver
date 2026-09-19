@@ -22,6 +22,7 @@
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleObservation.cs" Link="ScheduleObservation.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleEditorObservation.cs" Link="ScheduleEditorObservation.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleEditorRendering.cs" Link="ScheduleEditorRendering.cs" />
+    <Compile Include="../WiserHeatCrestronDriver.ControlProbe/IScheduleSaveObserver.cs" Link="IScheduleSaveObserver.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleSaveIsolation.cs" Link="ScheduleSaveIsolation.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleSaveConflict.cs" Link="ScheduleSaveConflict.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/ScheduleLayoutIsolation.cs" Link="ScheduleLayoutIsolation.cs" />

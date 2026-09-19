@@ -33,8 +33,15 @@ public sealed partial class GatewayUiTests
 
 		public async Task BeforeInputAsync (ScheduleControlSnapshot state, CancellationToken token)
 			{
+			await InitializeRoomAsync (state.Room.GetProperty ("id").GetInt32 (), token);
+			await ObserveRoomAsync (state, "before", false, token);
+			_after = _lastSecond.RefreshUtc;
+			_inputElapsed.Restart ();
+			}
+
+		private async Task InitializeRoomAsync (int id, CancellationToken token)
+			{
 			if (_originalRoom != null) throw new InvalidOperationException ("A room observer cannot be reused for another cycle.");
-			int id = state.Room.GetProperty ("id").GetInt32 ();
 			var rooms = _peer.Rooms;
 			if (rooms == null || rooms.Any (r => r == null || r.HubRoomId <= 0 || r.DeviceId <= 0 || r.LocationId <= 0 || string.IsNullOrWhiteSpace (r.Name)) ||
 				rooms.Select (r => r.HubRoomId).Distinct ().Count () != rooms.Length || rooms.Select (r => r.DeviceId).Distinct ().Count () != rooms.Length)
@@ -44,9 +51,6 @@ public sealed partial class GatewayUiTests
 			if (ConfigurationCompatibility.Identity (config) != _second.ConfigurationSha256)
 				throw new InvalidDataException ("Peer configuration changed before room observation.");
 			_roomUnits = config.Items.Single (item => item.Id == "TemperatureUnits").CurrentValue!.Value.GetString ()!;
-			await ObserveRoomAsync (state, "before", false, token);
-			_after = _lastSecond.RefreshUtc;
-			_inputElapsed.Restart ();
 			}
 
 		public Task AfterInputAsync (ScheduleControlSnapshot state, CancellationToken token) => ObserveRoomAsync (state, "after", true, token);
@@ -84,7 +88,9 @@ public sealed partial class GatewayUiTests
 				}
 			}
 
-		private async Task<RoomPeerSnapshot> ReadPeerRoomAsync (CancellationToken token)
+		private async Task<RoomPeerSnapshot> ReadPeerRoomAsync (CancellationToken token) => RoomSnapshot (await ReadPeerRoomDeviceAsync (token));
+
+		private async Task<DeviceInfo> ReadPeerRoomDeviceAsync (CancellationToken token)
 			{
 			var binding = _roomBinding ?? throw new InvalidOperationException ("Peer room preflight has not completed.");
 			var device = await _client!.GetDeviceAsync (binding.DeviceId, token) ?? throw new InvalidDataException ("Peer room disappeared.");
@@ -93,9 +99,14 @@ public sealed partial class GatewayUiTests
 				device.Model != "Room Thermostat" || device.PropertyValues["controlDeviceId"].GetString () != identity ||
 				device.PropertyValues["cp.driverConfiguration:driverLoadingStatus"].GetString () != "Loaded" || !device.PropertyValues["onlineIndicator:isOnline"].GetBoolean ())
 				throw new InvalidDataException ("Peer thermostat does not match its exact physical room and installed binding.");
+			return device;
+			}
+
+		private RoomPeerSnapshot RoomSnapshot (DeviceInfo device)
+			{
 			var activity = JsonSerializer.Deserialize<ScheduleActivity> (device.PropertyValues["controlStatus"].GetString ()!)
 				?? throw new InvalidDataException ("Peer command activity is absent.");
-			return new (device.Id, binding.LocationId, binding.Name, identity, activity, _roomUnits!,
+			return new (device.Id, device.LocationId ?? 0, device.Name!, device.PropertyValues["controlDeviceId"].GetString ()!, activity, _roomUnits!,
 				device.PropertyValues["scheduleEnabled"].GetBoolean (), device.PropertyValues["selectedScheduleId"].GetString ()!,
 				device.PropertyValues["targetTemperature"].GetDouble ());
 			}

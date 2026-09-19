@@ -10,6 +10,8 @@ Away-mode cleanup likewise uses independent hub/processor observations. A failed
 
 Room Auto/Manual controls now have opt-in two-instance cases, including equal, different and absent saved manual targets. The peer's physical room, mode, schedule, converted target and unchanged command activity are checked under its own reservation. Peer loss cannot prevent independent physical restoration. This source implementation has offline regression coverage but still requires actual two-processor validation after endurance. It does not establish schedule-editor isolation or second-app UI behavior; see [two-instance testing](TwoInstanceTesting.md).
 
+Save Day/Save All now have an opt-in peer-observation case for the exposed Monday editor, with the same shared-hub identity and configuration checks. Existing exclusive schedules and owned temporary copies both retain independent hub validation. Temporary-copy cleanup now restores the assignment and removes the owned copy before Android editor restoration, so an unavailable app cannot block physical cleanup. A separate `hub-restored` receipt distinguishes that observation from overall UI/restoration acceptance. This remains offline-validated harness work, not hardware evidence or a driver change.
+
 ## Candidate and release identity
 
 The installed submission candidate is **1.3.11** (processor version `1.3.011.0000`). Its immutable package is `NeilColvin_Thermostat_WiserHeat_IP_V2.pkg`, with SHA-256 `b84375d629ac5af2f65c1f6cde4dabf74a6302ff100caafd65d157ac1e6ab3cf`. It uses published WiserHeatAPIv2 1.1.2. The public driver release remains 1.3.8; this candidate has not been submitted to Crestron, and no certification or completed acceptance is claimed.

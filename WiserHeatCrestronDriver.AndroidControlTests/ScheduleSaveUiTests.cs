@@ -36,9 +36,16 @@ public sealed partial class GatewayUiTests
 		}
 
 	[Test, Category ("LiveControl"), Category ("LiveScheduleSave")]
-	public async Task ScheduleSaveDayAndAllRestoreOriginalSchedules ()
+	public Task ScheduleSaveDayAndAllRestoreOriginalSchedules () => RunScheduleSavesAsync (false);
+
+	[Test, Category ("LiveControl"), Category ("LiveScheduleSave"), Category ("MultipleInstance")]
+	public Task ScheduleSaveDayAndAllUpdateBothInstancesAndRestoreOriginal () => RunScheduleSavesAsync (true);
+
+	private async Task RunScheduleSavesAsync (bool requirePeer)
 		{
 		Assert.That (_nameRestored && _roomStatePreserved, Is.True, "An earlier restoration needs reconciliation.");
+		if (requirePeer && !_settings!.ObservePeerDuringScheduleSaves)
+			Assert.Ignore ("Enable ObservePeerDuringScheduleSaves for this required two-instance case.");
 		var rooms = _settings!.ScheduleSaveRooms;
 		if (rooms.Length == 0)
 			Assert.Ignore ("Set ScheduleSaveRooms explicitly to operate an isolated schedule through the app.");
@@ -59,6 +66,7 @@ public sealed partial class GatewayUiTests
 			await _navigation!.RestoreHomeAsync (timeout.Token);
 			var original = await ReadRoomAsync (binding, timeout.Token);
 			string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + ".schedule-save";
+			if (requirePeer) check += "-two-instances";
 			var session = new ScheduleSaveSession (this, hub, http, new ControlRoomBinding (control.DeviceId, control.HubRoomName), binding, original, check);
 			var snapshot = await session.ReadAsync (timeout.Token);
 			var physical = snapshot.Domain.GetProperty ("Room").EnumerateArray ().Single (r => r.GetProperty ("Name").GetString () == control.HubRoomName);
@@ -68,13 +76,24 @@ public sealed partial class GatewayUiTests
 				original.PropertyValues["selectedScheduleId"].GetString () != scheduleId.ToString (CultureInfo.InvariantCulture))
 				throw new InvalidDataException ("The independently observed hub room and driver assignment differ.");
 			ScheduleEditorObservation.RequireMatchesHub (ScheduleEditorObservation.Editor (original.PropertyValues), snapshot.Schedules, scheduleId);
-			var result = control.UseExistingExclusiveSchedule
-				? await ScheduleSaveIsolation.RunExistingAsync (session, roomId, TimeSpan.FromSeconds (45), timeout.Token)
-				: await ScheduleSaveIsolation.RunAsync (session, roomId, Guid.NewGuid (), TimeSpan.FromSeconds (45), timeout.Token);
-			bool homeRestored = _navigation?.HomeRestored == true;
-			_roomStatePreserved = result.RestorationConfirmed && homeRestored;
-			await session.RecordAsync ("result", new { Result = result, HomeRestored = homeRestored });
-			Assert.That (result.Passed && _roomStatePreserved, Is.True, result.Detail);
+			await using var peer = await GatewayPeerControlObserver.OpenForScheduleAsync (this, hub, check, timeout.Token);
+			ScheduleSaveIsolationResult? result = null;
+			Exception? failure = null;
+			try
+				{
+				result = control.UseExistingExclusiveSchedule
+					? await ScheduleSaveIsolation.RunExistingAsync (session, roomId, TimeSpan.FromSeconds (45), timeout.Token, peer)
+					: await ScheduleSaveIsolation.RunAsync (session, roomId, Guid.NewGuid (), TimeSpan.FromSeconds (45), timeout.Token, peer);
+				bool homeRestored = _navigation?.HomeRestored == true;
+				_roomStatePreserved = result.RestorationConfirmed && homeRestored;
+				await session.RecordAsync ("result", new { Result = result, HomeRestored = homeRestored });
+				Assert.That (result.Passed && _roomStatePreserved, Is.True, result.Detail);
+				}
+			catch (Exception error) { failure = error; throw; }
+			finally
+				{
+				if (peer != null) await peer.CompleteAsync (result?.RestorationConfirmed == true, failure != null || result?.Passed != true);
+				}
 			}
 		}
 
