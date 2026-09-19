@@ -1,5 +1,9 @@
 # Development and validation history
 
+## Configured Boost acceptance - 19 September 2026
+
+The native room Boost fixture now reads the actual configured Celsius increase and duration and checks their physical result, in addition to the existing active/inactive feedback. The expected raw hub target is independent of the display units. It records the input interval and checks expiry against the configured minutes, allowing one minute for hub timestamp granularity and clock tolerance. Missing settings or insufficient headroom below the thermostat limit stop the case before input. A wrong observed increase or duration fails the test while the original room policy is still independently restored, without replaying the input. These are test-tooling changes only; the frozen driver and running endurance collector are unchanged. Hardware execution of the stronger case remains pending.
+
 ## Configuration acceptance topology clarified - 19 September 2026
 
 The configuration test guide now maps the five official items to visible Setup/Configure observations and supporting API evidence. The draft blueprint describes a reserved driver instance using a shared household hub, rather than an isolated physical hub. Masked/omitted secrets are not claimed as readable saved values; authenticated restoration is recorded separately. No hub secret rotation, processor change or passing configuration attestation is implied. This changes the draft execution instructions only; the frozen candidate and running endurance policy are unchanged.

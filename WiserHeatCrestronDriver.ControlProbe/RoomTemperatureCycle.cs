@@ -15,6 +15,7 @@ public sealed record RoomTemperatureSnapshot (GatewayAwaySnapshot Gateway, int R
 	double HomeTarget, bool HomeBoost, bool UiMatches)
 	{
 	public string TemperatureUnits { get; init; } = "Celsius";
+	public RoomBoostSettings? BoostSettings { get; init; }
 	}
 public sealed record RoomTemperatureResult (bool Passed, bool RestorationConfirmed, string Detail);
 
@@ -84,11 +85,14 @@ public static class RoomTemperatureCycle
 		string detail = "Preflight failed before any room control input.";
 		Func<RoomTemperatureSnapshot, bool>? delivered = null;
 		DateTimeOffset requestedAfter = default;
+		DateTimeOffset boostInputStarted = default, boostInputReturned = default;
+		RoomBoostExpectation? boostExpected = null;
 		var elapsed = new Stopwatch ();
 		void Guard (RoomTemperatureSnapshot value)
 			{
 			RoomTemperatureRestoration.RequireGuarded (plan!, original!.Gateway, value.Gateway);
 			if (value.RoomId != original.RoomId || value.TemperatureUnits != original.TemperatureUnits ||
+				boost && value.BoostSettings != original.BoostSettings ||
 				value.Activity.Epoch != original.Activity.Epoch || value.Activity.Pending < 0 ||
 				value.Activity.Completed < original.Activity.Completed || value.Activity.Completed > original.Activity.Completed + commands)
 				throw new InvalidDataException ("Room identity, temperature units, command lifetime or attribution changed.");
@@ -126,6 +130,7 @@ public static class RoomTemperatureCycle
 			original = await session.ReadAsync (deadline.Token);
 			await session.RecordAsync ("preflight", new { Snapshot = original, Boost = boost, Off = off, MaximumBoundary = maximum });
 			plan = RoomTemperatureRestoration.Capture (Room (original));
+			if (boost) boostExpected = RoomBoostExpectation.Create (original);
 			if (!Guid.TryParseExact (original.Activity.Epoch, "N", out _) || original.Activity.Pending != 0 ||
 				original.Activity.Completed < 0 || original.Activity.Completed > long.MaxValue - (maximum.HasValue ? 50 : 2) || !Restored (plan, original))
 				throw new InvalidDataException ("Idle room, hub and UI state must agree before input.");
@@ -168,11 +173,13 @@ public static class RoomTemperatureCycle
 					: value => Room (value).GetProperty ("CurrentSetPoint").GetInt32 () == target &&
 						(plan.Scheduled ? Room (value).GetProperty ("OverrideType").GetString () == "Manual"
 							: RoomTemperatureRestoration.Origin (Room (value)) == "FromManualMode" && ScheduleObservation.ManualTarget (Room (value)) == target);
-				bool Requested (RoomTemperatureSnapshot value) => Agrees (value) && nextDelivered (value);
+				bool Requested (RoomTemperatureSnapshot value) => Agrees (value) && nextDelivered (value) &&
+					(action != RoomTemperatureAction.BoostOn || boostExpected!.Matches (value, boostInputStarted, boostInputReturned));
 				await session.RecordAsync ("input-" + (submitted + 1) + "-intent", new
 					{
 					Action = action,
 					Target = boost ? (int?)null : target,
+					BoostExpectation = action == RoomTemperatureAction.BoostOn ? boostExpected : null,
 					Snapshot = current
 					});
 				deadline.Token.ThrowIfCancellationRequested ();
@@ -187,7 +194,13 @@ public static class RoomTemperatureCycle
 				elapsed.Restart ();
 				using var inputDeadline = CancellationTokenSource.CreateLinkedTokenSource (deadline.Token);
 				inputDeadline.CancelAfter (timeout);
+				if (action == RoomTemperatureAction.BoostOn) boostInputStarted = DateTimeOffset.UtcNow;
 				await session.InputAsync (action, inputDeadline.Token);
+				if (action == RoomTemperatureAction.BoostOn)
+					{
+					boostInputReturned = DateTimeOffset.UtcNow;
+					await session.RecordAsync ("boost-input-interval", new { StartedUtc = boostInputStarted, ReturnedUtc = boostInputReturned, Expected = boostExpected });
+					}
 				current = await Wait (Requested, requestedAfter, inputDeadline.Token, firstMatchPhase: "input-" + submitted + "-first-match");
 				await session.RecordAsync ("input-" + submitted + "-observed", new
 					{

@@ -43,5 +43,6 @@
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/HotWaterControlCycle.cs" Link="HotWaterControlCycle.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/RoomTemperatureRestoration.cs" Link="RoomTemperatureRestoration.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/RoomTemperatureCycle.cs" Link="RoomTemperatureCycle.cs" />
+    <Compile Include="../WiserHeatCrestronDriver.ControlProbe/RoomBoostExpectation.cs" Link="RoomBoostExpectation.cs" />
   </ItemGroup>
 </Project>

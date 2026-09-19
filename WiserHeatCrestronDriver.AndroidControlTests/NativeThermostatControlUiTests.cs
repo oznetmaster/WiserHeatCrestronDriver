@@ -59,7 +59,7 @@ public sealed partial class GatewayUiTests
 		if (alternateUnits) check += ".alternate-units";
 		await _navigation!.InspectRoomExtensionPagesAsync (check, binding.RoomName, original.Name!, binding.PageTitle, async (_, token) =>
 			{
-				var session = new NativeTemperatureSession (this, hub, http, binding, control, original, check, maximum.HasValue);
+				var session = new NativeTemperatureSession (this, hub, http, binding, control, original, check, maximum.HasValue, boost);
 				var result = maximum.HasValue ? await RoomTemperatureCycle.RunBoundaryAsync (session, maximum.Value, TimeSpan.FromMinutes (3), token)
 					: off ? await RoomTemperatureCycle.RunOffAsync (session, TimeSpan.FromMinutes (3), token)
 					: await RoomTemperatureCycle.RunAsync (session, boost, TimeSpan.FromMinutes (3), token);
@@ -71,7 +71,7 @@ public sealed partial class GatewayUiTests
 		}
 
 	private sealed class NativeTemperatureSession (GatewayUiTests fixture, HubSettings hub, HttpClient http,
-		RoomBinding binding, ControlRoomBinding control, DeviceInfo original, string check, bool boundary = false) : IRoomTemperatureSession
+		RoomBinding binding, ControlRoomBinding control, DeviceInfo original, string check, bool boundary = false, bool verifyBoost = false) : IRoomTemperatureSession
 		{
 		private AndroidWorkflowSession Session => fixture._session!;
 		private RoomTemperatureSnapshot? _original;
@@ -125,9 +125,26 @@ public sealed partial class GatewayUiTests
 			}
 		public Task<RoomTemperatureSnapshot> ReadAsync (CancellationToken token) => ReadCoreAsync (token, observeUi: true);
 		public Task<RoomTemperatureSnapshot> ReadRestorationAsync (CancellationToken token) => ReadCoreAsync (token, observeUi: false);
+		private async Task<RoomBoostSettings?> ReadBoostSettingsAsync (CancellationToken token)
+			{
+			if (!verifyBoost) return null;
+			var configuration = await DriverConfigurationInspection.GetAsync (fixture._processor!, Session.Context.InstalledDriverId, token);
+			if (configuration.DeviceId != Session.Context.InstalledDriverId || configuration.Version != Session.Context.DriverVersion || configuration.IsConfigured != true)
+				throw new InvalidDataException ("Boost configuration does not belong to the installed candidate.");
+			string Value (string id)
+				{
+				var item = configuration.Items.Single (i => i.Id == id);
+				if (item.Masked || !item.HasCurrentValue || item.CurrentValue?.ValueKind != JsonValueKind.String)
+					throw new InvalidDataException ("The selected nonsecret Boost configuration must be readable.");
+				return item.CurrentValue.Value.GetString ()!;
+				}
+			if (Value ("TemperatureUnits") != TemperatureUnits) throw new InvalidDataException ("Display units changed during the Boost test.");
+			return new (double.Parse (Value ("BoostDelta"), CultureInfo.InvariantCulture), int.Parse (Value ("BoostDurationMinutes"), CultureInfo.InvariantCulture));
+			}
 		private async Task<RoomTemperatureSnapshot> ReadCoreAsync (CancellationToken token, bool observeUi)
 			{
 			AndroidWorkflowSession.VerifyContext (Session.Context);
+			var boostSettings = await ReadBoostSettingsAsync (token);
 			var before = await fixture.ReadRoomAsync (fixture._processor!, binding, token);
 			var gateway = await fixture.ReadGatewayAsync (token);
 			var domain = await ReadHub ("domain", token);
@@ -150,7 +167,8 @@ public sealed partial class GatewayUiTests
 				SuccessfulRefreshSequence.ParseTimestamp (gateway.PropertyValues["lastHubRefreshUtc"].GetString ()!), new (schedules, domain),
 				gateway.PropertyValues["awayModeIsEnabled"].GetBoolean (), true), roomId, Activity (after), target, boost, stable && offPropertiesAgree && hierarchy != null && DisplayMatches (hierarchy, target, boost))
 				{
-				TemperatureUnits = TemperatureUnits
+				TemperatureUnits = TemperatureUnits,
+				BoostSettings = boostSettings
 				};
 			_original ??= state;
 			_plan ??= RoomTemperatureRestoration.Capture (physicalRoom);

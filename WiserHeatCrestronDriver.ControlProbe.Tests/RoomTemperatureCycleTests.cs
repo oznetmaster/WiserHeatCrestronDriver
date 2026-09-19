@@ -38,7 +38,7 @@ public sealed class RoomTemperatureCycleTests
 				Heating = Array.Empty<object> (),
 				OnOff = Array.Empty<object> ()
 				}), JsonSerializer.SerializeToElement (domain)), false, true),
-			9, new (Guid.NewGuid ().ToString ("N"), 0, 0), 18, false, true);
+			9, new (Guid.NewGuid ().ToString ("N"), 0, 0), 18, false, true) { BoostSettings = new (2, 60) };
 		}
 	private static RoomTemperatureSnapshot Edit (RoomTemperatureSnapshot value, Action<JsonNode> edit)
 		{
@@ -117,16 +117,17 @@ public sealed class RoomTemperatureCycleTests
 				{
 				bool boost = action == RoomTemperatureAction.BoostOn;
 				int target = action == RoomTemperatureAction.PrepareOff ? -200 : action == RoomTemperatureAction.ResumeHeating ? 50 :
-					RoomTemperatureRestoration.Room (State.Gateway.Hub, 9).GetProperty ("CurrentSetPoint").GetInt32 () + (boost ? 20 : action == RoomTemperatureAction.Raise ? 5 : -5);
+					RoomTemperatureRestoration.Room (State.Gateway.Hub, 9).GetProperty ("CurrentSetPoint").GetInt32 () + (boost ? (int)(State.BoostSettings!.DeltaCelsius * 10) : action == RoomTemperatureAction.Raise ? 5 : -5);
+				if (boost && Behavior == "wrong-boost-target") target += 5;
 				State = Edit (State, d =>
 					{
 						var room = d["Room"]![0]!;
 						room["CurrentSetPoint"] = target;
 						// The real hub also reports FromBoost for a Manual override of an Auto schedule.
 						room["SetpointOrigin"] = boost || !manual ? "FromBoost" : "FromManualMode";
-						room["OverrideType"] = boost ? "Boost" : "Manual";
+						room["OverrideType"] = boost && Behavior != "wrong-boost-type" ? "Boost" : "Manual";
 						room["OverrideSetpoint"] = target;
-						room["OverrideTimeoutUnixTime"] = DateTimeOffset.UtcNow.AddHours (1).ToUnixTimeSeconds ();
+						room["OverrideTimeoutUnixTime"] = DateTimeOffset.UtcNow.AddMinutes (boost ? State.BoostSettings!.DurationMinutes + (Behavior == "wrong-boost-duration" ? 15 : 0) : 60).ToUnixTimeSeconds ();
 						if (manual && !boost)
 							room["ManualSetPoint"] = target;
 					}) with
@@ -551,5 +552,62 @@ public sealed class RoomTemperatureCycleTests
 		var plan = RoomTemperatureRestoration.Capture (RoomTemperatureRestoration.Room (original.Gateway.Hub, 9));
 		var changed = Edit (original, d => d["Room"]![0]!["OverrideType"] = "Manual");
 		Assert.Throws<NotSupportedException> (() => RoomTemperatureRestoration.RequireRestored (plan, RoomTemperatureRestoration.Room (changed.Gateway.Hub, 9)));
+		}
+	[TestCase ("Celsius"), TestCase ("Fahrenheit")]
+	public async Task ConfiguredBoostUsesCelsiusIncreaseRegardlessOfDisplayUnits (string units)
+		{
+		var session = new Session ();
+		session.State = session.State with { TemperatureUnits = units, HomeTarget = units == "Celsius" ? 18 : 64.4, BoostSettings = new (4, 15) };
+		var result = await Run (session, boost: true);
+		Assert.That (result.Passed && result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Targets, Is.EqualTo (new[] { 220, 180 }));
+		Assert.That (session.Records, Does.Contain ("boost-input-interval"));
+		}
+	[TestCase ("wrong-boost-target"), TestCase ("wrong-boost-duration"), TestCase ("wrong-boost-type")]
+	public async Task WrongPhysicalBoostDoesNotPassButOriginalPolicyIsRestored (string behavior)
+		{
+		var session = new Session { Behavior = behavior };
+		var original = session.State;
+		var result = await Run (session, boost: true);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs, Is.EqualTo (new[] { RoomTemperatureAction.BoostOn }));
+		Assert.That (session.Restores, Is.EqualTo (new[] { 0 }));
+		RoomTemperatureRestoration.RequireRestored (RoomTemperatureRestoration.Capture (RoomTemperatureRestoration.Room (original.Gateway.Hub, 9)), RoomTemperatureRestoration.Room (session.State.Gateway.Hub, 9));
+		}
+	[Test]
+	public async Task MissingBoostSettingsPreventsAnyControlInput ()
+		{
+		var session = new Session ();
+		session.State = session.State with { BoostSettings = null };
+		var result = await Run (session, boost: true);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (session.Inputs, Is.Empty);
+		Assert.That (session.Restores, Is.Empty);
+		}
+	[TestCase (0, 60), TestCase (6, 60), TestCase (double.NaN, 60), TestCase (double.PositiveInfinity, 60)]
+	[TestCase (2, 0), TestCase (2, 4), TestCase (2, 1441)]
+	public void InvalidBoostConfigurationCannotCreateAnExpectation (double delta, int duration)
+		{
+		Assert.Throws<InvalidDataException> (() => RoomBoostExpectation.Create (Snapshot () with { BoostSettings = new (delta, duration) }));
+		}
+	[Test]
+	public void BoostAtThePhysicalLimitRequiresItsOwnCaseBeforeInput ()
+		{
+		var state = Edit (Snapshot (), d => d["Room"]![0]!["CurrentSetPoint"] = 295);
+		Assert.Throws<InvalidDataException> (() => RoomBoostExpectation.Create (state));
+		}
+	[TestCase (-60, true), TestCase (60, true), TestCase (-61, false), TestCase (61, false)]
+	public void BoostExpiryUsesDeclaredMinuteTolerance (int seconds, bool matches)
+		{
+		var now = new DateTimeOffset (2026, 9, 19, 12, 0, 0, TimeSpan.Zero);
+		var original = Snapshot ();
+		var observed = Edit (original, d =>
+			{
+				d["Room"]![0]!["CurrentSetPoint"] = 200;
+				d["Room"]![0]!["OverrideType"] = "Boost";
+				d["Room"]![0]!["OverrideTimeoutUnixTime"] = now.AddMinutes (60).AddSeconds (seconds).ToUnixTimeSeconds ();
+			});
+		Assert.That (RoomBoostExpectation.Create (original).Matches (observed, now, now), Is.EqualTo (matches));
 		}
 	}
