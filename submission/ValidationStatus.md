@@ -12,6 +12,8 @@ Room Auto/Manual controls now have opt-in two-instance cases, including equal, d
 
 Save Day/Save All now have an opt-in peer-observation case for the exposed Monday editor, with the same shared-hub identity and configuration checks. Existing exclusive schedules and owned temporary copies both retain independent hub validation. Temporary-copy cleanup now restores the assignment and removes the owned copy before Android editor restoration, so an unavailable app cannot block physical cleanup. A separate `hub-restored` receipt distinguishes that observation from overall UI/restoration acceptance. This remains offline-validated harness work, not hardware evidence or a driver change.
 
+Pending schedule selections now have a required-peer case that checks the other editor and independent persistent hub state after day, time and visible setpoint changes, reopening and restoration. It sends no peer commands and preserves primary cleanup when peer checks fail. Offline comparison coverage is not two-processor acceptance; the candidate remains unchanged.
+
 ## Candidate and release identity
 
 The installed submission candidate is **1.3.11** (processor version `1.3.011.0000`). Its immutable package is `NeilColvin_Thermostat_WiserHeat_IP_V2.pkg`, with SHA-256 `b84375d629ac5af2f65c1f6cde4dabf74a6302ff100caafd65d157ac1e6ab3cf`. It uses published WiserHeatAPIv2 1.1.2. The public driver release remains 1.3.8; this candidate has not been submitted to Crestron, and no certification or completed acceptance is claimed.
@@ -39,7 +41,7 @@ Producer hashes and source digests are retained before execution and compared af
 
 ## Remaining acceptance work
 
-The [two-instance checks](TwoInstanceTesting.md) now include a read-only baseline and distinct Away/hot-water cases requiring peer observation. Offline regressions validate pinned identities, fresh shared-state convergence, configuration preservation and independent physical restoration despite peer failure. The project builds and the cases are discoverable; none has run against the processors. Room/schedule peer observations, the second UI, instance removal/session effects and full official multiple-instance acceptance remain outstanding.
+The [two-instance checks](TwoInstanceTesting.md) now include a read-only baseline and distinct Away/hot-water cases requiring peer observation. Offline regressions validate pinned identities, fresh shared-state convergence, configuration preservation and independent physical restoration despite peer failure. The project builds and the cases are discoverable; none has run against the processors. Hardware execution of room/schedule/pending-editor peer observations, the second UI, instance removal/session effects and full official multiple-instance acceptance remain outstanding.
 
 The control project now has explicit equal/different/absent saved-manual-target cases, with offline validation of their preconditions and restoration handling. They require separately selected physical runs after the current observation period; their existence does not expand the candidate's completed evidence above. A room must actually meet the selected starting condition, and the absent case retains its separate initialization permission and restoration limitation.
 

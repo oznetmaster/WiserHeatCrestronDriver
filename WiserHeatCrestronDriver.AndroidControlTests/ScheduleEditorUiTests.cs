@@ -21,6 +21,9 @@ public sealed partial class GatewayUiTests
 	[Test, Category ("LiveControl")]
 	public Task ScheduleEditorSelectionsCancelWithoutChangingHub () => ExerciseEditorSelectionsAsync (null);
 
+	[Test, Category ("LiveControl"), Category ("MultipleInstance")]
+	public Task ScheduleEditorPendingSelectionsRemainLocalAndCancel () => ExerciseEditorSelectionsAsync (null, true);
+
 	private sealed class EditorTestInterruptionException (string phase) : Exception ("Deliberate editor validation interruption: " + phase)
 		{
 		public string Phase { get; } = phase;
@@ -40,9 +43,11 @@ public sealed partial class GatewayUiTests
 		record.Flush (true);
 		}
 
-	private async Task ExerciseEditorSelectionsAsync (string? interruption)
+	private async Task ExerciseEditorSelectionsAsync (string? interruption, bool requirePeer = false)
 		{
 		Assert.That (_nameRestored && _roomStatePreserved, Is.True, "An earlier restoration needs reconciliation.");
+		if (requirePeer && !_settings!.ObservePeerDuringPendingEdits)
+			Assert.Ignore ("Enable ObservePeerDuringPendingEdits for this required two-instance case.");
 		if (_settings!.ControlRooms.Length == 0 || _settings.ControlRooms.Select (room => room.DeviceId).Distinct ().Count () != _settings.ControlRooms.Length ||
 			string.IsNullOrWhiteSpace (_settings.ControlHubSettingsPath) || !Path.IsPathFullyQualified (_settings.ControlHubSettingsPath))
 			throw new InvalidDataException ("Explicit control rooms and private hub settings are required.");
@@ -80,12 +85,16 @@ public sealed partial class GatewayUiTests
 			string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + (interruption == null ? ".editor-cancel" : ".editor-interruption-" + interruption);
 			string evidence = Path.Combine (_session!.Context.EvidenceDirectory, check + ".records");
 			Directory.CreateDirectory (evidence);
+			await using var peer = await GatewayPeerControlObserver.OpenForPendingAsync (this, hub, check, timeout.Token);
 			async Task Record (string phase, object value)
 				{
 				AndroidWorkflowSession.VerifyContext (_session.Context);
 				await using var file = new FileStream (Path.Combine (evidence, phase + ".json"), FileMode.CreateNew, FileAccess.Write, FileShare.Read);
 				await JsonSerializer.SerializeAsync (file, new { _session.Context.RunId, _session.Context.PackageSha256, Phase = phase, ObservedUtc = DateTimeOffset.UtcNow, Value = value });
 				file.Flush (true);
+				if (peer != null && (phase is "changed-day" or "time-observed" or "reopened" ||
+					phase.StartsWith ("setpoint-", StringComparison.Ordinal) && phase.EndsWith ("-observed", StringComparison.Ordinal)))
+					await peer.ObservePendingAsync (phase, timeout.Token);
 				}
 			await Record ("original", new { Editor = originalEditor, Schedules = schedules, Rooms = ScheduleEditorObservation.RoomAssignments (domain), Activity = activity });
 			_roomStatePreserved = false;
@@ -93,6 +102,9 @@ public sealed partial class GatewayUiTests
 			string? alternateDay = null;
 			try
 				{
+				if (peer != null)
+					await peer.BeginPendingAsync (physical.GetProperty ("id").GetInt32 (), async cancellation =>
+						new ScheduleHubSnapshot (await ReadHub ("schedules", cancellation), await ReadHub ("domain", cancellation)), timeout.Token);
 				await _navigation!.InspectRoomExtensionPagesAsync (check, binding.RoomName, before.Name!, binding.PageTitle, async (pages, token) =>
 					{
 					await pages.OpenPageAsync (Text ("Open"), "Schedule", CrestronHomePages.Resource ("customdevices_toolbarClose"), token);
@@ -140,45 +152,52 @@ public sealed partial class GatewayUiTests
 			catch (Exception error) { failure = error; throw; }
 			finally
 				{
-				using var cleanup = new CancellationTokenSource (TimeSpan.FromMinutes (2));
 				try
 					{
-					var after = await ReadRoomAsync (binding, cleanup.Token);
-					if (JsonSerializer.Deserialize<ScheduleActivity> (after.PropertyValues["controlStatus"].GetString ()!) != activity ||
-						after.Name != before.Name || after.LocationId != before.LocationId || after.ParentDeviceId != before.ParentDeviceId)
-						throw new InvalidDataException ("Concurrent activity or changed identity prevents editor restoration.");
-					if (!JsonElement.DeepEquals (originalEditor, ScheduleEditorObservation.Editor (after.PropertyValues)))
+					using var cleanup = new CancellationTokenSource (TimeSpan.FromMinutes (2));
+					try
 						{
-						string currentDay = after.PropertyValues["editSelectedDay"].GetString ()!;
-						if (currentDay != originalDay && currentDay != alternateDay)
-							throw new InvalidDataException ("An unrelated editor selection prevents restoration.");
-						await using var client = await ConfigurationClient.ConnectAsync (new () { Host = _settings.Host, CertificateSha256 = _settings.CertificateSha256 }, new NetworkCredential (_settings.UserName, _settings.Password), cleanup.Token);
-						if (currentDay != originalDay)
+						var after = await ReadRoomAsync (binding, cleanup.Token);
+						if (JsonSerializer.Deserialize<ScheduleActivity> (after.PropertyValues["controlStatus"].GetString ()!) != activity ||
+							after.Name != before.Name || after.LocationId != before.LocationId || after.ParentDeviceId != before.ParentDeviceId)
+							throw new InvalidDataException ("Concurrent activity or changed identity prevents editor restoration.");
+						if (!JsonElement.DeepEquals (originalEditor, ScheduleEditorObservation.Editor (after.PropertyValues)))
 							{
-							await Record ("recovery-day-intent", new { Original = originalDay });
-							await client.ExecuteDeviceCommandAsync (binding.DeviceId, "extension:setPropertyValue", new { property = "editSelectedDay", value = originalDay }, cleanup.Token);
-							await WaitForEditorAsync (binding, "editSelectedDay", originalDay, cleanup.Token);
+							string currentDay = after.PropertyValues["editSelectedDay"].GetString ()!;
+							if (currentDay != originalDay && currentDay != alternateDay)
+								throw new InvalidDataException ("An unrelated editor selection prevents restoration.");
+							await using var client = await ConfigurationClient.ConnectAsync (new () { Host = _settings.Host, CertificateSha256 = _settings.CertificateSha256 }, new NetworkCredential (_settings.UserName, _settings.Password), cleanup.Token);
+							if (currentDay != originalDay)
+								{
+								await Record ("recovery-day-intent", new { Original = originalDay });
+								await client.ExecuteDeviceCommandAsync (binding.DeviceId, "extension:setPropertyValue", new { property = "editSelectedDay", value = originalDay }, cleanup.Token);
+								await WaitForEditorAsync (binding, "editSelectedDay", originalDay, cleanup.Token);
+								}
+							await Record ("recovery-cancel-intent", new { Original = originalEditor });
+							await client.ExecuteDeviceCommandAsync (binding.DeviceId, "extension:doCommand", new { commandName = "cancelEditSchedule", args = Array.Empty<string> () }, cleanup.Token);
+							while (true)
+								{
+								after = await ReadRoomAsync (client, binding, cleanup.Token);
+								if (JsonElement.DeepEquals (originalEditor, ScheduleEditorObservation.Editor (after.PropertyValues))) break;
+								await Task.Delay (250, cleanup.Token);
+								}
 							}
-						await Record ("recovery-cancel-intent", new { Original = originalEditor });
-						await client.ExecuteDeviceCommandAsync (binding.DeviceId, "extension:doCommand", new { commandName = "cancelEditSchedule", args = Array.Empty<string> () }, cleanup.Token);
-						while (true)
-							{
-							after = await ReadRoomAsync (client, binding, cleanup.Token);
-							if (JsonElement.DeepEquals (originalEditor, ScheduleEditorObservation.Editor (after.PropertyValues))) break;
-							await Task.Delay (250, cleanup.Token);
-							}
+						var finalSchedules = await ReadHub ("schedules", cleanup.Token);
+						var finalRooms = ScheduleEditorObservation.RoomAssignments (await ReadHub ("domain", cleanup.Token));
+						_roomStatePreserved = _navigation!.HomeRestored && JsonElement.DeepEquals (originalEditor, ScheduleEditorObservation.Editor (after.PropertyValues)) &&
+							JsonElement.DeepEquals (ScheduleEditorObservation.PersistentSchedules (schedules), ScheduleEditorObservation.PersistentSchedules (finalSchedules)) &&
+							JsonElement.DeepEquals (ScheduleEditorObservation.RoomAssignments (domain), finalRooms);
+						await Record ("verification", new { Restored = _roomStatePreserved, HomeRestored = _navigation.HomeRestored, Editor = ScheduleEditorObservation.Editor (after.PropertyValues), Schedules = finalSchedules, Rooms = finalRooms, Passed = failure == null && _roomStatePreserved });
+						Assert.That (_roomStatePreserved, Is.True, "Editor, independent hub schedules, assignments and Home must all be restored.");
 						}
-					var finalSchedules = await ReadHub ("schedules", cleanup.Token);
-					var finalRooms = ScheduleEditorObservation.RoomAssignments (await ReadHub ("domain", cleanup.Token));
-					_roomStatePreserved = _navigation!.HomeRestored && JsonElement.DeepEquals (originalEditor, ScheduleEditorObservation.Editor (after.PropertyValues)) &&
-						JsonElement.DeepEquals (ScheduleEditorObservation.PersistentSchedules (schedules), ScheduleEditorObservation.PersistentSchedules (finalSchedules)) &&
-						JsonElement.DeepEquals (ScheduleEditorObservation.RoomAssignments (domain), finalRooms);
-					await Record ("verification", new { Restored = _roomStatePreserved, HomeRestored = _navigation.HomeRestored, Editor = ScheduleEditorObservation.Editor (after.PropertyValues), Schedules = finalSchedules, Rooms = finalRooms, Passed = failure == null && _roomStatePreserved });
-					Assert.That (_roomStatePreserved, Is.True, "Editor, independent hub schedules, assignments and Home must all be restored.");
+					catch (Exception recoveryError) when (failure != null)
+						{
+						throw new AggregateException ("Editor validation and restoration both failed.", failure, recoveryError);
+						}
 					}
-				catch (Exception recoveryError) when (failure != null)
+				finally
 					{
-					throw new AggregateException ("Editor validation and restoration both failed.", failure, recoveryError);
+					if (peer != null) await peer.CompletePendingAsync (_roomStatePreserved, failure != null || !_roomStatePreserved);
 					}
 				}
 			}
