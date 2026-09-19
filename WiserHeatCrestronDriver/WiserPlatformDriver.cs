@@ -1057,15 +1057,22 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		if (room == null)
 			return false;
 
+		bool scheduled = string.Equals (room.Mode, "Auto", StringComparison.OrdinalIgnoreCase);
+		// A refresh rebuilds the global schedule index. Missing index entries must
+		// never turn an Auto room into Manual when only its temperature was changed.
+		// Validate the room's schedule before cancelling any existing override.
+		if (scheduled && room.Schedule?.Next == null)
+			return false;
+
 		if (room.IsBoost)
-			await room.CancelBoostAsync (CancellationToken.None).ConfigureAwait (false);
+			if (!await room.CancelBoostAsync (CancellationToken.None).ConfigureAwait (false))
+				return false;
 
-		if (_api.Schedules?.GetByRoomId (roomId) != null && !string.Equals (room.Mode, "Manual", StringComparison.OrdinalIgnoreCase))
-			await room.SetTargetTemperatureForDurationOfScheduleAsync (setpoint, CancellationToken.None).ConfigureAwait (false);
-		else
-			await room.SetManualTemperatureAsync (setpoint, CancellationToken.None).ConfigureAwait (false);
+		bool accepted = scheduled
+			? await room.SetTargetTemperatureForDurationOfScheduleAsync (setpoint, CancellationToken.None).ConfigureAwait (false)
+			: await room.SetManualTemperatureAsync (setpoint, CancellationToken.None).ConfigureAwait (false);
 
-		return await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
+		return accepted && await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
 		}
 
 	internal async Task<bool> TriggerRoomBoostAsync (int roomId)
