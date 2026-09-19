@@ -1,5 +1,13 @@
 # Development and validation history
 
+## Completed post-endurance and paired-instance checks - 19 September 2026
+
+The unchanged 1.3.11 candidate completed 480 periodic observations across 24 hours and 1 minute; the collection was preserved and independently reviewed. Subsequent read-only UI, feature configurations, repeated room mode, native setpoint/Off and corrected repeated Boost checks passed with restoration. The earlier failed Boost expectation is retained as failed test evidence; its correction changed test code only.
+
+Two processors using the same household hub passed fresh shared-state observations, room Auto/Manual/Auto, Away/hot-water controls and unsaved editor isolation/cancellation. The latter exercised day/time changes and four visible temperature rows; the original editor, persistent schedules and guarded rooms matched after Cancel. Each completed phase verified candidate preservation, temporary-child cleanup and released reservations. Released audit tooling checked the retained artifacts for the successful phases. These results do not establish every official requirement, independent-hub behavior or a second rendered app UI.
+
+Submission validation status now distinguishes these results from remaining configuration, control, outage, final-form and delivery work. The signature remains private and unapplied. No production code, driver changelog or frozen package changed.
+
 ## Retain independently observed schedule save results - 19 September 2026
 
 Save Day and Save All acceptance now retain the complete hub snapshot that satisfied their independent comparison, alongside the existing expected schedule record. This uses the already-read confirming snapshot and adds no device request. Both exclusive existing schedules and owned temporary schedules use this evidence path. Failure to store the snapshot fails the case and triggers the existing restoration without replaying the save. Earlier retained runs remain unchanged and cannot be claimed to contain these new records. This is test tooling only; the frozen driver candidate and endurance collector are unchanged.

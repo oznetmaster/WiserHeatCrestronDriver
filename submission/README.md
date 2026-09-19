@@ -2,7 +2,7 @@
 
 The [Wiser submission status](ValidationStatus.md) records this driver's pilot, tested pages and remaining acceptance work. Shared tool documentation describes reusable contracts; Wiser-specific fixtures and results belong here.
 
-The Android observation and control projects use released CrestronHomeNUnit.TestAdapter 1.12.0 and CrestronHomeDevTools 1.10.0. Use the released NUnit runner's `installed-tests` command for selected checks against an existing immutable candidate. It validates the selected installation and holds processor/emulator reservations; ordinary test discovery does not authorize hardware access. Keep the control project explicitly selected and supply its private opt-in settings only for the intended run. These test-tool versions do not change the frozen driver package.
+The Android observation and control projects use released CrestronHomeNUnit.TestAdapter 1.12.1 and CrestronHomeDevTools 1.13.1. Use the released NUnit runner's `installed-tests` command for selected checks against an existing immutable candidate. It validates the selected installation and holds processor/emulator reservations; ordinary test discovery does not authorize hardware access. Keep the control project explicitly selected and supply its private opt-in settings only for the intended run. These test-tool versions do not change the frozen driver package.
 
 ## Driver-specific test coverage
 
