@@ -20,6 +20,9 @@ public sealed partial class GatewayUiTests
 	[TestCaseSource (nameof (EditorChoiceCases)), Category ("LiveControl")]
 	public Task ScheduleEditorEveryChoiceAppliesAndCancels (int slot, bool requirePeer) => ExerciseEditorSelectionsAsync (null, requirePeer, slot);
 
+	[TestCaseSource (nameof (EditorChoiceCases)), Category ("LiveControl")]
+	public Task ScheduleEditorSelectorAppliesAndCancels (int slot, bool requirePeer) => ExerciseEditorSelectionsAsync (null, requirePeer, slot, exhaustiveChoices: false);
+
 	private async Task FindEditorChoiceAsync (string check, string[] titles, string[] choices, string original, string desired,
 		Action<AndroidHierarchy> guard, CancellationToken token)
 		{
@@ -56,7 +59,7 @@ public sealed partial class GatewayUiTests
 		}
 
 	private async Task CancelEditorOptionsAsync (string check, string[] titles, string label, string[] allowed, string original,
-		Func<string, object, Task> record, CancellationToken token)
+		Func<string, object, Task> record, CancellationToken token, bool inspectInventory = false)
 		{
 		var session = _session!;
 		void Page (AndroidHierarchy hierarchy)
@@ -92,6 +95,8 @@ public sealed partial class GatewayUiTests
 		await session.Device.TapAsync (Text (label), Page, token);
 		await WaitFor (Selection);
 		await session.CaptureAsync (check + ".dialog-cancel.open", Selection, token);
+		if (inspectInventory)
+			await CaptureEditorChoiceInventoryAsync (check, titles, allowed, original, Selection, record, token);
 		await record ("choice-dialog-cancel-intent", new { Label = label, ActionChosen = false,
 			Control = "customdevice_selectionToolbar_backButton", Scope = "The app's selector toolbar Back control dismisses without selecting a value." });
 		await session.Device.TapAsync (CrestronHomePages.Resource ("customdevice_selectionToolbar_backButton"), Selection, token);
@@ -100,9 +105,50 @@ public sealed partial class GatewayUiTests
 		// Input failures propagate to the existing outer state-restoration path, never a repeated tap.
 		}
 
-	private async Task ExerciseAllEditorChoicesAsync (CrestronHomeExtensionNavigation pages, string check, RoomBinding binding,
+	private async Task CaptureEditorChoiceInventoryAsync (string check, string[] titles, string[] labels, string selected,
+		Action<AndroidHierarchy> guard, Func<string, object, Task> record, CancellationToken token)
+		{
+		var session = _session!;
+		var scan = new ScheduleChoiceScan (labels, selected);
+		for (int viewport = 0; viewport < 128; viewport++)
+			{
+			IReadOnlyList<AndroidSelectionOption> options = [];
+			await session.CaptureAsync (check + ".inventory-" + viewport, hierarchy =>
+				{
+				guard (hierarchy);
+				options = CrestronHomeExtensionPages.ReadSelectionOptions (CrestronHomeExtensionPages.RequireSelection (hierarchy, titles));
+				}, token);
+			var action = scan.Observe (options.Select (option => new ScheduleChoiceValue (option.Label, option.Selected)).ToArray ());
+			await record ("inventory-" + viewport, new { Options = options, Action = action.ToString () });
+			if (action == ScheduleChoiceScanAction.Complete)
+				{
+				await record ("inventory-complete", new { Expected = labels, StartingValue = selected, BothEndsObserved = true });
+				return;
+				}
+			var current = await session.Device.CaptureAsync (token);
+			guard (current);
+			var container = CrestronHomeExtensionPages.RequireSelection (current, titles).RequireUnique (CrestronHomePages.Resource ("customdevice_selectionRecyclerView"));
+			if (!container.Enabled || container.Bottom - container.Top < 80)
+				throw new InvalidDataException ("The selector inventory scroll area is unavailable.");
+			int x = (container.Left + container.Right) / 2;
+			int start = container.Top + (container.Bottom - container.Top) * 3 / 4;
+			int end = container.Top + (container.Bottom - container.Top) / 4;
+			if (action == ScheduleChoiceScanAction.ScrollUp) (start, end) = (end, start);
+			await record ("inventory-scroll-" + viewport, new { X = x, Start = start, End = end, Direction = action.ToString () });
+			AndroidWorkflowSession.VerifyContext (session.Context);
+			token.ThrowIfCancellationRequested ();
+			var profile = session.Context.Profile;
+			var transport = new AdbCommandTransport (profile.AdbExecutable, profile.DeviceSerial, TimeSpan.FromSeconds (25));
+			await transport.ExecuteAsync (["shell", "input", "swipe", x.ToString (CultureInfo.InvariantCulture), start.ToString (CultureInfo.InvariantCulture),
+				x.ToString (CultureInfo.InvariantCulture), end.ToString (CultureInfo.InvariantCulture), "350"], token);
+			// Each gesture follows a fresh observation; failed or uncertain gestures are never repeated.
+			}
+		throw new InvalidDataException ("The bounded selector inventory did not reach both ends and all expected choices.");
+		}
+
+	private async Task ExerciseEditorChoiceSequenceAsync (CrestronHomeExtensionNavigation pages, string check, RoomBinding binding,
 		JsonElement originalEditor, ScheduleHubSnapshot originalHub, int scheduleId, int slot, Action<string, string> ownDay,
-		Func<string, object, Task> record, Func<CancellationToken, Task<ScheduleHubSnapshot>> readHub, CancellationToken token)
+		Func<string, object, Task> record, Func<CancellationToken, Task<ScheduleHubSnapshot>> readHub, CancellationToken token, bool exhaustive)
 		{
 		string property = slot == 0 ? "editSelectedDay" : "editSlot" + slot.ToString (CultureInfo.InvariantCulture) + "Time";
 		string label = slot == 0 ? "DAY" : "TIME " + slot.ToString (CultureInfo.InvariantCulture);
@@ -116,7 +162,7 @@ public sealed partial class GatewayUiTests
 		var beforeCancel = await ReadRoomAsync (binding, token);
 		if (!JsonElement.DeepEquals (originalEditor, ScheduleEditorObservation.Editor (beforeCancel.PropertyValues)))
 			throw new InvalidDataException ("The editor changed before the cancellation check.");
-		await CancelEditorOptionsAsync (check, titles, label, choices, current, record, token);
+		await CancelEditorOptionsAsync (check, titles, label, choices, current, record, token, inspectInventory: !exhaustive);
 		var afterCancel = await ReadRoomAsync (binding, token);
 		var cancelHub = await readHub (token);
 		if (!JsonElement.DeepEquals (originalEditor, ScheduleEditorObservation.Editor (afterCancel.PropertyValues)) ||
@@ -127,8 +173,9 @@ public sealed partial class GatewayUiTests
 		await record ("choice-dialog-cancel-observed", new { Slot = slot, Label = label, NoSelectionMade = true,
 			Editor = ScheduleEditorObservation.Editor (afterCancel.PropertyValues), Activity = afterCancel.PropertyValues["controlStatus"], Hub = cancelHub });
 		var selected = new HashSet<string> (StringComparer.Ordinal);
-		// Select every entry, including the initial value, then return to the captured starting value.
-		var sequence = choices.Concat (choices[^1] == initialLabel ? [] : new[] { initialLabel }).ToArray ();
+		// The bounded case retains every offered choice but selects endpoints and the starting value.
+		// The separate exhaustive case still selects every value. Both restore the original selection.
+		var sequence = ScheduleChoiceSequence.Create (choices, initialLabel, exhaustive);
 		for (int index = 0; index < sequence.Length; index++)
 			{
 			string desired = sequence[index];
@@ -175,8 +222,10 @@ public sealed partial class GatewayUiTests
 			selected.Add (desired);
 			current = desired;
 			}
-		Assert.That (selected.SetEquals (choices), Is.True, "Every supported choice must be selected and observed.");
-		await record ("choices-coverage", new { Slot = slot, Label = label, Expected = choices, Selected = selected, StartingValue = initialLabel, FinalValue = current });
+		Assert.That (selected.SetEquals (sequence), Is.True, "Every planned selection must be observed.");
+		Assert.That (current, Is.EqualTo (initialLabel), "The sequence must restore its starting value.");
+		await record ("choices-coverage", new { Slot = slot, Label = label, Expected = choices, PlannedSelections = sequence,
+			Selected = selected, Exhaustive = exhaustive, StartingValue = initialLabel, FinalValue = current });
 		await RevealEditorNavigationAsync (pages, check + ".choices-cancel", "Cancel", token);
 		await pages.ClosePageAsync (token);
 		var cancelled = ScheduleEditorObservation.Editor ((await ReadRoomAsync (binding, token)).PropertyValues);

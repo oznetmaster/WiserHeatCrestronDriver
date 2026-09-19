@@ -43,7 +43,7 @@ public sealed partial class GatewayUiTests
 		record.Flush (true);
 		}
 
-	private async Task ExerciseEditorSelectionsAsync (string? interruption, bool requirePeer = false, int? choiceSlot = null)
+	private async Task ExerciseEditorSelectionsAsync (string? interruption, bool requirePeer = false, int? choiceSlot = null, bool exhaustiveChoices = true)
 		{
 		Assert.That (_nameRestored && _roomStatePreserved, Is.True, "An earlier restoration needs reconciliation.");
 		if (requirePeer && !_settings!.ObservePeerDuringPendingEdits)
@@ -86,7 +86,7 @@ public sealed partial class GatewayUiTests
 				Assert.Ignore ("The selected time row is absent in this layout; run the case with an applicable schedule layout.");
 			string originalDay = originalEditor.GetProperty ("editSelectedDay").GetString ()!;
 			string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + (interruption == null ? ".editor-cancel" : ".editor-interruption-" + interruption);
-			if (choiceSlot.HasValue) check += ".all-choices-" + choiceSlot.Value.ToString (CultureInfo.InvariantCulture);
+			if (choiceSlot.HasValue) check += (exhaustiveChoices ? ".all-choices-" : ".selector-control-") + choiceSlot.Value.ToString (CultureInfo.InvariantCulture);
 			if (requirePeer) check += ".two-instances";
 			string evidence = Path.Combine (_session!.Context.EvidenceDirectory, check + ".records");
 			Directory.CreateDirectory (evidence);
@@ -117,8 +117,8 @@ public sealed partial class GatewayUiTests
 					string[] titles = [binding.PageTitle, "Schedule", "Edit Schedule"];
 					if (choiceSlot.HasValue)
 						{
-						await ExerciseAllEditorChoicesAsync (pages, check, binding, originalEditor, new (schedules, domain), scheduleId, choiceSlot.Value,
-							(from, to) => { previousChoiceDay = from; alternateDay = to; }, Record, async cancellation => new ScheduleHubSnapshot (await ReadHub ("schedules", cancellation), await ReadHub ("domain", cancellation)), token);
+						await ExerciseEditorChoiceSequenceAsync (pages, check, binding, originalEditor, new (schedules, domain), scheduleId, choiceSlot.Value,
+							(from, to) => { previousChoiceDay = from; alternateDay = to; }, Record, async cancellation => new ScheduleHubSnapshot (await ReadHub ("schedules", cancellation), await ReadHub ("domain", cancellation)), token, exhaustiveChoices);
 						return;
 						}
 					await CaptureEditorValuesAsync (check, "controls-initial", titles, binding, Record, token);
