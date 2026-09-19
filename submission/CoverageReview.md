@@ -1,5 +1,11 @@
 # Coverage source review
 
+## Selector-value scope - 19 September 2026
+
+The official item-9 wording requires every supported selector button, not an exhaustive iteration of all values in each button. SDK documentation distinguishes `selectorbutton` property controls from `listbutton` controls and `actionselector` alerts. Fresh inspection of the frozen package confirmed twelve room selector buttons and no list buttons or action selectors. Applicable subpage behavior under item 18 remains required.
+
+The corrected single/paired expectation keeps each control and conditional row, the complete offered-value inventory, dismissal, changed selection, restored selection and intended editor/assignment effects. Exhaustive value iteration remains optional regression coverage. No original evidence or policy has been relabelled, and no missing observation is marked passed. The released coverage generator validated all source bindings and retained all 35 official items and 540 expanded assertions. These are coverage obligations, not a count of required test runs. Existing pending-editor evidence covers DAY and TIME 1; other rows still need their own applicable observations.
+
 ## Endurance phases - 19 September 2026
 
 System item 3 now maps to three mandatory observations: the original periodic collection, final functionality with state restoration, and performance comparison. The earlier combined scope incorrectly attached a restoration event to read-only samples and attempted to put final tests within the periodic observation interval. The split retains the 24-hour minimum and every final-check obligation. It changes no other official item, candidate bytes or active collection policy. See [Endurance evidence](EnduranceEvidence.md) for the original-evidence and review boundaries. No passing observation or completed form is produced by this correction.
