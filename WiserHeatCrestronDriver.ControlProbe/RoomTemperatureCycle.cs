@@ -75,9 +75,10 @@ public static class RoomTemperatureCycle
 				value.Activity.Completed < original.Activity.Completed || value.Activity.Completed > original.Activity.Completed + commands)
 				throw new InvalidDataException ("Room identity, temperature units, command lifetime or attribution changed.");
 			}
-		async Task<RoomTemperatureSnapshot> Wait (Func<RoomTemperatureSnapshot, bool> predicate, DateTimeOffset after, CancellationToken ct, bool independent = false)
+		async Task<RoomTemperatureSnapshot> Wait (Func<RoomTemperatureSnapshot, bool> predicate, DateTimeOffset after, CancellationToken ct, bool independent = false, string? firstMatchPhase = null)
 			{
 			int matches = 0;
+			bool firstRecorded = false;
 			var last = after;
 			while (true)
 				{
@@ -89,6 +90,12 @@ public static class RoomTemperatureCycle
 				last = value.Gateway.RefreshUtc;
 				bool ready = value.Activity.Pending == 0 && value.Activity.Completed == original!.Activity.Completed + commands;
 				matches = ready && value.Gateway.RefreshUtc > after && predicate (value) ? matches + 1 : 0;
+				if (matches == 1 && !firstRecorded && firstMatchPhase != null)
+					{
+					// Retain the first full match separately; two matches still determine confirmation.
+					await session.RecordAsync (firstMatchPhase, new { Snapshot = value });
+					firstRecorded = true;
+					}
 				if (matches == 2)
 					return value;
 				await Task.Delay (25, ct);
@@ -148,7 +155,7 @@ public static class RoomTemperatureCycle
 				restored = false;
 				elapsed.Restart ();
 				await session.InputAsync (action, deadline.Token);
-				current = await Wait (requested, requestedAfter, deadline.Token);
+				current = await Wait (requested, requestedAfter, deadline.Token, firstMatchPhase: "input-" + submitted + "-first-match");
 				await session.RecordAsync ("input-" + submitted + "-observed", new
 					{
 					Snapshot = current,

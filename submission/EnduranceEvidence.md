@@ -24,4 +24,12 @@ The three-way form mapping enforces that each observation is supplied. Generic e
 
 Missing or incomparable baseline measurements cannot support an unqualified no-degradation conclusion. Likewise, cached connection/readiness values cannot replace periodic functional observations. Keep any such gap visible for review instead of changing evidence timestamps, dropping failed attempts or declaring success from a test count.
 
+## Native thermostat response records
+
+The native-control fixture now records `input-N-first-match` separately from `input-N-observed`. The first record is the first complete matching observation of independent hub state, processor properties and rendered UI. The second still requires two matching observations; a transient first match does not pass the test. Writing the first record does not capture another screenshot or issue an input. A failed evidence write still fails the cycle and invokes its guarded restoration.
+
+These records include `InputTiming` with the dispatch-start timestamp, observation timestamp, monotonic elapsed seconds, route and boundary. The timer starts immediately before the guarded Android tap, after preliminary reads and screenshot capture. It therefore includes the tap's own guards, dispatch and subsequent reads, but excludes earlier preparation and later confirmation screenshots. These are observed response upper bounds, not the precise physical device-change time. Direct HTTP preparation for an Off/resume case is labelled `direct-hub-off-preparation`; it must not be counted as a driver-command measurement.
+
+The existing `Value.Seconds` remains the broader cycle timer, so earlier records keep their meaning. In the retained pre-period native-control records, approximately seven to eight seconds elapsed between the cycle intent and the tap intent. Keep those original timings as conservative bounds rather than relabelling them as device latency. Compare the same boundaries and operating conditions in final tests; do not claim a precise improvement from changing instrumentation. New records cannot supply a missing historical measurement.
+
 This separation changes submission evidence organization only. It does not change the driver package, restart an active observation period, waive final checks or establish that the official item has passed.

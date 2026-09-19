@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Neil Colvin.
 // Licensed under the MIT License with Commons Clause. See LICENSE in the repository root.
 
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -70,6 +71,9 @@ public sealed partial class GatewayUiTests
 		private RoomTemperatureSnapshot? _intent;
 		private RoomTemperatureRestorePlan? _plan;
 		private int _inputs;
+		private readonly Stopwatch _inputResponseTimer = new ();
+		private DateTimeOffset _inputDispatchUtc;
+		private string _inputRoute = "";
 		private readonly HashSet<int> _restores = [];
 		private AndroidHierarchy Page (AndroidHierarchy hierarchy) => CrestronHomeExtensionPages.RequirePage (hierarchy, [binding.PageTitle]);
 		private static AndroidSelector Target => CrestronHomePages.Resource ("statusLabels_value") with { AncestorResourceId = CrestronHomePages.ResourcePrefix + "customdevice_thermostat_heatSetpoint" };
@@ -148,6 +152,18 @@ public sealed partial class GatewayUiTests
 		public async Task RecordAsync (string phase, object value)
 			{
 			AndroidWorkflowSession.VerifyContext (Session.Context);
+			var observedUtc = DateTimeOffset.UtcNow;
+			bool firstMatch = phase == "input-" + _inputs + "-first-match";
+			bool confirmed = phase == "input-" + _inputs + "-observed";
+			var timing = _inputResponseTimer.IsRunning && (firstMatch || confirmed) ? new
+				{
+				DispatchStartedUtc = _inputDispatchUtc,
+				ObservedUtc = observedUtc,
+				Seconds = _inputResponseTimer.Elapsed.TotalSeconds,
+				Route = _inputRoute,
+				Boundary = firstMatch ? "first-full-match" : "two-match-confirmation",
+				Measurement = "Observed response upper bound including dispatch guards and reads; not exact physical device latency"
+				} : null;
 			var serialized = JsonSerializer.SerializeToElement (value);
 			if (phase.StartsWith ("input-", StringComparison.Ordinal) && phase.EndsWith ("-intent", StringComparison.Ordinal))
 				{
@@ -164,11 +180,14 @@ public sealed partial class GatewayUiTests
 					Session.Context.PackageSha256,
 					Session.Context.ReleaseSourceCommit,
 					Phase = phase,
-					ObservedUtc = DateTimeOffset.UtcNow,
+					ObservedUtc = observedUtc,
+					InputTiming = timing,
 					Value = value
 					});
 				file.Flush (flushToDisk: true);
 				}
+			if (confirmed)
+				_inputResponseTimer.Stop ();
 			if (phase == "restored" || phase.StartsWith ("input-", StringComparison.Ordinal) && phase.EndsWith ("-observed", StringComparison.Ordinal))
 				{
 				var state = serialized.GetProperty ("Snapshot").Deserialize<RoomTemperatureSnapshot> ()!;
@@ -199,6 +218,9 @@ public sealed partial class GatewayUiTests
 					{
 					Content = new StringContent (request.GetRawText (), Encoding.UTF8, "application/json")
 					};
+				_inputRoute = "direct-hub-off-preparation";
+				_inputDispatchUtc = DateTimeOffset.UtcNow;
+				_inputResponseTimer.Restart ();
 				using var response = await http.SendAsync (message, token);
 				await RecordAsync ("prepare-off-http-response", new { Status = (int)response.StatusCode });
 				response.EnsureSuccessStatusCode ();
@@ -221,6 +243,9 @@ public sealed partial class GatewayUiTests
 				{
 				Action = action
 				});
+			_inputRoute = "android-tap-with-guard";
+			_inputDispatchUtc = DateTimeOffset.UtcNow;
+			_inputResponseTimer.Restart ();
 			await Session.Device.TapAsync (selector, Guard, token);
 			_intent = null;
 			}

@@ -64,12 +64,17 @@ public sealed class RoomTemperatureCycleTests
 		public List<string> Records = [];
 		public string? Behavior;
 		public string? FailRecord;
+		public bool TransientUiMismatch;
+		private int _postInputReads;
+		public List<int> ConfirmationReadCounts = [];
 		public CancellationTokenSource? CancelAfterInput;
 		public Task<RoomTemperatureSnapshot> ReadAsync (CancellationToken token)
 			{
 			token.ThrowIfCancellationRequested ();
 			if (Behavior == "capture-throws" && Inputs.Count != 0)
 				throw new IOException ("Synthetic unavailable Android capture.");
+			if (TransientUiMismatch && Inputs.Count != 0 && ++_postInputReads == 2)
+				return Task.FromResult (State with { UiMatches = false });
 			return Task.FromResult (State);
 			}
 		public Task<RoomTemperatureSnapshot> ReadRestorationAsync (CancellationToken token)
@@ -82,6 +87,8 @@ public sealed class RoomTemperatureCycleTests
 			if (FailRecord == phase)
 				throw new IOException ("journal failed");
 			Records.Add (phase);
+			if (phase.StartsWith ("input-", StringComparison.Ordinal) && phase.EndsWith ("-observed", StringComparison.Ordinal))
+				ConfirmationReadCounts.Add (_postInputReads);
 			return Task.CompletedTask;
 			}
 		private double Displayed (int raw) => raw == -200 ? -20 : State.TemperatureUnits == "Fahrenheit" ? raw * 0.18d + 32d : raw / 10d;
@@ -98,6 +105,7 @@ public sealed class RoomTemperatureCycleTests
 			token.ThrowIfCancellationRequested ();
 			_originalRoom ??= RoomTemperatureRestoration.Room (State.Gateway.Hub, 9);
 			Inputs.Add (action);
+			_postInputReads = 0;
 			if (Behavior == "not-delivered")
 				throw new IOException ("uncertain input");
 			if (action == RoomTemperatureAction.BoostOff)
@@ -203,7 +211,35 @@ public sealed class RoomTemperatureCycleTests
 		var result = await Run (session, boost);
 		Assert.That (result.Passed && result.RestorationConfirmed, Is.True, result.Detail);
 		Assert.That (session.Inputs.Count, Is.EqualTo (2));
+		foreach (int input in new[] { 1, 2 })
+			{
+			Assert.That (session.Records.Count (phase => phase == "input-" + input + "-first-match"), Is.EqualTo (1));
+			Assert.That (session.Records.IndexOf ("input-" + input + "-first-match"), Is.LessThan (session.Records.IndexOf ("input-" + input + "-observed")));
+			}
 		Assert.That (session.Restores.Count, Is.EqualTo (boost ? 0 : manual ? 2 : 1));
+		RoomTemperatureRestoration.RequireRestored (RoomTemperatureRestoration.Capture (RoomTemperatureRestoration.Room (original.Gateway.Hub, 9)), RoomTemperatureRestoration.Room (session.State.Gateway.Hub, 9));
+		}
+	[Test]
+	public async Task TransientMismatchRetainsOneFirstMatchButStillRequiresStableConfirmation ()
+		{
+		var session = new Session { TransientUiMismatch = true };
+		var result = await RoomTemperatureCycle.RunAsync (session, false, TimeSpan.FromSeconds (2), CancellationToken.None);
+		Assert.That (result.Passed && result.RestorationConfirmed, Is.True, result.Detail);
+		foreach (int input in new[] { 1, 2 })
+			Assert.That (session.Records.Count (phase => phase == "input-" + input + "-first-match"), Is.EqualTo (1));
+		Assert.That (session.Inputs.Count, Is.EqualTo (2), "Observation mismatch must never replay input.");
+		Assert.That (session.ConfirmationReadCounts, Has.All.GreaterThanOrEqualTo (4), "A first match followed by a mismatch requires two fresh matches before confirmation.");
+		}
+	[TestCase (false), TestCase (true)]
+	public async Task FirstMatchRecordFailureStillRestoresWithoutAnotherInput (bool boost)
+		{
+		var session = new Session { FailRecord = "input-1-first-match" };
+		var original = session.State;
+		var result = await Run (session, boost);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs.Count, Is.EqualTo (1));
+		Assert.That (session.Records, Does.Not.Contain ("input-1-observed"));
 		RoomTemperatureRestoration.RequireRestored (RoomTemperatureRestoration.Capture (RoomTemperatureRestoration.Room (original.Gateway.Hub, 9)), RoomTemperatureRestoration.Room (session.State.Gateway.Hub, 9));
 		}
 	[TestCase (false, false), TestCase (false, true), TestCase (true, false), TestCase (true, true)]
