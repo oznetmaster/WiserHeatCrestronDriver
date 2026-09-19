@@ -66,6 +66,7 @@ public sealed class RoomTemperatureCycleTests
 		public string? Behavior;
 		public string? FailRecord;
 		public Action? BeforeRestoration;
+		public Action? BeforeRead;
 		public bool TransientUiMismatch;
 		private int _postInputReads;
 		public List<int> ConfirmationReadCounts = [];
@@ -73,6 +74,7 @@ public sealed class RoomTemperatureCycleTests
 		public Task<RoomTemperatureSnapshot> ReadAsync (CancellationToken token)
 			{
 			token.ThrowIfCancellationRequested ();
+			BeforeRead?.Invoke ();
 			if (Behavior == "capture-throws" && Inputs.Count != 0)
 				throw new IOException ("Synthetic unavailable Android capture.");
 			if (TransientUiMismatch && Inputs.Count != 0 && ++_postInputReads == 2)
@@ -631,5 +633,87 @@ public sealed class RoomTemperatureCycleTests
 			});
 		var input = new DateTimeOffset (2026, 9, 18, 15, 6, 50, TimeSpan.Zero);
 		Assert.That (RoomBoostExpectation.Create (original).Matches (observed, input, input.AddSeconds (1)), Is.EqualTo (matches));
+		}
+
+	[TestCase (false), TestCase (true)]
+	public async Task RepeatedBoostRestoresOneOriginalPolicyAcrossThreeCycles (bool fahrenheit)
+		{
+		var session = new Session ();
+		if (fahrenheit) session.State = session.State with { TemperatureUnits = "Fahrenheit", HomeTarget = 64.4 };
+		var original = session.State;
+		var result = await RoomBoostRepetition.RunAsync (_ => session, 3, TimeSpan.FromSeconds (1), CancellationToken.None);
+		Assert.That (result.Passed && result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs, Is.EqualTo (Enumerable.Range (0, 3).SelectMany (_ => new[] { RoomTemperatureAction.BoostOn, RoomTemperatureAction.BoostOff })));
+		Assert.That (session.Records.Count (phase => phase == "repetition-verified"), Is.EqualTo (3));
+		Assert.That (session.State.HomeTarget, Is.EqualTo (original.HomeTarget));
+		Assert.That (session.Restores, Is.Empty);
+		}
+
+	[TestCase ("configuration"), TestCase ("units"), TestCase ("epoch"), TestCase ("commands"), TestCase ("manual-target"), TestCase ("other-room")]
+	public async Task RepeatedBoostStopsInsteadOfAdoptingAChangedBaseline (string change)
+		{
+		var session = new Session ();
+		int created = 0;
+		var result = await RoomBoostRepetition.RunAsync (index =>
+			{
+				created++;
+				if (index == 1) session.State = change switch
+					{
+					"configuration" => session.State with { BoostSettings = new (3, 60) },
+					"units" => session.State with { TemperatureUnits = "Fahrenheit", HomeTarget = 64.4 },
+					"epoch" => session.State with { Activity = session.State.Activity with { Epoch = Guid.NewGuid ().ToString ("N") } },
+					"commands" => session.State with { Activity = session.State.Activity with { Completed = 3 } },
+					"manual-target" => Edit (session.State, d => d["Room"]![0]!["ManualSetPoint"] = 190),
+					_ => Edit (session.State, d => d["Room"]![1]!["ManualSetPoint"] = 200)
+					};
+				return session;
+			}, 3, TimeSpan.FromSeconds (1), CancellationToken.None);
+		Assert.That (result.Passed || result.RestorationConfirmed, Is.False);
+		Assert.That (created, Is.EqualTo (2));
+		Assert.That (session.Inputs.Count, Is.EqualTo (2));
+		Assert.That (session.Restores, Is.Empty);
+		}
+
+	[Test]
+	public async Task RepeatedBoostRechecksTheBaselineInsideCyclePreflight ()
+		{
+		var session = new Session ();
+		int reads = 0;
+		session.BeforeRead = () =>
+			{
+				if (++reads == 2) session.State = session.State with { BoostSettings = new (3, 60) };
+			};
+		var result = await RoomBoostRepetition.RunAsync (_ => session, 3, TimeSpan.FromSeconds (1), CancellationToken.None);
+		Assert.That (result.Passed || result.RestorationConfirmed, Is.False);
+		Assert.That (session.Inputs, Is.Empty);
+		}
+
+	[TestCase ("wrong-boost-target", true), TestCase ("not-delivered", false)]
+	public async Task FailedBoostDoesNotStartAnotherCycle (string behavior, bool restored)
+		{
+		var session = new Session { Behavior = behavior };
+		int created = 0;
+		var result = await RoomBoostRepetition.RunAsync (_ => { created++; return session; }, 3, TimeSpan.FromMilliseconds (250), CancellationToken.None);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.EqualTo (restored));
+		Assert.That (created, Is.EqualTo (1));
+		Assert.That (session.Inputs, Is.EqualTo (new[] { RoomTemperatureAction.BoostOn }));
+		}
+
+	[TestCase ("repetition-baseline", 0), TestCase ("repetition-verified", 2)]
+	public async Task RepeatedBoostStopsWhenItsEvidenceCannotBeWritten (string phase, int inputs)
+		{
+		var session = new Session { FailRecord = phase };
+		int created = 0;
+		var result = await RoomBoostRepetition.RunAsync (_ => { created++; return session; }, 3, TimeSpan.FromSeconds (1), CancellationToken.None);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (created, Is.EqualTo (1));
+		Assert.That (session.Inputs.Count, Is.EqualTo (inputs));
+		}
+
+	[TestCase (0), TestCase (4)]
+	public void RepeatedBoostRejectsAnUnboundedOrEmptyRun (int cycles)
+		{
+		Assert.ThrowsAsync<ArgumentOutOfRangeException> (async () => await RoomBoostRepetition.RunAsync (_ => throw new AssertionException ("No session should open."), cycles, TimeSpan.FromSeconds (1), CancellationToken.None));
 		}
 	}

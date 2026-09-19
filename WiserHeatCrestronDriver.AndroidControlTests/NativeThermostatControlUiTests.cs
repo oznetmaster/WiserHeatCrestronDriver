@@ -26,10 +26,14 @@ public sealed partial class GatewayUiTests
 			}
 		public bool AllowNativeThermostatOffControl { get; init; }
 		public bool AllowNativeThermostatBoundaryControl { get; init; }
+		public bool AllowRepeatedNativeBoostControl { get; init; }
 		}
 
 	[TestCase (false), TestCase (true), Category ("LiveControl")]
 	public Task NativeThermostatInputsChangeHubAndRestorePolicy (bool boost) => RunNativeControlAsync (boost, off: false);
+
+	[Test, Category ("LiveControl")]
+	public Task NativeBoostRepeatedCyclesRestoreOriginalPolicy () => RunNativeControlAsync (boost: true, off: false, cycles: 3);
 
 	[Test, Category ("LiveControl")]
 	public Task NativeThermostatOffResumeRestoresPolicy () => RunNativeControlAsync (boost: false, off: true);
@@ -37,9 +41,11 @@ public sealed partial class GatewayUiTests
 	[TestCase (false), TestCase (true), Category ("LiveControl")]
 	public Task NativeThermostatBoundaryRestoresPolicy (bool maximum) => RunNativeControlAsync (boost: false, off: false, maximum);
 
-	private async Task RunNativeControlAsync (bool boost, bool off, bool? maximum = null, CancellationToken cancellationToken = default, bool alternateUnits = false)
+	private async Task RunNativeControlAsync (bool boost, bool off, bool? maximum = null, CancellationToken cancellationToken = default, bool alternateUnits = false, int cycles = 1)
 		{
 		Assert.That (_nameRestored && _roomStatePreserved, Is.True, "Earlier restoration must be reconciled before more controls.");
+		if (cycles > 1 && !_settings!.AllowRepeatedNativeBoostControl)
+			Assert.Ignore ("Explicitly enable repeated Boost operation for the selected physical room.");
 		if (maximum.HasValue ? !_settings!.AllowNativeThermostatBoundaryControl : off ? !_settings!.AllowNativeThermostatOffControl : !_settings!.AllowNativeThermostatControl)
 			Assert.Ignore ("Explicitly enable the selected native thermostat control scope.");
 		if (_settings.ControlRooms.Length != 1 || string.IsNullOrWhiteSpace (_settings.ControlHubSettingsPath) || !Path.IsPathFullyQualified (_settings.ControlHubSettingsPath))
@@ -53,14 +59,17 @@ public sealed partial class GatewayUiTests
 		var control = _settings.ControlRooms.Single ();
 		var binding = _settings.Rooms.Single (r => r.DeviceId == control.DeviceId);
 		using var timeout = CancellationTokenSource.CreateLinkedTokenSource (cancellationToken);
-		timeout.CancelAfter (TimeSpan.FromMinutes (maximum.HasValue ? 45 : 15));
+		timeout.CancelAfter (TimeSpan.FromMinutes (maximum.HasValue ? 45 : cycles * 15));
 		var original = await ReadRoomAsync (binding, timeout.Token);
 		string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + (maximum.HasValue ? maximum.Value ? ".native-maximum" : ".native-minimum" : off ? ".native-off" : boost ? ".native-boost" : ".native-setpoint");
 		if (alternateUnits) check += ".alternate-units";
+		if (cycles > 1) check += ".repeated";
 		await _navigation!.InspectRoomExtensionPagesAsync (check, binding.RoomName, original.Name!, binding.PageTitle, async (_, token) =>
 			{
 				var session = new NativeTemperatureSession (this, hub, http, binding, control, original, check, maximum.HasValue, boost);
-				var result = maximum.HasValue ? await RoomTemperatureCycle.RunBoundaryAsync (session, maximum.Value, TimeSpan.FromMinutes (3), token)
+				var result = cycles > 1 ? await RoomBoostRepetition.RunAsync (index => new NativeTemperatureSession (this, hub, http, binding, control, original,
+					check + ".cycle-" + (index + 1).ToString (CultureInfo.InvariantCulture), verifyBoost: true), cycles, TimeSpan.FromMinutes (3), token)
+					: maximum.HasValue ? await RoomTemperatureCycle.RunBoundaryAsync (session, maximum.Value, TimeSpan.FromMinutes (3), token)
 					: off ? await RoomTemperatureCycle.RunOffAsync (session, TimeSpan.FromMinutes (3), token)
 					: await RoomTemperatureCycle.RunAsync (session, boost, TimeSpan.FromMinutes (3), token);
 				_roomStatePreserved = result.RestorationConfirmed;
