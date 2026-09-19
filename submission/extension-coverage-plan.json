@@ -908,26 +908,15 @@
       "id": "extension.controls.17",
       "checks": [
         {
-          "id": "selector-dialog",
+          "id": "confirm-action-selector-absence",
           "targets": [
-            "room/EditSchedulePage/EditScheduleDaySelector",
-            "room/EditSchedulePage/EditSlot10Time",
-            "room/EditSchedulePage/EditSlot1Time",
-            "room/EditSchedulePage/EditSlot2Time",
-            "room/EditSchedulePage/EditSlot3Time",
-            "room/EditSchedulePage/EditSlot4Time",
-            "room/EditSchedulePage/EditSlot5Time",
-            "room/EditSchedulePage/EditSlot6Time",
-            "room/EditSchedulePage/EditSlot7Time",
-            "room/EditSchedulePage/EditSlot8Time",
-            "room/EditSchedulePage/EditSlot9Time",
-            "room/SchedulePage/ScheduleSelector"
+            "$driver-action-selector-alerts"
           ],
-          "method": "combined",
-          "expectation": "Inspect native selection dialog title, complete choices and cancel/back behavior. Cancel must close without change; each choice must perform only its intended selection action. Restore the original selected/editor/device state.",
+          "method": "absence",
+          "expectation": "Inspect both final packaged UI definitions, their loading paths and runtime/configuration variants for SDK actionselector alerts. The packaged selectorbutton controls belong to item 9 and must not be counted as action-selector alerts. Propose NotApplicable only with retained absence evidence and reviewed runtime corroboration; an actual action-selector alert invalidates this proposal and requires its title, action and Cancel behavior to be tested.",
           "minimumSeconds": 0,
           "responseLimitSeconds": null,
-          "restore": true
+          "restore": false
         }
       ]
     },
@@ -1420,38 +1409,16 @@
           "restore": false
         },
         {
-          "id": "repeat-17-selector-dialog",
+          "id": "repeat-17-confirm-action-selector-absence",
           "targets": [
-            "$instance-one.room.editschedulepage.editscheduledayselector",
-            "$instance-one.room.editschedulepage.editslot10time",
-            "$instance-one.room.editschedulepage.editslot1time",
-            "$instance-one.room.editschedulepage.editslot2time",
-            "$instance-one.room.editschedulepage.editslot3time",
-            "$instance-one.room.editschedulepage.editslot4time",
-            "$instance-one.room.editschedulepage.editslot5time",
-            "$instance-one.room.editschedulepage.editslot6time",
-            "$instance-one.room.editschedulepage.editslot7time",
-            "$instance-one.room.editschedulepage.editslot8time",
-            "$instance-one.room.editschedulepage.editslot9time",
-            "$instance-one.room.schedulepage.scheduleselector",
-            "$instance-two.room.editschedulepage.editscheduledayselector",
-            "$instance-two.room.editschedulepage.editslot10time",
-            "$instance-two.room.editschedulepage.editslot1time",
-            "$instance-two.room.editschedulepage.editslot2time",
-            "$instance-two.room.editschedulepage.editslot3time",
-            "$instance-two.room.editschedulepage.editslot4time",
-            "$instance-two.room.editschedulepage.editslot5time",
-            "$instance-two.room.editschedulepage.editslot6time",
-            "$instance-two.room.editschedulepage.editslot7time",
-            "$instance-two.room.editschedulepage.editslot8time",
-            "$instance-two.room.editschedulepage.editslot9time",
-            "$instance-two.room.schedulepage.scheduleselector"
+            "$instance-one.context.driver-action-selector-alerts",
+            "$instance-two.context.driver-action-selector-alerts"
           ],
-          "method": "combined",
-          "expectation": "Bind two actual gateway-driver instances on separate processors to the available physical hub; record both instance/package identities and the shared hub topology, then repeat on each instance: Inspect native selection dialog title, complete choices and cancel/back behavior. Cancel must close without change; each choice must perform only its intended selection action. Restore the original selected/editor/device state. Verify that expected shared-hub changes propagate correctly to both instances while local instance configuration and unrelated room settings remain unchanged. Restore and independently verify every affected shared setting and both local configurations. Two managed children alone are not two gateway instances; disclose the one-hub topology without claiming independent-hub validation. No clarification reply is required before executing this documented arrangement.",
+          "method": "absence",
+          "expectation": "For each of the two verified candidate gateway instances, inspect its platform and room UI definitions and runtime/configuration variants for action-selector alerts. Retain the exact shared-hub, separate-processor topology and candidate identities. Do not substitute selectorbutton selection pages for actionselector alerts. Propose NotApplicable only after absence is corroborated on both instances; any actual alert requires the applicable item-17 tests. Existing selector-button and paired state-isolation checks remain under items 9, 18 and 19. No clarification reply is required before executing this documented arrangement.",
           "minimumSeconds": 0,
           "responseLimitSeconds": null,
-          "restore": true
+          "restore": false
         },
         {
           "id": "repeat-18-subpage-completeness",

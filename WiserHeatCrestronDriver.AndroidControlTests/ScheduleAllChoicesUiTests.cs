@@ -55,6 +55,51 @@ public sealed partial class GatewayUiTests
 		throw new InvalidDataException ("The bounded selector search did not find its requested value.");
 		}
 
+	private async Task CancelEditorOptionsAsync (string check, string[] titles, string label, string[] allowed, string original,
+		Func<string, object, Task> record, CancellationToken token)
+		{
+		var session = _session!;
+		void Page (AndroidHierarchy hierarchy)
+			{
+			AndroidWorkflowSession.VerifyContext (session.Context);
+			var front = CrestronHomeExtensionPages.RequirePage (hierarchy, titles);
+			if (front.RequireUnique (Text (label)) != hierarchy.RequireUnique (Text (label)))
+				throw new InvalidOperationException ("The selector label is not unique on the front editor page.");
+			}
+		void Selection (AndroidHierarchy hierarchy)
+			{
+			AndroidWorkflowSession.VerifyContext (session.Context);
+			var front = CrestronHomeExtensionPages.RequireSelection (hierarchy, titles);
+			var options = CrestronHomeExtensionPages.ReadSelectionOptions (front);
+			if (options.Any (option => !allowed.Contains (option.Label, StringComparer.Ordinal) || option.Selected != (option.Label == original)))
+				throw new InvalidDataException ("The cancellation dialog differs from the expected choice state.");
+			var back = CrestronHomePages.Resource ("customdevice_selectionToolbar_backButton");
+			if (front.RequireUnique (back) != hierarchy.RequireUnique (back) || !front.RequireUnique (back).Enabled)
+				throw new InvalidOperationException ("The selector's own dismissal control is unavailable.");
+			}
+		async Task WaitFor (Action<AndroidHierarchy> guard)
+			{
+			using var deadline = CancellationTokenSource.CreateLinkedTokenSource (token);
+			deadline.CancelAfter (TimeSpan.FromSeconds (25));
+			while (true)
+				{
+				var hierarchy = await session.Device.CaptureAsync (deadline.Token);
+				try { guard (hierarchy); return; }
+				catch (InvalidOperationException) { await Task.Delay (250, deadline.Token); }
+				}
+			}
+		await record ("choice-dialog-open-intent", new { Label = label, Original = original });
+		await session.Device.TapAsync (Text (label), Page, token);
+		await WaitFor (Selection);
+		await session.CaptureAsync (check + ".dialog-cancel.open", Selection, token);
+		await record ("choice-dialog-cancel-intent", new { Label = label, ActionChosen = false,
+			Control = "customdevice_selectionToolbar_backButton", Scope = "The app's selector toolbar Back control dismisses without selecting a value." });
+		await session.Device.TapAsync (CrestronHomePages.Resource ("customdevice_selectionToolbar_backButton"), Selection, token);
+		await WaitFor (Page);
+		await session.CaptureAsync (check + ".dialog-cancel.closed", Page, token);
+		// Input failures propagate to the existing outer state-restoration path, never a repeated tap.
+		}
+
 	private async Task ExerciseAllEditorChoicesAsync (CrestronHomeExtensionNavigation pages, string check, RoomBinding binding,
 		JsonElement originalEditor, ScheduleHubSnapshot originalHub, int scheduleId, int slot, Action<string, string> ownDay,
 		Func<string, object, Task> record, Func<CancellationToken, Task<ScheduleHubSnapshot>> readHub, CancellationToken token)
@@ -67,6 +112,20 @@ public sealed partial class GatewayUiTests
 		string current = choices.Single (s => s.Trim () == initial);
 		string initialLabel = current;
 		string[] titles = [binding.PageTitle, "Schedule", "Edit Schedule"];
+		await RevealEditorNavigationAsync (pages, check + ".dialog-cancel.reveal", label, token);
+		var beforeCancel = await ReadRoomAsync (binding, token);
+		if (!JsonElement.DeepEquals (originalEditor, ScheduleEditorObservation.Editor (beforeCancel.PropertyValues)))
+			throw new InvalidDataException ("The editor changed before the cancellation check.");
+		await CancelEditorOptionsAsync (check, titles, label, choices, current, record, token);
+		var afterCancel = await ReadRoomAsync (binding, token);
+		var cancelHub = await readHub (token);
+		if (!JsonElement.DeepEquals (originalEditor, ScheduleEditorObservation.Editor (afterCancel.PropertyValues)) ||
+			!JsonElement.DeepEquals (beforeCancel.PropertyValues["controlStatus"], afterCancel.PropertyValues["controlStatus"]) ||
+			!JsonElement.DeepEquals (ScheduleEditorObservation.PersistentSchedules (originalHub.Schedules), ScheduleEditorObservation.PersistentSchedules (cancelHub.Schedules)) ||
+			!JsonElement.DeepEquals (ScheduleEditorObservation.RoomAssignments (originalHub.Domain), ScheduleEditorObservation.RoomAssignments (cancelHub.Domain)))
+			throw new InvalidDataException ("Dismissing the selector changed editor, command activity or persistent hub state.");
+		await record ("choice-dialog-cancel-observed", new { Slot = slot, Label = label, NoSelectionMade = true,
+			Editor = ScheduleEditorObservation.Editor (afterCancel.PropertyValues), Activity = afterCancel.PropertyValues["controlStatus"], Hub = cancelHub });
 		var selected = new HashSet<string> (StringComparer.Ordinal);
 		// Select every entry, including the initial value, then return to the captured starting value.
 		var sequence = choices.Concat (choices[^1] == initialLabel ? [] : new[] { initialLabel }).ToArray ();

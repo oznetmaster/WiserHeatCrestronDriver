@@ -90,7 +90,7 @@ This case has offline comparison tests and builds against the released tooling. 
 
 ## Complete day/time selections
 
-The [action-selector cases](ActionSelectorTesting.md) exercise all seven days and all 48 time choices for each supported row, with optional mandatory peer observation. They remain prepared source fixtures, not hardware acceptance. They reuse pending-state isolation and add independent hub comparisons after every choice.
+The [selector-button cases](ActionSelectorTesting.md) exercise all seven days and all 48 time choices for each supported row, with optional mandatory peer observation. They remain prepared source fixtures, not hardware acceptance. They reuse pending-state isolation and add independent hub comparisons after every choice. These controls map to item 9, not the distinct action-selector alerts in item 17.
 
 ## Remaining control scope
 

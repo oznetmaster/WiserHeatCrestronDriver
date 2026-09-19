@@ -43,6 +43,8 @@ Producer hashes and source digests are retained before execution and compared af
 
 ## Remaining acceptance work
 
+The draft coverage mapping now distinguishes selector buttons (item 9) from action-selector alerts (item 17). Inspection of both frozen-package UI definitions found twelve selector buttons and no action-selector alerts. Item 17 is now an absence-review proposal rather than a duplicate of the selector-button tests; runtime/configuration corroboration is still required. The [selector test guide](ActionSelectorTesting.md) records the distinction. This changes neither the frozen candidate nor the policy pinned to the ongoing endurance run, and does not mark any official checkbox passed.
+
 The [two-instance checks](TwoInstanceTesting.md) now include a read-only baseline and distinct Away/hot-water cases requiring peer observation. Offline regressions validate pinned identities, fresh shared-state convergence, configuration preservation and independent physical restoration despite peer failure. The project builds and the cases are discoverable; none has run against the processors. Hardware execution of room/schedule/pending-editor peer observations, the second UI, instance removal/session effects and full official multiple-instance acceptance remain outstanding.
 
 The control project now has explicit equal/different/absent saved-manual-target cases, with offline validation of their preconditions and restoration handling. They require separately selected physical runs after the current observation period; their existence does not expand the candidate's completed evidence above. A room must actually meet the selected starting condition, and the absent case retains its separate initialization permission and restoration limitation.
