@@ -125,7 +125,7 @@ public sealed class RoomTemperatureCycleTests
 						room["CurrentSetPoint"] = target;
 						// The real hub also reports FromBoost for a Manual override of an Auto schedule.
 						room["SetpointOrigin"] = boost || !manual ? "FromBoost" : "FromManualMode";
-						room["OverrideType"] = boost && Behavior != "wrong-boost-type" ? "Boost" : "Manual";
+						room["OverrideType"] = boost && Behavior == "wrong-boost-type" ? "None" : "Manual";
 						room["OverrideSetpoint"] = target;
 						room["OverrideTimeoutUnixTime"] = DateTimeOffset.UtcNow.AddMinutes (boost ? State.BoostSettings!.DurationMinutes + (Behavior == "wrong-boost-duration" ? 15 : 0) : 60).ToUnixTimeSeconds ();
 						if (manual && !boost)
@@ -605,9 +605,31 @@ public sealed class RoomTemperatureCycleTests
 		var observed = Edit (original, d =>
 			{
 				d["Room"]![0]!["CurrentSetPoint"] = 200;
-				d["Room"]![0]!["OverrideType"] = "Boost";
+				d["Room"]![0]!["OverrideType"] = "Manual";
+				d["Room"]![0]!["SetpointOrigin"] = "FromBoost";
 				d["Room"]![0]!["OverrideTimeoutUnixTime"] = now.AddMinutes (60).AddSeconds (seconds).ToUnixTimeSeconds ();
 			});
 		Assert.That (RoomBoostExpectation.Create (original).Matches (observed, now, now), Is.EqualTo (matches));
+		}
+	[TestCase ("Manual", "FromBoost", true)]
+	[TestCase ("Boost", "FromBoost", false)]
+	[TestCase ("None", "FromBoost", false)]
+	[TestCase ("Manual", "FromManualMode", false)]
+	public void BoostReadbackUsesObservedHubStateRatherThanRequestType (string type, string origin, bool matches)
+		{
+		// Non-identifying values from the retained second-generation HubR response.
+		// Its outgoing Boost request is already checked in PlatformTemperatureTests.
+		var original = Edit (Snapshot (), d => d["Room"]![0]!["CurrentSetPoint"] = 190) with { BoostSettings = new (4, 60) };
+		var observed = Edit (original, d =>
+			{
+				var room = d["Room"]![0]!;
+				room["CurrentSetPoint"] = 230;
+				room["OverrideSetpoint"] = 230;
+				room["OverrideType"] = type;
+				room["SetpointOrigin"] = origin;
+				room["OverrideTimeoutUnixTime"] = 1789747560L;
+			});
+		var input = new DateTimeOffset (2026, 9, 18, 15, 6, 50, TimeSpan.Zero);
+		Assert.That (RoomBoostExpectation.Create (original).Matches (observed, input, input.AddSeconds (1)), Is.EqualTo (matches));
 		}
 	}

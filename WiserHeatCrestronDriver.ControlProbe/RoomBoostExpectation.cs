@@ -26,8 +26,11 @@ public sealed record RoomBoostExpectation (int TargetTenthsCelsius, int Duration
 		{
 		if (inputStartedUtc == default || inputReturnedUtc < inputStartedUtc) return false;
 		var room = RoomTemperatureRestoration.Room (observed.Gateway.Hub, observed.RoomId);
+		// The tested HubR accepts Type=Boost in the command, but reports the active
+		// override as Manual with FromBoost origin. Request and state enums differ.
 		if (room.GetProperty ("CurrentSetPoint").GetInt32 () != TargetTenthsCelsius ||
-			!room.TryGetProperty ("OverrideType", out var kind) || kind.ValueKind != System.Text.Json.JsonValueKind.String || kind.GetString () != "Boost" ||
+			RoomTemperatureRestoration.Origin (room) != "FromBoost" ||
+			!room.TryGetProperty ("OverrideType", out var kind) || kind.ValueKind != System.Text.Json.JsonValueKind.String || kind.GetString () != "Manual" ||
 			!room.TryGetProperty ("OverrideTimeoutUnixTime", out var expiry) || !expiry.TryGetInt64 (out long seconds)) return false;
 		// Include the observed input interval and one minute of clock/timestamp granularity
 		// tolerance; this is not a precise response-time check.

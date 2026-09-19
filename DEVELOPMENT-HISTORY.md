@@ -1,5 +1,9 @@
 # Development and validation history
 
+## Boost response assertion corrected from retained hardware evidence - 19 September 2026
+
+Review of the original Fahrenheit Boost response found that the tested HubR reports a timed Manual override with FromBoost origin, even though the outgoing request type is Boost. The newly prepared acceptance helper and its synthetic responses now use that observed state representation. A regression uses the non-identifying target, expiry and input time from the retained response; mismatched origins and override types still fail. Configured increase, duration, identity and restoration checks remain in place. This corrects test tooling only; no installed driver, package or endurance process changes.
+
 ## Configured Boost acceptance - 19 September 2026
 
 The native room Boost fixture now reads the actual configured Celsius increase and duration and checks their physical result, in addition to the existing active/inactive feedback. The expected raw hub target is independent of the display units. It records the input interval and checks expiry against the configured minutes, allowing one minute for hub timestamp granularity and clock tolerance. Missing settings or insufficient headroom below the thermostat limit stop the case before input. A wrong observed increase or duration fails the test while the original room policy is still independently restored, without replaying the input. These are test-tooling changes only; the frozen driver and running endurance collector are unchanged. Hardware execution of the stronger case remains pending.
