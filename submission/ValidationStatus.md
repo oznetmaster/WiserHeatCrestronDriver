@@ -43,6 +43,8 @@ Producer hashes and source digests are retained before execution and compared af
 
 ## Remaining acceptance work
 
+The [native thermostat boundary cases](NativeThermostatBoundaries.md) now reach the supported minimum and maximum through confirmed UI steps and independently restore the original policy. Offline checks cover both units and Auto/Manual states, full-span/endpoint starts, uncertain later input and failed evidence recording. Hardware execution is still pending; the earlier one-step and schedule-editor tests do not establish this native-control scope.
+
 The [gateway feature configuration cycle](GatewayFeatureConfiguration.md) is now executable through the reserved installed-test workflow. It exercises all four Away/hot-water visibility combinations and restores the original flags, with independent physical-policy preservation checks. Synthetic recovery tests passed; the rendered hardware cases remain outstanding. It changes test tooling only, not the frozen candidate.
 
 The draft coverage mapping now distinguishes selector buttons (item 9) from action-selector alerts (item 17). Inspection of both frozen-package UI definitions found twelve selector buttons and no action-selector alerts. Four retained gateway/room runtime snapshots structurally match the package; the [coverage review](CoverageReview.md) records that corroboration and its one-processor/configuration limits. Item 17 remains an absence-review proposal rather than a duplicate of the selector-button tests. This changes neither the frozen candidate nor the policy pinned to the ongoing endurance run, and does not mark any official checkbox passed.

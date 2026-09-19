@@ -25,6 +25,7 @@ public sealed partial class GatewayUiTests
 			get; init;
 			}
 		public bool AllowNativeThermostatOffControl { get; init; }
+		public bool AllowNativeThermostatBoundaryControl { get; init; }
 		}
 
 	[TestCase (false), TestCase (true), Category ("LiveControl")]
@@ -33,10 +34,13 @@ public sealed partial class GatewayUiTests
 	[Test, Category ("LiveControl")]
 	public Task NativeThermostatOffResumeRestoresPolicy () => RunNativeControlAsync (boost: false, off: true);
 
-	private async Task RunNativeControlAsync (bool boost, bool off)
+	[TestCase (false), TestCase (true), Category ("LiveControl")]
+	public Task NativeThermostatBoundaryRestoresPolicy (bool maximum) => RunNativeControlAsync (boost: false, off: false, maximum);
+
+	private async Task RunNativeControlAsync (bool boost, bool off, bool? maximum = null)
 		{
 		Assert.That (_nameRestored && _roomStatePreserved, Is.True, "Earlier restoration must be reconciled before more controls.");
-		if (off ? !_settings!.AllowNativeThermostatOffControl : !_settings!.AllowNativeThermostatControl)
+		if (maximum.HasValue ? !_settings!.AllowNativeThermostatBoundaryControl : off ? !_settings!.AllowNativeThermostatOffControl : !_settings!.AllowNativeThermostatControl)
 			Assert.Ignore ("Explicitly enable the selected native thermostat control scope.");
 		if (_settings.ControlRooms.Length != 1 || string.IsNullOrWhiteSpace (_settings.ControlHubSettingsPath) || !Path.IsPathFullyQualified (_settings.ControlHubSettingsPath))
 			throw new InvalidDataException ("One explicit room and absolute private hub settings are required.");
@@ -48,13 +52,14 @@ public sealed partial class GatewayUiTests
 		http.DefaultRequestHeaders.Add ("SECRET", hub.Secret);
 		var control = _settings.ControlRooms.Single ();
 		var binding = _settings.Rooms.Single (r => r.DeviceId == control.DeviceId);
-		using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (15));
+		using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (maximum.HasValue ? 45 : 15));
 		var original = await ReadRoomAsync (binding, timeout.Token);
-		string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + (off ? ".native-off" : boost ? ".native-boost" : ".native-setpoint");
+		string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + (maximum.HasValue ? maximum.Value ? ".native-maximum" : ".native-minimum" : off ? ".native-off" : boost ? ".native-boost" : ".native-setpoint");
 		await _navigation!.InspectRoomExtensionPagesAsync (check, binding.RoomName, original.Name!, binding.PageTitle, async (_, token) =>
 			{
-				var session = new NativeTemperatureSession (this, hub, http, binding, control, original, check);
-				var result = off ? await RoomTemperatureCycle.RunOffAsync (session, TimeSpan.FromMinutes (3), token)
+				var session = new NativeTemperatureSession (this, hub, http, binding, control, original, check, maximum.HasValue);
+				var result = maximum.HasValue ? await RoomTemperatureCycle.RunBoundaryAsync (session, maximum.Value, TimeSpan.FromMinutes (3), token)
+					: off ? await RoomTemperatureCycle.RunOffAsync (session, TimeSpan.FromMinutes (3), token)
 					: await RoomTemperatureCycle.RunAsync (session, boost, TimeSpan.FromMinutes (3), token);
 				_roomStatePreserved = result.RestorationConfirmed;
 				await session.RecordAsync ("result", result);
@@ -64,7 +69,7 @@ public sealed partial class GatewayUiTests
 		}
 
 	private sealed class NativeTemperatureSession (GatewayUiTests fixture, HubSettings hub, HttpClient http,
-		RoomBinding binding, ControlRoomBinding control, DeviceInfo original, string check) : IRoomTemperatureSession
+		RoomBinding binding, ControlRoomBinding control, DeviceInfo original, string check, bool boundary = false) : IRoomTemperatureSession
 		{
 		private AndroidWorkflowSession Session => fixture._session!;
 		private RoomTemperatureSnapshot? _original;
@@ -188,7 +193,7 @@ public sealed partial class GatewayUiTests
 				}
 			if (confirmed)
 				_inputResponseTimer.Stop ();
-			if (phase == "restored" || phase.StartsWith ("input-", StringComparison.Ordinal) && phase.EndsWith ("-observed", StringComparison.Ordinal))
+			if (phase is "restored" or "boundary-observed" || phase.StartsWith ("input-", StringComparison.Ordinal) && phase.EndsWith ("-observed", StringComparison.Ordinal))
 				{
 				var state = serialized.GetProperty ("Snapshot").Deserialize<RoomTemperatureSnapshot> ()!;
 				using var timeout = new CancellationTokenSource (TimeSpan.FromSeconds (25));
@@ -201,7 +206,8 @@ public sealed partial class GatewayUiTests
 			}
 		public async Task InputAsync (RoomTemperatureAction action, CancellationToken token)
 			{
-			if (_original == null || _plan == null || _intent == null || _inputs >= 2)
+			if (_original == null || _plan == null || _intent == null || _inputs >= (boundary ? 50 : 2) ||
+				boundary && (!fixture._settings!.AllowNativeThermostatBoundaryControl || action is not (RoomTemperatureAction.Raise or RoomTemperatureAction.Lower)))
 				throw new InvalidOperationException ("No fresh recorded native control intent is available.");
 			var current = await ReadAsync (token);
 			RoomTemperatureRestoration.RequireGuarded (_plan, _original.Gateway, current.Gateway);

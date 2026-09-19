@@ -60,6 +60,7 @@ public sealed class RoomTemperatureCycleTests
 		public RoomTemperatureSnapshot State = Snapshot (manual, absent);
 		private JsonElement? _originalRoom;
 		public List<RoomTemperatureAction> Inputs = [];
+		public List<int> Targets = [];
 		public List<int> Restores = [];
 		public List<string> Records = [];
 		public string? Behavior;
@@ -178,7 +179,8 @@ public sealed class RoomTemperatureCycleTests
 						RefreshUtc = State.Gateway.RefreshUtc.AddSeconds (-1)
 						}
 					};
-			if (Behavior == "lost-input" && Inputs.Count == 1)
+			Targets.Add (RoomTemperatureRestoration.Room (State.Gateway.Hub, 9).GetProperty ("CurrentSetPoint").GetInt32 ());
+			if (Behavior == "lost-input" && Inputs.Count == 1 || Behavior == "lost-later-input" && Inputs.Count == 3)
 				throw new IOException ("input acknowledgement lost");
 			CancelAfterInput?.Cancel ();
 			return Task.CompletedTask;
@@ -203,6 +205,89 @@ public sealed class RoomTemperatureCycleTests
 			}
 		}
 	private static Task<RoomTemperatureResult> Run (Session session, bool boost = false) => RoomTemperatureCycle.RunAsync (session, boost, TimeSpan.FromMilliseconds (250), CancellationToken.None);
+	[TestCase (false, false, false), TestCase (false, false, true), TestCase (false, true, false), TestCase (false, true, true)]
+	[TestCase (true, false, false), TestCase (true, false, true), TestCase (true, true, false), TestCase (true, true, true)]
+	public async Task BoundaryWalkUsesOnlyConfirmedHalfDegreeInputsAndRestoresPolicy (bool manual, bool fahrenheit, bool maximum)
+		{
+		var session = new Session (manual);
+		if (fahrenheit)
+			session.State = session.State with { TemperatureUnits = "Fahrenheit", HomeTarget = 64.4 };
+		var original = session.State;
+		var result = await RoomTemperatureCycle.RunBoundaryAsync (session, maximum, TimeSpan.FromSeconds (2), CancellationToken.None);
+		Assert.That (result.Passed && result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Targets.Last (), Is.EqualTo (maximum ? 300 : 50));
+		Assert.That (session.Targets, Has.All.InRange (50, 300));
+		Assert.That (session.Inputs, Has.All.EqualTo (maximum ? RoomTemperatureAction.Raise : RoomTemperatureAction.Lower));
+		Assert.That (session.Inputs.Count, Is.EqualTo (maximum ? 24 : 26));
+		Assert.That (session.Records, Does.Contain ("boundary-observed"));
+		Assert.That (session.Records.Count (p => p.StartsWith ("input-", StringComparison.Ordinal) && p.EndsWith ("-observed", StringComparison.Ordinal)), Is.EqualTo (session.Inputs.Count));
+		RoomTemperatureRestoration.RequireRestored (RoomTemperatureRestoration.Capture (RoomTemperatureRestoration.Room (original.Gateway.Hub, 9)), RoomTemperatureRestoration.Room (session.State.Gateway.Hub, 9));
+		}
+	[TestCase (false, false), TestCase (false, true), TestCase (true, false), TestCase (true, true)]
+	public async Task BoundaryStartingAtLimitUsesInwardStepOrFullSpanWithoutOutOfRangeInput (bool maximum, bool opposite)
+		{
+		int start = maximum != opposite ? 300 : 50;
+		var session = new Session ();
+		session.State = Edit (session.State, d =>
+			{
+			d["Room"]![0]!["CurrentSetPoint"] = start;
+			d["Room"]![0]!["ScheduledSetPoint"] = start;
+			}) with { HomeTarget = start / 10d };
+		var result = await RoomTemperatureCycle.RunBoundaryAsync (session, maximum, TimeSpan.FromSeconds (2), CancellationToken.None);
+		Assert.That (result.Passed && result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs.Count, Is.EqualTo (opposite ? 50 : 2));
+		Assert.That (session.Targets, Has.All.InRange (50, 300));
+		Assert.That (session.Targets.Last (), Is.EqualTo (maximum ? 300 : 50));
+		Assert.That (session.State.HomeTarget, Is.EqualTo (start / 10d));
+		}
+	[TestCase (false), TestCase (true)]
+	public async Task UncertainThirdBoundaryInputStopsSequenceAndRestoresWithoutReplay (bool maximum)
+		{
+		var session = new Session { Behavior = "lost-later-input" };
+		var result = await RoomTemperatureCycle.RunBoundaryAsync (session, maximum, TimeSpan.FromSeconds (2), CancellationToken.None);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs.Count, Is.EqualTo (3));
+		Assert.That (session.Restores, Is.EqualTo (new[] { 0 }));
+		Assert.That (session.Records, Does.Not.Contain ("boundary-observed"));
+		Assert.That (session.State.HomeTarget, Is.EqualTo (18));
+		}
+	[Test]
+	public async Task BoundaryRecordFailureStillRestoresButDoesNotPass ()
+		{
+		var session = new Session { FailRecord = "boundary-observed" };
+		var result = await RoomTemperatureCycle.RunBoundaryAsync (session, true, TimeSpan.FromSeconds (2), CancellationToken.None);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs.Count, Is.EqualTo (24));
+		Assert.That (session.State.HomeTarget, Is.EqualTo (18));
+		}
+	[TestCase (false), TestCase (true)]
+	public async Task NextIntentWriteFailureRestoresLastDeliveredInput (bool boundary)
+		{
+		var session = new Session { FailRecord = boundary ? "input-4-intent" : "input-2-intent" };
+		var result = boundary
+			? await RoomTemperatureCycle.RunBoundaryAsync (session, true, TimeSpan.FromSeconds (2), CancellationToken.None)
+			: await RoomTemperatureCycle.RunAsync (session, false, TimeSpan.FromSeconds (2), CancellationToken.None);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Inputs.Count, Is.EqualTo (boundary ? 3 : 1));
+		Assert.That (session.Restores, Is.EqualTo (new[] { 0 }));
+		Assert.That (session.State.HomeTarget, Is.EqualTo (18));
+		}
+	[Test]
+	public async Task BoundaryOffGridStartingTargetIsRejectedBeforeInput ()
+		{
+		var session = new Session ();
+		session.State = Edit (session.State, d =>
+			{
+			d["Room"]![0]!["CurrentSetPoint"] = 182;
+			d["Room"]![0]!["ScheduledSetPoint"] = 182;
+			}) with { HomeTarget = 18.2 };
+		var result = await RoomTemperatureCycle.RunBoundaryAsync (session, true, TimeSpan.FromSeconds (2), CancellationToken.None);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (session.Inputs, Is.Empty);
+		}
 	[TestCase (false, false), TestCase (false, true), TestCase (true, false), TestCase (true, true)]
 	public async Task BothInputsRestoreOriginalPolicyAndTarget (bool manual, bool boost)
 		{

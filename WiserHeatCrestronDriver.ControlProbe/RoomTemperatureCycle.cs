@@ -54,7 +54,9 @@ public static class RoomTemperatureCycle
 		RunCoreAsync (session, boost, false, timeout, token);
 	public static Task<RoomTemperatureResult> RunOffAsync (IRoomTemperatureSession session, TimeSpan timeout, CancellationToken token) =>
 		RunCoreAsync (session, false, true, timeout, token);
-	private static async Task<RoomTemperatureResult> RunCoreAsync (IRoomTemperatureSession session, bool boost, bool off, TimeSpan timeout, CancellationToken token)
+	public static Task<RoomTemperatureResult> RunBoundaryAsync (IRoomTemperatureSession session, bool maximum, TimeSpan timeout, CancellationToken token) =>
+		RunCoreAsync (session, false, false, timeout, token, maximum);
+	private static async Task<RoomTemperatureResult> RunCoreAsync (IRoomTemperatureSession session, bool boost, bool off, TimeSpan timeout, CancellationToken token, bool? maximum = null)
 		{
 		if (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromMinutes (3))
 			throw new ArgumentOutOfRangeException (nameof (timeout));
@@ -63,7 +65,6 @@ public static class RoomTemperatureCycle
 		int submitted = 0, commands = 0;
 		bool attempted = false, passed = false, restored = true;
 		string detail = "Preflight failed before any room control input.";
-		Func<RoomTemperatureSnapshot, bool>? requested = null;
 		Func<RoomTemperatureSnapshot, bool>? delivered = null;
 		DateTimeOffset requestedAfter = default;
 		var elapsed = new Stopwatch ();
@@ -102,14 +103,14 @@ public static class RoomTemperatureCycle
 				}
 			}
 		using var deadline = CancellationTokenSource.CreateLinkedTokenSource (token);
-		deadline.CancelAfter (timeout);
+		deadline.CancelAfter (maximum.HasValue ? TimeSpan.FromMinutes (30) : timeout);
 		try
 			{
 			original = await session.ReadAsync (deadline.Token);
-			await session.RecordAsync ("preflight", new { Snapshot = original, Boost = boost, Off = off });
+			await session.RecordAsync ("preflight", new { Snapshot = original, Boost = boost, Off = off, MaximumBoundary = maximum });
 			plan = RoomTemperatureRestoration.Capture (Room (original));
 			if (!Guid.TryParseExact (original.Activity.Epoch, "N", out _) || original.Activity.Pending != 0 ||
-				original.Activity.Completed < 0 || original.Activity.Completed > long.MaxValue - 2 || !Restored (plan, original))
+				original.Activity.Completed < 0 || original.Activity.Completed > long.MaxValue - (maximum.HasValue ? 50 : 2) || !Restored (plan, original))
 				throw new InvalidDataException ("Idle room, hub and UI state must agree before input.");
 			Guard (original);
 			await session.RecordAsync ("original", new
@@ -129,17 +130,28 @@ public static class RoomTemperatureCycle
 			RoomTemperatureAction[] actions = off ? [RoomTemperatureAction.PrepareOff, RoomTemperatureAction.ResumeHeating]
 				: boost ? [RoomTemperatureAction.BoostOn, RoomTemperatureAction.BoostOff]
 				: delta > 0 ? [RoomTemperatureAction.Raise, RoomTemperatureAction.Lower] : [RoomTemperatureAction.Lower, RoomTemperatureAction.Raise];
+			if (maximum.HasValue)
+				{
+				if (start % 5 != 0)
+					throw new InvalidDataException ("Boundary tests require a target on the supported half-degree grid.");
+				int boundary = maximum.Value ? 300 : 50;
+				var direction = maximum.Value ? RoomTemperatureAction.Raise : RoomTemperatureAction.Lower;
+				actions = start == boundary
+					? [maximum.Value ? RoomTemperatureAction.Lower : RoomTemperatureAction.Raise, direction]
+					: Enumerable.Repeat (direction, Math.Abs (boundary - start) / 5).ToArray ();
+				}
 			foreach (var action in actions)
 				{
-				int target = off ? submitted == 0 ? -200 : 50 : submitted == 0 ? start + delta : start;
-				delivered = boost
+				int target = maximum.HasValue ? Room (current).GetProperty ("CurrentSetPoint").GetInt32 () + (action == RoomTemperatureAction.Raise ? 5 : -5)
+					: off ? submitted == 0 ? -200 : 50 : submitted == 0 ? start + delta : start;
+				Func<RoomTemperatureSnapshot, bool> nextDelivered = boost
 					? action == RoomTemperatureAction.BoostOn
 						? value => RoomTemperatureRestoration.Origin (Room (value)) == "FromBoost" && Room (value).GetProperty ("OverrideTimeoutUnixTime").GetInt64 () > DateTimeOffset.UtcNow.ToUnixTimeSeconds ()
 						: value => Restored (plan, value, verifyUi: false)
 					: value => Room (value).GetProperty ("CurrentSetPoint").GetInt32 () == target &&
 						(plan.Scheduled ? Room (value).GetProperty ("OverrideType").GetString () == "Manual"
 							: RoomTemperatureRestoration.Origin (Room (value)) == "FromManualMode" && ScheduleObservation.ManualTarget (Room (value)) == target);
-				requested = value => Agrees (value) && delivered (value);
+				bool Requested (RoomTemperatureSnapshot value) => Agrees (value) && nextDelivered (value);
 				await session.RecordAsync ("input-" + (submitted + 1) + "-intent", new
 					{
 					Action = action,
@@ -147,6 +159,8 @@ public static class RoomTemperatureCycle
 					Snapshot = current
 					});
 				deadline.Token.ThrowIfCancellationRequested ();
+				// Cleanup must track the last attempted input, not a next intent whose journal write failed.
+				delivered = nextDelivered;
 				requestedAfter = current.Gateway.RefreshUtc;
 				submitted++;
 				if (action != RoomTemperatureAction.PrepareOff)
@@ -154,13 +168,22 @@ public static class RoomTemperatureCycle
 				attempted = true;
 				restored = false;
 				elapsed.Restart ();
-				await session.InputAsync (action, deadline.Token);
-				current = await Wait (requested, requestedAfter, deadline.Token, firstMatchPhase: "input-" + submitted + "-first-match");
+				using var inputDeadline = CancellationTokenSource.CreateLinkedTokenSource (deadline.Token);
+				inputDeadline.CancelAfter (timeout);
+				await session.InputAsync (action, inputDeadline.Token);
+				current = await Wait (Requested, requestedAfter, inputDeadline.Token, firstMatchPhase: "input-" + submitted + "-first-match");
 				await session.RecordAsync ("input-" + submitted + "-observed", new
 					{
 					Snapshot = current,
 					Seconds = elapsed.Elapsed.TotalSeconds
 					});
+				}
+			if (maximum.HasValue)
+				{
+				int boundary = maximum.Value ? 300 : 50;
+				if (Room (current).GetProperty ("CurrentSetPoint").GetInt32 () != boundary || !Agrees (current))
+					throw new InvalidDataException ("The requested thermostat boundary was not observed.");
+				await session.RecordAsync ("boundary-observed", new { Snapshot = current, RawBoundary = boundary, Inputs = submitted });
 				}
 			passed = true;
 			}
