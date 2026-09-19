@@ -211,6 +211,21 @@ public sealed partial class PlatformDiscoveryTests
 	[TestCase ("Fahrenheit", 86, 300)]
 	public async Task TemperatureDisplay_NativeCommandWritesTheEquivalentCelsiusValue (string units, double input, int expected)
 		{
+		await WriteNativeTemperatureCommandAsync (units, input, expected);
+		}
+
+	[TestCase (66.2, 0.9, 22, 300)]
+	[TestCase (86, -0.9, 50, 50)]
+	public async Task TemperatureDisplay_AccumulatedFahrenheitStepsReachTheBoundary (double start, double step, int count, int expected)
+		{
+		double input = start;
+		for (int index = 0; index < count; index++)
+			input += step;
+		await WriteNativeTemperatureCommandAsync ("Fahrenheit", input, expected);
+		}
+
+	private async Task WriteNativeTemperatureCommandAsync (string units, double input, int expected)
+		{
 		Set ("_temperatureUnits", units);
 		_transport.AllowRoomCommands = true;
 		await Refresh ("""[{"id":4,"Name":"Synthetic","Mode":"Manual","CurrentSetPoint":190}]""");
@@ -233,6 +248,8 @@ public sealed partial class PlatformDiscoveryTests
 	[TestCase ("Celsius", 4.9)]
 	[TestCase ("Fahrenheit", 86.1)]
 	[TestCase ("Fahrenheit", 40.9)]
+	[TestCase ("Fahrenheit", 86.00001)]
+	[TestCase ("Fahrenheit", 40.99999)]
 	[TestCase ("Fahrenheit", double.NaN)]
 	[TestCase ("Celsius", double.PositiveInfinity)]
 	public async Task TemperatureDisplay_InvalidNativeCommandDoesNotWriteOrChangeFeedback (string units, double input)

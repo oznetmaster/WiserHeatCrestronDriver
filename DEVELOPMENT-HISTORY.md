@@ -1,12 +1,20 @@
 # Development and validation history
 
+## Fahrenheit endpoint roundoff and candidate 1.3.13 preparation - 19 September 2026
+
+Candidate 1.3.12 passed the Fahrenheit minimum exercise with 28 accepted inputs and verified restoration. The maximum exercise accepted 21 inputs to 29.5 C but did not accept the final increase. The test failed and retained its reservation. Independent reconciliation confirmed the original Auto mode and saved manual target, cleared only the temporary override, restored Celsius and removed the owned child. The failed test remains failed.
+
+Offline SDK-harness tests reproduce a numerical defect: accumulating the declared 0.9 F increment can produce 86.00000000000013 F, which strict bounds rejected before accepting the command. A similarly accumulated lower endpoint was rejected too. Validation now permits only a tiny floating-point tolerance before rounding to the supported half-degree grid. Both regression cases failed before and passed after; all 16 focused boundary/invalid-input cases and 197 desktop driver cases passed, with three real-hub cases skipped. The net472 build passed. The exact incoming value from the failed hardware run was not logged, so the numerical cause remains a hypothesis for that particular press until the updated package is tested.
+
+The proposed automatic restart of endurance has been held following change-impact review. The official form does not explicitly require a new period after every code change. Preserve the completed 1.3.11 record with its true candidate identity, disclose the command-path changes and repeat the affected functionality on the final package. This does not claim that the updated package completed 24 hours, or that Crestron will accept the evidence. No new endurance period has started.
+
 ## Auto-mode fallback fix and candidate 1.3.12 preparation - 19 September 2026
 
 The 1.3.11 Fahrenheit endpoint run failed after eleven downward inputs because Upstairs Hall changed from Auto to Manual. The room's original Auto policy, saved manual target and gateway Celsius configuration were independently restored; the owned test child was removed and reservations released. The failed evidence remains failed.
 
 Offline tests reproduced a driver defect: a temporarily empty global schedule index caused a setpoint request to switch an Auto room to Manual. The fix uses the room's control mode and assigned schedule, validates the schedule before cancelling an override, and checks command acceptance. Three regression cases failed before the fix and passed afterward. The full desktop driver suite passed 193 cases, with three real-hub cases deliberately skipped; the net472 build passed. The hardware failure is consistent with this path, but its exact refresh interleaving was not instrumented.
 
-This is a production change. Candidate 1.3.12 requires new processor acceptance and endurance evidence. The completed 1.3.11 endurance record is retained for that package only. This preparation is not a published release or a completed submission.
+This is a production change requiring new processor acceptance. An automatic new endurance period was originally proposed, then held following the change-impact review above. The completed 1.3.11 record retains its original candidate identity. This preparation is not a published release or a completed submission.
 
 ## Completed post-endurance and paired-instance checks - 19 September 2026
 

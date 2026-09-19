@@ -10,6 +10,7 @@ internal static class TemperatureDisplay
 	internal const double MinimumCelsius = 5;
 	internal const double MaximumCelsius = 30;
 	internal const double StepCelsius = 0.5;
+	private const double BoundaryToleranceCelsius = 1e-9;
 
 	internal static bool IsFahrenheit (string? units) => string.Equals (units, "Fahrenheit", StringComparison.OrdinalIgnoreCase);
 	internal static string NormalizeUnits (string? units) => IsFahrenheit (units) ? "Fahrenheit" : "Celsius";
@@ -20,7 +21,9 @@ internal static class TemperatureDisplay
 	internal static bool TrySetpoint (double displayed, string? units, out double celsius)
 		{
 		celsius = IsFahrenheit (units) ? (displayed - 32) * 5 / 9 : displayed;
-		if (double.IsNaN (celsius) || double.IsInfinity (celsius) || celsius < MinimumCelsius || celsius > MaximumCelsius)
+		// Repeated UI steps can accumulate binary roundoff at an exact endpoint.
+		// Accept only numerical noise before rounding to the supported half-degree grid.
+		if (double.IsNaN (celsius) || double.IsInfinity (celsius) || celsius < MinimumCelsius - BoundaryToleranceCelsius || celsius > MaximumCelsius + BoundaryToleranceCelsius)
 			return false;
 		celsius = Math.Round (celsius / StepCelsius, MidpointRounding.AwayFromZero) * StepCelsius;
 		return true;

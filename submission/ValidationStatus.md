@@ -2,7 +2,9 @@
 
 Updated 19 September 2026. The submission is not complete and has not been sent to Crestron. The results below apply to the frozen candidate; they do not imply certification or acceptance by Crestron.
 
-**Candidate superseded:** the later Fahrenheit endpoint run exposed an unintended Auto-to-Manual transition. Restoration and cleanup are complete. A reproduced driver fallback defect is fixed locally, and candidate **1.3.12** is being prepared. The observations below remain historical evidence for **1.3.11**, not acceptance or endurance evidence for the corrected package. See [development history](../DEVELOPMENT-HISTORY.md) for the failure, recovery and offline regression results.
+**Candidate revisions:** the 1.3.11 Fahrenheit run exposed an unintended Auto-to-Manual transition, fixed in 1.3.12. That candidate passed the lower endpoint but its last upper-endpoint input was not accepted. Original household settings, Celsius configuration and owned-child cleanup are restored. Offline tests reproduced an accumulated-rounding boundary rejection, now fixed locally; candidate **1.3.13** is being prepared for hardware retesting. The exact input from the failed hardware press was not logged. See [development history](../DEVELOPMENT-HISTORY.md) for evidence and limits.
+
+The observations below retain their actual **1.3.11** identity. A fresh endurance period is not automatic for these isolated command-path changes: retain the completed record, disclose the differences and assess it together with final-candidate regression and functionality. This does not assert that the final package itself ran for 24 hours or that Crestron will accept the assessment. No new endurance run has started.
 
 ## Candidate and test environment
 
