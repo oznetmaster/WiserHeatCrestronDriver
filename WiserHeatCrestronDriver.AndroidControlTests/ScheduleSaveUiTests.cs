@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Neil Colvin.
 // Licensed under the MIT License with Commons Clause. See LICENSE in the repository root.
 
+using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http;
 using System.Text;
@@ -217,11 +218,33 @@ public sealed partial class GatewayUiTests
 				await Session.CaptureAsync (check + "." + phase + ".before-save", GuardSave, cancellation);
 				await RecordAsync (phase + "-button-input", new { Expected = operation.After });
 				_saveAttempts++;
+				var tapRequestedUtc = DateTimeOffset.UtcNow;
+				long responseStarted = Stopwatch.GetTimestamp ();
 				await Session.Device.TapAsync (Text (operation.AllDays ? "Save All" : "Save Day"), GuardSave, cancellation);
+				var tapReturnedUtc = DateTimeOffset.UtcNow;
+				double tapReturnedMilliseconds = Stopwatch.GetElapsedTime (responseStarted).TotalMilliseconds;
 				var saved = await ObserveDriverAsync (operation.ScheduleId, null, cancellation);
+				var driverObservedUtc = DateTimeOffset.UtcNow;
+				double driverObservedMilliseconds = Stopwatch.GetElapsedTime (responseStarted).TotalMilliseconds;
 				if (!string.IsNullOrEmpty (saved.PropertyValues["editScheduleError"].GetString ()))
 					throw new InvalidDataException ("The driver reported a schedule save error.");
-				ScheduleEditorObservation.RequireMatchesHub (ScheduleEditorObservation.Editor (saved.PropertyValues), (await ReadAsync (cancellation)).Schedules, operation.ScheduleId);
+				var physical = await ReadAsync (cancellation);
+				var hubObservedUtc = DateTimeOffset.UtcNow;
+				double hubObservedMilliseconds = Stopwatch.GetElapsedTime (responseStarted).TotalMilliseconds;
+				var observedSchedule = ScheduleEditorObservation.PersistentSchedules (physical.Schedules).GetProperty ("Heating")
+					.EnumerateArray ().Single (schedule => schedule.GetProperty ("id").GetInt32 () == operation.ScheduleId);
+				bool matchesExpectedSchedule = JsonElement.DeepEquals (observedSchedule, operation.After);
+				await RecordAsync (phase + "-response", new
+					{
+					TapRequestedUtc = tapRequestedUtc, TapReturnedUtc = tapReturnedUtc, DriverObservedUtc = driverObservedUtc, HubObservedUtc = hubObservedUtc,
+					TapReturnedMilliseconds = tapReturnedMilliseconds, DriverObservedMilliseconds = driverObservedMilliseconds, HubObservedMilliseconds = hubObservedMilliseconds,
+					TimingScope = "Conservative tap-helper-start to completed observations; includes hierarchy, transport and polling overhead, excludes later screenshots and navigation.",
+					PromptResponseAccepted = false, MatchesExpectedSchedule = matchesExpectedSchedule,
+					DriverActivity = Activity (saved), ExpectedSchedule = operation.After, ObservedSchedule = observedSchedule
+					});
+				if (!matchesExpectedSchedule)
+					throw new InvalidDataException ("The independently observed schedule differs from the completed save.");
+				ScheduleEditorObservation.RequireMatchesHub (ScheduleEditorObservation.Editor (saved.PropertyValues), physical.Schedules, operation.ScheduleId);
 				await Session.CaptureAsync (check + "." + phase + ".saved", GuardSave, cancellation);
 				await pages.ClosePageAsync (cancellation);
 				await pages.OpenPageAsync (Text ("Edit"), "Edit Schedule", Text ("Cancel"), cancellation);
