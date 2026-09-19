@@ -738,14 +738,22 @@ public sealed partial class PlatformDiscoveryTests
 		Assert.That (room.GetState ().Definition.Properties.Keys, Does.Contain ("controlStatus"));
 		_transport.HoldNextDomain = true;
 		room.DisableSchedule ();
-		await TestSupport.Complete (_transport.Entered.Task);
-		Assert.That (room.ControlStatus, Does.Contain ("\"Completed\":0,\"Pending\":1"));
-		int commands = _transport.RoomCommands;
-		room.EnableSchedule ();
-		room.SetSelectedScheduleId ("7");
-		Assert.That (_transport.RoomCommands, Is.EqualTo (commands), "A busy room must reject other commands, including schedule selection.");
-		_transport.Release.TrySetResult (true);
-		await TestSupport.Complete (WaitForCompletion (room));
+		try
+			{
+			await TestSupport.Complete (_transport.Entered.Task);
+			Assert.That (room.ControlStatus, Does.Contain ("\"Completed\":0,\"Pending\":1"));
+			AssertRoomScheduleControls (room, busy: true, automatic: true);
+			int commands = _transport.RoomCommands;
+			room.EnableSchedule ();
+			room.SetSelectedScheduleId ("7");
+			Assert.That (_transport.RoomCommands, Is.EqualTo (commands), "A busy room must reject other commands, including schedule selection.");
+			}
+		finally
+			{
+			_transport.Release.TrySetResult (true);
+			}
+		await TestSupport.Complete (WaitForRoomControls (room, completed: 1, automatic: true));
+		AssertRoomScheduleControls (room, busy: false, automatic: true);
 		Assert.That (room.DeviceLabel, Is.EqualTo ("Office"));
 		Assert.That (room.ControlStatus, Does.Contain ("\"Completed\":1,\"Pending\":0"));
 		}
@@ -774,6 +782,9 @@ public sealed partial class PlatformDiscoveryTests
 		internal string HeatingSchedules;
 		internal string HotWaterState;
 		internal bool AllowRoomCommands;
+		internal bool HoldNextRoomWrite;
+		internal bool RejectRoomWrite;
+		internal bool ThrowRoomWrite;
 		internal int RoomCommands;
 		internal string LastRoomWrite;
 		internal bool AllowAwayCommands;
@@ -829,6 +840,16 @@ public sealed partial class PlatformDiscoveryTests
 				{
 				RoomCommands++;
 				LastRoomWrite = await request.Content.ReadAsStringAsync ();
+				if (HoldNextRoomWrite)
+					{
+					HoldNextRoomWrite = false;
+					Entered.TrySetResult (true);
+					await Release.Task;
+					}
+				if (ThrowRoomWrite)
+					throw new HttpRequestException ("Synthetic room transport failure.");
+				if (RejectRoomWrite)
+					return new HttpResponseMessage (HttpStatusCode.BadRequest) { Content = new StringContent ("{}") };
 				Rooms = Rooms.Replace ("Before command", "Hub confirmed");
 				return new HttpResponseMessage (HttpStatusCode.NoContent);
 				}

@@ -1,5 +1,9 @@
 # Development and validation history
 
+## Room command failure and busy-state coverage - 19 September 2026
+
+The desktop/processor fixture sources now exercise rejected HTTP writes, transport exceptions and failed confirmation reads through the room's public commands and the real library with a synthetic HTTP transport. A burst of mode, boost, temperature and schedule-selection inputs is refused while the first write is pending. Controls remain unavailable through the confirmation read, recover after failure, and accept one new explicit command without replaying the failed request. The desktop lifecycle suite passed; physical and rendered Android busy/error acceptance remains separate. No production source or frozen candidate package changed.
+
 ## Repeated room mode fixture preparation - 19 September 2026
 
 A separately enabled Android case now performs three sequential room Auto/Manual/Auto cycles with one original-policy baseline. Each cycle has distinct evidence and requires independent restoration before continuing; unrelated settings, unexpected commands or an unsuccessful cycle stop the sequence. Missing manual targets are refused. This is prepared test code, not a hardware result, rapid-input coverage or a driver change. See submission/RepeatedRoomModeTesting.md.

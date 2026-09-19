@@ -65,6 +65,10 @@ After the immutable candidate has been built, the submission workflow must retai
 
 These are mandatory submission acceptance obligations, not all implemented automated checks. The coverage plan and the shared evidence validator remain separate from the help builder. An empty help `pending` list proves neither passing hardware tests nor submission readiness. Do not change the tested package's help after the run; rebuild and repeat candidate-bound validation when its bytes change.
 
+## Offline command checks and physical acceptance
+
+Offline room-command regression coverage includes overlapping inputs during a pending write or confirmation read, HTTP rejection, transport failure, and failed state refresh. Run the lifecycle test project described in the main README to exercise these with synthetic responses; no household hub is contacted. These checks prove command suppression and restoration of the published control properties, not rendered Android behavior or physical outage recovery. In the current room layout, both mode-action rows are hidden while busy because their visibility and enabled bindings use the same availability properties. Submission evidence must observe the actual layout rather than assume a disabled button stays visible.
+
 ## Dependency licenses and notices
 
 `dependency-notices.json` records the actual merged dependency DLL hashes, package versions, original copyright metadata and reviewed license/NOTICE documents in `license-sources`. Those documents retain their original bytes and notices, including the WiserHeatAPIv2 authors and YamlDotNet's separate libyaml license. They are third-party notices, not project-owned source files.
