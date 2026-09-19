@@ -21,6 +21,8 @@ public sealed class RoomTemperatureCycleTests
 			ScheduleId = 10,
 			ManualSetPoint = manual ? 180 : 170,
 			CurrentSetPoint = 180,
+			CalculatedTemperature = 180,
+			ClimateCapabilities = new { SetpointStep = 5, MaximumHeatSetpoint = 300 },
 			ScheduledSetPoint = 180,
 			SetpointOrigin = manual ? "FromManualMode" : "FromSchedule"
 			})!;
@@ -596,8 +598,46 @@ public sealed class RoomTemperatureCycleTests
 	[Test]
 	public void BoostAtThePhysicalLimitRequiresItsOwnCaseBeforeInput ()
 		{
-		var state = Edit (Snapshot (), d => d["Room"]![0]!["CurrentSetPoint"] = 295);
+		var state = Edit (Snapshot (), d => d["Room"]![0]!["CalculatedTemperature"] = 295);
 		Assert.Throws<InvalidDataException> (() => RoomBoostExpectation.Create (state));
+		}
+	[TestCase (190, 212, 230)]
+	[TestCase (190, 211, 230)]
+	[TestCase (190, 218, 240)]
+	[TestCase (250, 212, 250)]
+	public void BoostExpectationUsesAmbientResolutionWithoutLoweringAnExistingHigherTarget (int scheduled, int ambient, int expected)
+		{
+		var original = Edit (Snapshot (), d =>
+			{
+				d["Room"]![0]!["CurrentSetPoint"] = scheduled;
+				d["Room"]![0]!["CalculatedTemperature"] = ambient;
+			});
+		Assert.That (RoomBoostExpectation.Create (original).TargetTenthsCelsius, Is.EqualTo (expected));
+		}
+	[TestCase ("CalculatedTemperature"), TestCase ("ClimateCapabilities")]
+	public void BoostWithoutAmbientOrResolutionCannotInventAnExpectedTarget (string missing)
+		{
+		var original = Edit (Snapshot (), d => d["Room"]![0]!.AsObject ().Remove (missing));
+		Assert.Throws<KeyNotFoundException> (() => RoomBoostExpectation.Create (original));
+		}
+	[TestCase (210, false), TestCase (230, true), TestCase (235, false)]
+	public void WarmRoomBoostRejectsScheduledTargetArithmeticAndWrongQuantizedTargets (int target, bool matches)
+		{
+		var original = Edit (Snapshot (), d =>
+			{
+				d["Room"]![0]!["CurrentSetPoint"] = 190;
+				d["Room"]![0]!["CalculatedTemperature"] = 212;
+			});
+		var input = new DateTimeOffset (2026, 9, 19, 18, 29, 15, TimeSpan.Zero);
+		var observed = Edit (original, d =>
+			{
+				var room = d["Room"]![0]!;
+				room["CurrentSetPoint"] = target;
+				room["OverrideType"] = "Manual";
+				room["SetpointOrigin"] = "FromBoost";
+				room["OverrideTimeoutUnixTime"] = input.AddMinutes (60).ToUnixTimeSeconds ();
+			});
+		Assert.That (RoomBoostExpectation.Create (original).Matches (observed, input, input), Is.EqualTo (matches));
 		}
 	[TestCase (-60, true), TestCase (60, true), TestCase (-61, false), TestCase (61, false)]
 	public void BoostExpiryUsesDeclaredMinuteTolerance (int seconds, bool matches)
@@ -621,7 +661,11 @@ public sealed class RoomTemperatureCycleTests
 		{
 		// Non-identifying values from the retained second-generation HubR response.
 		// Its outgoing Boost request is already checked in PlatformTemperatureTests.
-		var original = Edit (Snapshot (), d => d["Room"]![0]!["CurrentSetPoint"] = 190) with { BoostSettings = new (4, 60) };
+		var original = Edit (Snapshot (), d =>
+			{
+				d["Room"]![0]!["CurrentSetPoint"] = 190;
+				d["Room"]![0]!["CalculatedTemperature"] = 212;
+			});
 		var observed = Edit (original, d =>
 			{
 				var room = d["Room"]![0]!;

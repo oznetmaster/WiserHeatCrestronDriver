@@ -14,7 +14,14 @@ public sealed record RoomBoostExpectation (int TargetTenthsCelsius, int Duration
 		if (!double.IsFinite (settings.DeltaCelsius) || settings.DeltaCelsius is < 1 or > 5 || settings.DurationMinutes is < 5 or > 1440)
 			throw new InvalidDataException ("Boost settings are outside the declared driver ranges.");
 		var room = RoomTemperatureRestoration.Room (original.Gateway.Hub, original.RoomId);
-		int target = checked (room.GetProperty ("CurrentSetPoint").GetInt32 () + (int)(settings.DeltaCelsius * 10));
+		int ambient = room.GetProperty ("CalculatedTemperature").GetInt32 ();
+		int step = room.GetProperty ("ClimateCapabilities").GetProperty ("SetpointStep").GetInt32 ();
+		if (ambient is < -500 or > 1000 || step is <= 0 or > 10)
+			throw new InvalidDataException ("A valid ambient temperature and declared setpoint resolution are required for Boost.");
+		// HubR applies Boost above ambient temperature, not above a lower scheduled
+		// target. Its returned setpoint is quantized to the room's declared step.
+		int boostedAmbient = checked ((int)Math.Round ((ambient + settings.DeltaCelsius * 10) / step, MidpointRounding.AwayFromZero) * step);
+		int target = Math.Max (room.GetProperty ("CurrentSetPoint").GetInt32 (), boostedAmbient);
 		int maximum = room.TryGetProperty ("ClimateCapabilities", out var capabilities) && capabilities.TryGetProperty ("MaximumHeatSetpoint", out var limit)
 			? limit.GetInt32 () : 300;
 		if (target > maximum || target > 300)
