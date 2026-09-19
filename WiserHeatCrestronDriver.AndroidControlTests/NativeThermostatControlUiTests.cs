@@ -37,7 +37,7 @@ public sealed partial class GatewayUiTests
 	[TestCase (false), TestCase (true), Category ("LiveControl")]
 	public Task NativeThermostatBoundaryRestoresPolicy (bool maximum) => RunNativeControlAsync (boost: false, off: false, maximum);
 
-	private async Task RunNativeControlAsync (bool boost, bool off, bool? maximum = null)
+	private async Task RunNativeControlAsync (bool boost, bool off, bool? maximum = null, CancellationToken cancellationToken = default, bool alternateUnits = false)
 		{
 		Assert.That (_nameRestored && _roomStatePreserved, Is.True, "Earlier restoration must be reconciled before more controls.");
 		if (maximum.HasValue ? !_settings!.AllowNativeThermostatBoundaryControl : off ? !_settings!.AllowNativeThermostatOffControl : !_settings!.AllowNativeThermostatControl)
@@ -52,9 +52,11 @@ public sealed partial class GatewayUiTests
 		http.DefaultRequestHeaders.Add ("SECRET", hub.Secret);
 		var control = _settings.ControlRooms.Single ();
 		var binding = _settings.Rooms.Single (r => r.DeviceId == control.DeviceId);
-		using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (maximum.HasValue ? 45 : 15));
+		using var timeout = CancellationTokenSource.CreateLinkedTokenSource (cancellationToken);
+		timeout.CancelAfter (TimeSpan.FromMinutes (maximum.HasValue ? 45 : 15));
 		var original = await ReadRoomAsync (binding, timeout.Token);
 		string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + (maximum.HasValue ? maximum.Value ? ".native-maximum" : ".native-minimum" : off ? ".native-off" : boost ? ".native-boost" : ".native-setpoint");
+		if (alternateUnits) check += ".alternate-units";
 		await _navigation!.InspectRoomExtensionPagesAsync (check, binding.RoomName, original.Name!, binding.PageTitle, async (_, token) =>
 			{
 				var session = new NativeTemperatureSession (this, hub, http, binding, control, original, check, maximum.HasValue);

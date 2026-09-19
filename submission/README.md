@@ -8,6 +8,8 @@ The Android observation and control projects use released CrestronHomeNUnit.Test
 
 [Native thermostat boundary testing](NativeThermostatBoundaries.md) describes the separately enabled minimum/maximum cases, their restoration and evidence, and the unit variants still requiring hardware execution.
 
+[Alternate-unit native testing](NativeThermostatUnits.md) provides selectable configuration/control cases that restore the original room policy and gateway units, without a private coordinator program.
+
 [extension-coverage-plan.json](extension-coverage-plan.json) is a draft breakdown of every item in the official Extension self-test form. It covers the gateway Home tile, managed-room thermostats, all declared pages/controls and conditional schedule slots, configuration, restoration, outages, endurance and repeated multi-instance checks. The source [DevTools coverage generator](https://github.com/oznetmaster/CrestronHomeDevTools/blob/main/docs/submission/CoveragePlanning.md) expands it into a draft policy, form mapping and execution contract. It checks the recorded UI/behavior/configuration source hashes and rejects omitted UI targets or official items.
 
 This is planned coverage, not a test result. Producer bindings, real Release candidate evidence, visual review and policy approval remain incomplete. The generated contract records response deadlines and restoration requirements, which future producers must enforce; generic hash/evidence validation alone does not measure them. Repeated assertions can share a controlled sequence and captures when each assertion is actually verified.

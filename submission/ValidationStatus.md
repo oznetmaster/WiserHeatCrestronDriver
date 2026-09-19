@@ -43,6 +43,8 @@ Producer hashes and source digests are retained before execution and compared af
 
 ## Remaining acceptance work
 
+The [alternate-unit native fixtures](NativeThermostatUnits.md) now expose configuration change, the selected physical control exercise and verified restoration through ordinary NUnit cases. This replaces the private-coordinator requirement for future Celsius/Fahrenheit control runs. The recovery engine's offline regressions pass; these new fixture variants still need hardware execution after endurance.
+
 The [native thermostat boundary cases](NativeThermostatBoundaries.md) now reach the supported minimum and maximum through confirmed UI steps and independently restore the original policy. Offline checks cover both units and Auto/Manual states, full-span/endpoint starts, uncertain later input and failed evidence recording. Hardware execution is still pending; the earlier one-step and schedule-editor tests do not establish this native-control scope.
 
 The [gateway feature configuration cycle](GatewayFeatureConfiguration.md) is now executable through the reserved installed-test workflow. It exercises all four Away/hot-water visibility combinations and restores the original flags, with independent physical-policy preservation checks. Synthetic recovery tests passed; the rendered hardware cases remain outstanding. It changes test tooling only, not the frozen candidate.

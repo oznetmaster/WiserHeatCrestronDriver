@@ -38,6 +38,7 @@
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/IGatewayControlObserver.cs" Link="IGatewayControlObserver.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ConfigurationProbe/ConfigurationCompatibility.cs" Link="ConfigurationCompatibility.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ConfigurationProbe/GatewayFeatureCycle.cs" Link="GatewayFeatureCycle.cs" />
+    <Compile Include="../WiserHeatCrestronDriver.ConfigurationProbe/TemperatureUnitsCycle.cs" Link="TemperatureUnitsCycle.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/HotWaterRestoration.cs" Link="HotWaterRestoration.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/HotWaterControlCycle.cs" Link="HotWaterControlCycle.cs" />
     <Compile Include="../WiserHeatCrestronDriver.ControlProbe/RoomTemperatureRestoration.cs" Link="RoomTemperatureRestoration.cs" />
