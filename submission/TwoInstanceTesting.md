@@ -106,3 +106,7 @@ The Save Day/Save All session now retains a separate `save-day-response.json` or
 These measurements are conservative observation bounds, including the tap helper's fresh hierarchy check, transport and polling overhead. They are not the device's internal execution time or the Android event timestamp. `PromptResponseAccepted` remains false: the reviewed official-check binding must assess the measured bound against its prompt-response criterion. Later navigation time must not be reported as save latency. Repeated input, rendered UI feedback and peer response retain their separate observations.
 
 Historical candidate results without this response record retain their functional/restoration scope; no timing record or workflow producer manifest is manufactured after execution. The planned two-instance save runs use the public workflow's fresh producer/discovery/selection pins and will collect the new timing evidence after endurance. Source preparation is not hardware acceptance.
+
+## Payload-check dependency
+
+Both Android test projects use released DevTools1.13.1 and TestAdapter1.12.1. DevTools1.13.1 resolves full configuration catalogue IDs to their processor storage folders when comparing the pinned package. Updating only the outer runner is insufficient for paired cases: the fixture itself also calls the payload inspector for the peer processor. This dependency update changes test tooling, not the frozen driver package.
