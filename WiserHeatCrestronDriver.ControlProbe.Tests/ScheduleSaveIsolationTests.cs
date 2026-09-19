@@ -19,6 +19,8 @@ public sealed partial class ScheduleSaveIsolationTests
 		public JsonObject Domain { get; } = JsonNode.Parse ("""{"Room":[{"id":1,"Name":"Test","ScheduleId":1,"Mode":"Auto","CurrentSetPoint":220,"ScheduledSetPoint":220,"SetpointOrigin":"FromSchedule","EcoModeEnabled":false},{"id":2,"Name":"Other shared user","ScheduleId":1,"Mode":"Auto"}]}""")!.AsObject ();
 		public List<string> Calls { get; } = [];
 		public List<string> Records { get; } = [];
+		public Dictionary<string, object> RecordValues { get; } = [];
+		public List<ScheduleHubSnapshot> Reads { get; } = [];
 		public List<ScheduleSaveCase> Saves { get; } = [];
 		public string? LoseReply { get; init; }
 		public bool FailEditorRestoration { get; init; }
@@ -31,13 +33,16 @@ public sealed partial class ScheduleSaveIsolationTests
 		public Task<ScheduleHubSnapshot> ReadAsync (CancellationToken token)
 			{
 			token.ThrowIfCancellationRequested ();
-			return Task.FromResult (new ScheduleHubSnapshot (JsonSerializer.SerializeToElement (Schedules), JsonSerializer.SerializeToElement (Domain)));
+			var snapshot = new ScheduleHubSnapshot (JsonSerializer.SerializeToElement (Schedules), JsonSerializer.SerializeToElement (Domain));
+			Reads.Add (snapshot);
+			return Task.FromResult (snapshot);
 			}
 		public Task RecordAsync (string phase, object value)
 			{
 			if (phase == FailRecord)
 				throw new IOException ("Injected evidence failure.");
 			Records.Add (phase);
+			RecordValues.Add (phase, value);
 			return Task.CompletedTask;
 			}
 		public Task SendAsync (string method, string path, object body, CancellationToken token)
@@ -146,6 +151,39 @@ public sealed partial class ScheduleSaveIsolationTests
 		Assert.That (session.Saves, Has.Count.EqualTo (2));
 		Assert.That (session.Saves.Select (s => s.Temperature), Is.EqualTo (new[] { 225, 230 }));
 		Assert.That (session.Records, Does.Contain ("existing-schedule-intent"));
+		ScheduleSaveIsolation.RequireOriginal (original, await session.ReadAsync (default));
+		}
+
+	[TestCase (false), TestCase (true)]
+	public async Task BothSaveReceiptsRetainActualIndependentHubSnapshots (bool existing)
+		{
+		var session = existing ? Exclusive () : new Session ();
+		var result = existing ? await RunExisting (session) : await Run (session);
+		Assert.That (result.Passed && result.RestorationConfirmed, Is.True, result.Detail);
+		foreach (var save in session.Saves)
+			{
+			string phase = save.AllDays ? "save-all" : "save-day";
+			var snapshot = (ScheduleHubSnapshot)session.RecordValues[phase + "-hub-observed"];
+			Assert.That (session.Reads.Any (read => ReferenceEquals (read, snapshot)), Is.True, "Evidence must come from a hub observation, not a reconstructed expectation.");
+			var observed = snapshot.Schedules.GetProperty ("Heating").EnumerateArray ().Single (s => s.GetProperty ("id").GetInt32 () == save.ScheduleId);
+			Assert.That (JsonElement.DeepEquals (observed, save.After), Is.True);
+			Assert.That (snapshot.Domain.GetProperty ("Room").GetArrayLength (), Is.EqualTo (2));
+			Assert.That (session.Records.IndexOf (phase + "-hub-observed"), Is.LessThan (session.Records.IndexOf (phase + "-observed")));
+			}
+		}
+
+	[TestCase (false, "save-day-hub-observed"), TestCase (true, "save-day-hub-observed")]
+	[TestCase (false, "save-all-hub-observed"), TestCase (true, "save-all-hub-observed")]
+	public async Task MissingRawSaveEvidenceFailsAndRestoresWithoutReplayingInput (bool existing, string phase)
+		{
+		var session = new Session { FailRecord = phase };
+		if (existing) Exclusive (session);
+		var original = await session.ReadAsync (default);
+		var result = existing ? await RunExisting (session) : await Run (session);
+		Assert.That (result.Passed, Is.False);
+		Assert.That (result.RestorationConfirmed, Is.True, result.Detail);
+		Assert.That (session.Saves.Count, Is.EqualTo (phase.StartsWith ("save-day", StringComparison.Ordinal) ? 1 : 2));
+		Assert.That (session.Saves.Select (s => s.AllDays).Distinct ().Count (), Is.EqualTo (session.Saves.Count));
 		ScheduleSaveIsolation.RequireOriginal (original, await session.ReadAsync (default));
 		}
 

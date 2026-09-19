@@ -1,5 +1,9 @@
 # Development and validation history
 
+## Retain independently observed schedule save results - 19 September 2026
+
+Save Day and Save All acceptance now retain the complete hub snapshot that satisfied their independent comparison, alongside the existing expected schedule record. This uses the already-read confirming snapshot and adds no device request. Both exclusive existing schedules and owned temporary schedules use this evidence path. Failure to store the snapshot fails the case and triggers the existing restoration without replaying the save. Earlier retained runs remain unchanged and cannot be claimed to contain these new records. This is test tooling only; the frozen driver candidate and endurance collector are unchanged.
+
 ## Boost response assertion corrected from retained hardware evidence - 19 September 2026
 
 Review of the original Fahrenheit Boost response found that the tested HubR reports a timed Manual override with FromBoost origin, even though the outgoing request type is Boost. The newly prepared acceptance helper and its synthetic responses now use that observed state representation. A regression uses the non-identifying target, expiry and input time from the retained response; mismatched origins and override types still fail. Configured increase, duration, identity and restoration checks remain in place. This corrects test tooling only; no installed driver, package or endurance process changes.

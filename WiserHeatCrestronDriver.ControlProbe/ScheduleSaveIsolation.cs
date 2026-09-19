@@ -65,7 +65,7 @@ public static partial class ScheduleSaveIsolation
 				await session.RecordAsync (phase + "-intent", operation);
 				allowed.Add (after);
 				await session.ExerciseAsync (operation, token);
-				await WaitAsync (session, snapshot =>
+				var confirmed = await WaitAsync (session, snapshot =>
 					{
 					var current = Heating (snapshot.Schedules).Single (s => Id (s) == scheduleId);
 					if (!Equal (current, expected) && !Equal (current, after))
@@ -74,6 +74,7 @@ public static partial class ScheduleSaveIsolation
 					return Equal (current, after);
 					}, observationTimeout, token);
 				expected = after;
+				await session.RecordAsync (phase + "-hub-observed", confirmed);
 				await session.RecordAsync (phase + "-observed", after);
 				if (observer != null)
 					{
@@ -225,7 +226,8 @@ public static partial class ScheduleSaveIsolation
 				await session.RecordAsync (phase + "-intent", operation);
 				await session.ExerciseAsync (operation, token);
 				expected = after;
-				await WaitAsync (session, snapshot => ObserveOwned (original, snapshot, roomId, ownedId.Value, after, true, allowed), observationTimeout, token);
+				var confirmed = await WaitAsync (session, snapshot => ObserveOwned (original, snapshot, roomId, ownedId.Value, after, true, allowed), observationTimeout, token);
+				await session.RecordAsync (phase + "-hub-observed", confirmed);
 				await session.RecordAsync (phase + "-observed", after);
 				if (observer != null)
 					{
@@ -373,7 +375,7 @@ public static partial class ScheduleSaveIsolation
 		return found;
 		}
 
-	private static async Task WaitAsync (IScheduleSaveIsolationSession session, Func<ScheduleHubSnapshot, bool> verify, TimeSpan timeout, CancellationToken token)
+	private static async Task<ScheduleHubSnapshot> WaitAsync (IScheduleSaveIsolationSession session, Func<ScheduleHubSnapshot, bool> verify, TimeSpan timeout, CancellationToken token)
 		{
 		using var deadline = CancellationTokenSource.CreateLinkedTokenSource (token);
 		deadline.CancelAfter (timeout);
@@ -383,7 +385,7 @@ public static partial class ScheduleSaveIsolation
 			var snapshot = await session.ReadAsync (deadline.Token);
 			matches = verify (snapshot) ? matches + 1 : 0;
 			if (matches == 2)
-				return;
+				return snapshot;
 			await Task.Delay (250, deadline.Token);
 			}
 		}
