@@ -1,5 +1,17 @@
 # Coverage source review
 
+## Selector applicability and retained runtime review - 19 September 2026
+
+The current draft has 538 scoped assertions across all 35 official form items. It supersedes the 571-assertion draft below for future review; the earlier generated policy and evidence retain their original identities. No running endurance policy was changed.
+
+The reduction corrects a control-type mismatch. The day, time and schedule controls are `selectorbutton` elements, covered by item 9. They are not the `actionselector` alerts covered by item 17. Both packaged UI definitions have empty alerts sections. The draft now requests an absence review for item 17 and its paired-instance repetition; the item-9 selector checks and other checks are unchanged. See [selector-button testing](ActionSelectorTesting.md) for the SDK distinction and frozen package identity.
+
+The retained candidate read-only run also exposes complete runtime UI definitions. Four snapshots were reviewed: the gateway before and after that run, the fresh managed room, and its ready observation. Their element trees, attributes and non-whitespace text match the corresponding packaged definitions. Only XML serialization whitespace and comments are excluded from that structural comparison. All have empty alert sections; the room definition contains twelve selector buttons. The installed-payload record matches all seven package files, and all 253 files in the earlier Android audit inventory were rehashed successfully.
+
+This supplies runtime corroboration for the observed configuration on one processor. It does not assert observations of a second instance or every framework-generated configuration dialog. The runtime sidecars were reviewed and hashed separately now; they were not retroactively added to the original audit inventory. The original evidence shares the worker account and does not establish independently authenticated producer identity. Retain these boundaries when binding the final absence evidence to the form. No official checkbox has been changed by this review.
+
+Do not generalize this result to other control types: the native thermostat can render controls that are not separate tags in the driver's XML. Those controls still require their applicable rendered-UI and functional checks.
+
 ## Evidence-to-form checkpoint - 18 September 2026
 
 The bundled coverage command verified the current reviewed source snapshot and reproduced the existing draft policy hash without changing the candidate declaration. Its 571 scoped assertions map to 35 official form items; these are obligations, not a required number of independent physical test runs. One verified sequence can support several assertions. The 342 assertions under the multiple-instance item still require observed results. The chosen plan uses two actual gateway-driver instances on separate processors with the existing physical hub; disclose that topology and verify independent configuration alongside expected shared-state propagation. Waiting for clarification is not a prerequisite. A second room child is not being substituted for a second gateway instance.
