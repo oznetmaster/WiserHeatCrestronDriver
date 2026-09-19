@@ -1,5 +1,9 @@
 # Development and validation history
 
+## Configuration acceptance topology clarified - 19 September 2026
+
+The configuration test guide now maps the five official items to visible Setup/Configure observations and supporting API evidence. The draft blueprint describes a reserved driver instance using a shared household hub, rather than an isolated physical hub. Masked/omitted secrets are not claimed as readable saved values; authenticated restoration is recorded separately. No hub secret rotation, processor change or passing configuration attestation is implied. This changes the draft execution instructions only; the frozen candidate and running endurance policy are unchanged.
+
 ## Read-only temperature inspection in either unit - 19 September 2026
 
 The read-only native thermostat fixture now accepts the original Celsius or Fahrenheit configuration and independently compares hub temperatures, processor feedback and rendered text at the documented display precision. It rejects unit changes, mismatched labels, unavailable readings and nonfinite values. This removes a Celsius-only limitation in the test harness without operating the hub, changing the driver or claiming gauge calibration. Offline comparison coverage supports preparation; the expanded physical case still requires execution.

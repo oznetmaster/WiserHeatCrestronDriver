@@ -67,6 +67,8 @@ These are mandatory submission acceptance obligations, not all implemented autom
 
 ## Offline command checks and physical acceptance
 
+The [configuration acceptance guide](ConfigurationAcceptance.md) distinguishes actual Setup/Configure observations from supporting API evidence and describes how to preserve a shared household hub. A separate test processor does not make its physical devices isolated.
+
 Offline room-command regression coverage includes overlapping inputs during a pending write or confirmation read, HTTP rejection, transport failure, and failed state refresh. Run the lifecycle test project described in the main README to exercise these with synthetic responses; no household hub is contacted. These checks prove command suppression and restoration of the published control properties, not rendered Android behavior or physical outage recovery. In the current room layout, both mode-action rows are hidden while busy because their visibility and enabled bindings use the same availability properties. Submission evidence must observe the actual layout rather than assume a disabled button stays visible.
 
 ## Dependency licenses and notices

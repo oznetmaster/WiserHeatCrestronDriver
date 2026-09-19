@@ -189,7 +189,7 @@
             "$config.temperature-units"
           ],
           "method": "configuration",
-          "expectation": "Reopen Installer settings after connection and reload; confirm the previously supplied value, using private masked comparison for secrets.",
+          "expectation": "Reopen Installer settings after connection and reload; confirm previously supplied non-secret values. Verify masked secret-field presentation and successful authenticated reconnection without exposing the secret. An omitted or masked value is not byte-for-byte proof of the stored secret; record that evidence limit.",
           "minimumSeconds": 0,
           "responseLimitSeconds": null,
           "restore": false
@@ -206,7 +206,7 @@
             "$config.temperature-units"
           ],
           "method": "combined",
-          "expectation": "On the isolated test hub, change the setting, observe reconnection and correct independent hub/device state, restore the original setting and verify recovery. Do not rotate credentials or global settings on another installed driver.",
+          "expectation": "On the reserved submission driver instance, change the setting, observe reconnection and correct independent hub/device state, restore the original setting and verify recovery. When the hub also serves the household or another processor, keep changes local to this driver configuration and preserve peer configuration and shared physical policy. Any physical control needs its separately authorized restoration procedure. Do not rotate the household hub secret or change global device settings merely to manufacture a configuration case.",
           "minimumSeconds": 0,
           "responseLimitSeconds": null,
           "restore": true
