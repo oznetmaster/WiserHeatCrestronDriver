@@ -1,5 +1,9 @@
 # Development and validation history
 
+## Submission build instructions - 19 September 2026
+
+The submission guide now uses the released DevTools 1.11.0 console and its bundled help-packaging targets. It no longer asks consuming developers to configure Python or obtain a tools source checkout. LibreOffice and the official pinned template remain documented prerequisites. This documentation correction does not rebuild or change the frozen driver candidate.
+
 See the [product changelog](CHANGELOG.md) for shipped changes. This document preserves test, CI, build and submission preparation history. Dated development entries describe work at that time, not a published product version or completed acceptance. Version headings identify the release alongside which development work was recorded; processor-test versions identify separate test packages.
 
 ## Where changes belong

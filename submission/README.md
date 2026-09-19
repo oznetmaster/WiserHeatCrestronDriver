@@ -18,7 +18,7 @@ See the [coverage source review](CoverageReview.md) for the current snapshot and
 
 ## Help source
 
-[help-content.json](help-content.json) is public source for the driver's help document, using the official Crestron help template and the source tools in [CrestronHomeDevTools](https://github.com/oznetmaster/CrestronHomeDevTools). The builder and renderer are source tools in DevTools; use the reviewed source revision providing website support. See its `docs/submission/HelpBuild.md` for the content format and commands.
+[help-content.json](help-content.json) is public source for the driver's help document, using the official Crestron help template and the source tools in [CrestronHomeDevTools](https://github.com/oznetmaster/CrestronHomeDevTools). Use the complete released DevTools console for help generation and rendering; its bundled runtime supports website-only contact metadata. See [help build setup](https://github.com/oznetmaster/CrestronHomeDevTools/blob/v1.11.0/docs/submission/HelpBuild.md) for the content format and commands.
 
 This is a review draft for the current driver, not an approved portal submission. It is not embedded in the released driver package. Ordinary builds retain their existing package name and do not require document tools. The source manifest now contains the approved public GitHub support website and an empty Email field; runtime behavior, GUID and driver version are unchanged by this preparation.
 
@@ -30,13 +30,13 @@ The help must identify this driver's MIT License with Commons Clause accurately.
 
 ## Opt-in submission build
 
-The driver project now imports the reusable help packaging targets when `CrestronSubmission=true` and `SubmissionToolsDirectory` points to a reviewed CrestronHomeDevTools source checkout's `tools/submission` directory. Configure the explicit Python, LibreOffice and pinned official template paths described in DevTools' `docs/submission/HelpBuild.md`. Keep machine-specific settings in the privately excluded local targets file or pass them to the build command.
+Download and extract the complete [CrestronHomeDevTools console release](https://github.com/oznetmaster/CrestronHomeDevTools/releases/tag/v1.11.0). The driver imports its help packaging targets when `CrestronSubmission=true` and `SubmissionToolsDirectory` points to the download's `scripts/submission` directory. Set `SubmissionConsole` to the executable in that same download. Its internal document runtime is included: developers do not install or configure Python or need a DevTools source checkout. LibreOffice and the pinned official template remain external prerequisites described in [help build setup](https://github.com/oznetmaster/CrestronHomeDevTools/blob/v1.11.0/docs/submission/HelpBuild.md). Keep machine-specific settings in the privately excluded local targets file or pass them to the build command.
 
 ```text
-dotnet build WiserHeatCrestronDriver/WiserHeatCrestronDriver.csproj -c Release -p:CrestronSubmission=true -p:DeployAfterBuild=false -p:SubmissionToolsDirectory=TOOLS_DIRECTORY -p:SubmissionPython=PYTHON_EXE -p:SubmissionSoffice=LIBREOFFICE_EXE -p:SubmissionHelpTemplate=OFFICIAL_DOCX -p:SubmissionHelpTemplateSha256=PINNED_SHA256
+dotnet build WiserHeatCrestronDriver/WiserHeatCrestronDriver.csproj -c Release -p:CrestronSubmission=true -p:DeployAfterBuild=false -p:SubmissionToolsDirectory="CONSOLE_DIRECTORY/scripts/submission" -p:SubmissionConsole="CONSOLE_DIRECTORY/CrestronHomeDevTools.Console.exe" -p:SubmissionSoffice="LIBREOFFICE_EXE" -p:SubmissionHelpTemplate="OFFICIAL_DOCX" -p:SubmissionHelpTemplateSha256=PINNED_SHA256
 ```
 
-Replace the uppercase placeholders with local paths and the reviewed template digest; quote arguments containing spaces. These Python source tools are not embedded in the DevTools NuGet package or console ZIP. Website support requires the updated source checkout. Do not enable the option in the ordinary release workflow until a complete candidate has passed validation.
+Replace the uppercase placeholders with absolute local paths and the reviewed template digest. Preserve the entire extracted console directory; copying only its executable omits required files. The NuGet library does not contain the document runtime; use the console ZIP for this build step. Website-only support metadata is supported by this released console. The older explicit-interpreter route remains for tooling maintainers, but is not required here. Ordinary releases remain independent of optional submission.
 
 This option uses `NeilColvin_Thermostat_WiserHeat_IP_V2` as the matching package/DLL/help basename. It preserves the driver GUID. Release version preparation remains authoritative, and the content's four-component version must match the prepared manifest. Before deploying a future submission candidate, select a new version and update the content; do not replace the bytes of an already published or tested version.
 
