@@ -1,5 +1,9 @@
 # Development and validation history
 
+## Repeated room mode fixture preparation - 19 September 2026
+
+A separately enabled Android case now performs three sequential room Auto/Manual/Auto cycles with one original-policy baseline. Each cycle has distinct evidence and requires independent restoration before continuing; unrelated settings, unexpected commands or an unsuccessful cycle stop the sequence. Missing manual targets are refused. This is prepared test code, not a hardware result, rapid-input coverage or a driver change. See submission/RepeatedRoomModeTesting.md.
+
 ## Submission build instructions - 19 September 2026
 
 The submission guide now uses the released DevTools 1.11.0 console and its bundled help-packaging targets. It no longer asks consuming developers to configure Python or obtain a tools source checkout. LibreOffice and the official pinned template remain documented prerequisites. This documentation correction does not rebuild or change the frozen driver candidate.

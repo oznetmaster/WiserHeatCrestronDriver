@@ -192,6 +192,8 @@ The [UK/Ireland system guide](https://www.productinfo.schneider-electric.com/wis
 
 ### Whole-house Away control
 
+For repeated **room** Auto/Manual testing, see [repeated room mode testing](../submission/RepeatedRoomModeTesting.md). Its separate opt-in case restores one original room policy between three sequential cycles; it does not operate the whole-house Away setting.
+
 `GatewayAwayChangesHubStateAndRestoresOriginal` requires `AllowGatewayAwayControl`, private `ControlHubSettingsPath` and one bound `Rooms` child to verify that the selected gateway is connected to the intended physical hub. Away mode affects the household, not just that binding's room; obtain permission for that scope before enabling the flag.
 
 The fixture captures the original Away state, schedules, guarded room settings and hot-water overrides. It supports either starting Away state. One observed labelled UI action changes Away mode, then a distinct action restores its original value. Fresh independent hub reads, a later successful driver refresh, enabled controls and the actual Android row must agree. Timing and before/after captures are saved as private evidence. Dynamic temperatures and relay feedback may legitimately change; this is not a promise to restore historic sensor readings. Existing override values and absolute deadlines must remain unchanged. Unsupported system overrides are rejected before input.

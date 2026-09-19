@@ -41,11 +41,15 @@ public sealed partial class GatewayUiTests
 			}
 		public ControlRoomBinding[] ControlRooms { get; init; } = [];
 		public bool AllowScheduleManualStartingStateCases { get; init; }
+		public bool AllowRepeatedRoomModeControl { get; init; }
 		}
 	private sealed record HubSettings (string HubHost, string Secret);
 
 	[Test, Category ("LiveControl")]
 	public Task RoomScheduleControlChangesHubModeAndRestoresSchedule () => RunRoomScheduleControlAsync (ScheduleManualTargetRequirement.Any);
+
+	[Test, Category ("LiveControl")]
+	public Task RoomScheduleControlRepeatedCyclesRestoreOriginalPolicy () => RunRoomScheduleControlAsync (ScheduleManualTargetRequirement.Any, cycles: 3);
 
 	[TestCase (ScheduleManualTargetRequirement.EqualToCurrent)]
 	[TestCase (ScheduleManualTargetRequirement.DifferentFromCurrent)]
@@ -62,9 +66,13 @@ public sealed partial class GatewayUiTests
 	[Category ("LiveControl"), Category ("MultipleInstance")]
 	public Task RoomScheduleControlVerifiesStartingStateOnBothInstances (ScheduleManualTargetRequirement startingState) => RunRoomScheduleControlAsync (startingState, true);
 
-	private async Task RunRoomScheduleControlAsync (ScheduleManualTargetRequirement startingState, bool requirePeer = false)
+	private async Task RunRoomScheduleControlAsync (ScheduleManualTargetRequirement startingState, bool requirePeer = false, int cycles = 1)
 		{
 		Assert.That (_nameRestored && _roomStatePreserved, Is.True, "An earlier restoration needs reconciliation.");
+		if (cycles > 1 && !_settings!.AllowRepeatedRoomModeControl)
+			Assert.Ignore ("Enable AllowRepeatedRoomModeControl and select the repeated room-mode case explicitly.");
+		if (cycles > 1 && _settings!.ObservePeerDuringRoomControls)
+			throw new InvalidDataException ("The repeated room case requires a single-instance profile. Paired repetition is a separate acceptance case.");
 		if (requirePeer && !_settings!.ObservePeerDuringRoomControls)
 			Assert.Ignore ("Enable ObservePeerDuringRoomControls for this required two-instance case.");
 		if (startingState != ScheduleManualTargetRequirement.Any && !_settings!.AllowScheduleManualStartingStateCases)
@@ -86,9 +94,10 @@ public sealed partial class GatewayUiTests
 		foreach (var control in controls)
 			{
 			var binding = _settings.Rooms.Single (room => room.DeviceId == control.DeviceId);
-			using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (5));
+			using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (cycles * 3 + 2));
 			var original = await ReadRoomAsync (binding, timeout.Token);
 			string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + ".control";
+			if (cycles > 1) check += "-repeated";
 			if (startingState != ScheduleManualTargetRequirement.Any)
 				check += "-" + startingState;
 			if (requirePeer) check += "-two-instances";
@@ -103,7 +112,10 @@ public sealed partial class GatewayUiTests
 					await pages.OpenPageAsync (Text ("Open"), "Schedule", CrestronHomePages.Resource ("customdevices_toolbarClose"), token);
 					var cycle = new RoomControlSession (this, hub, http, host, binding, control, original, check);
 					started = true;
-					result = await ScheduleControlCycle.RunAsync (cycle, TimeSpan.FromSeconds (peer == null ? 45 : 90), token, control.AllowManualTargetInitialization, startingState, peer);
+					result = cycles == 1
+						? await ScheduleControlCycle.RunAsync (cycle, TimeSpan.FromSeconds (peer == null ? 45 : 90), token, control.AllowManualTargetInitialization, startingState, peer)
+						: await ScheduleControlRepetition.RunAsync (index => new RoomControlSession (this, hub, http, host, binding, control, original,
+							check + ".cycle-" + (index + 1).ToString (CultureInfo.InvariantCulture)), cycles, TimeSpan.FromSeconds (45), token);
 					_roomStatePreserved = result.RestorationConfirmed;
 					await cycle.SaveResultAsync (result);
 					Assert.That (result.Passed, Is.True, result.Detail);

@@ -26,7 +26,7 @@ See the [coverage source review](CoverageReview.md) for the current snapshot and
 
 ## Help source
 
-[help-content.json](help-content.json) is public source for the driver's help document, using the official Crestron help template and the source tools in [CrestronHomeDevTools](https://github.com/oznetmaster/CrestronHomeDevTools). The builder and renderer are source tools in DevTools; use the reviewed source revision providing website support. See its `docs/submission/HelpBuild.md` for the content format and commands.
+[help-content.json](help-content.json) is public source for the driver's help document, using the official Crestron help template and the source tools in [CrestronHomeDevTools](https://github.com/oznetmaster/CrestronHomeDevTools). Use the complete released DevTools console for help generation and rendering; its bundled runtime supports website-only contact metadata. See [help build setup](https://github.com/oznetmaster/CrestronHomeDevTools/blob/v1.11.0/docs/submission/HelpBuild.md) for the content format and commands.
 
 The help source now targets corrected submission candidate 1.3.11, which is not yet an approved portal submission or public release. Its illustrated PDF has been rebuilt and verified in the opt-in candidate package. The earlier 1.3.9 candidate failed processor startup; see [validation status](ValidationStatus.md). The published 1.3.8 package is unchanged. Ordinary builds retain their existing package name and do not require document tools. The candidate preserves the driver GUID and approved GitHub support website with an empty Email field.
 
