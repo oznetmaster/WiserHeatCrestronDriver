@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "title": "Drayton Wiser Heat Gateway Driver Help",
   "author": "Neil Colvin",
-  "version": "1.3.013.0000",
+  "version": "1.3.014.0000",
   "pending": [],
   "uiPages": [
     "platform.options",
@@ -21,7 +21,7 @@
       },
       {
         "kind": "paragraph",
-        "text": "This guide applies to driver version 1.3.13. It explains installation, gateway and room controls, schedule editing and the supported equipment. Package availability does not establish Crestron certification."
+        "text": "This guide applies to driver version 1.3.14. It explains installation, gateway and room controls, schedule editing and the supported equipment. Package availability does not establish Crestron certification."
       }
     ],
     "notes": [
@@ -67,7 +67,7 @@
       },
       {
         "kind": "bullet",
-        "text": "Choose Celsius or Fahrenheit for displayed temperatures. Room and schedule targets support 5 to 30 C (41 to 86 F), in steps equivalent to 0.5 C (0.9 F). Boost Increase is always configured in Celsius: 1 to 5 C, equivalent to 1.8 to 9 F. Boost Duration Minutes supports 5 to 1440. The defaults are Celsius display, a 2 C boost increase, and 60 minutes."
+        "text": "Choose Celsius or Fahrenheit for displayed temperatures. Room and schedule targets support 5 to 30 C (41 to 86 F), with 0.5 C or 1 F input steps. Fahrenheit requests are rounded to the hub's nearest supported half-degree Celsius value, so reported Fahrenheit targets can include a decimal. Boost Increase is always configured in Celsius: 1 to 5 C, equivalent to 1.8 to 9 F. Boost Duration Minutes supports 5 to 1440. The defaults are Celsius display, a 2 C boost increase, and 60 minutes."
       },
       {
         "kind": "bullet",
@@ -262,31 +262,23 @@
     "history": [
       {
         "kind": "heading2",
-        "text": "Version 1.3.13"
+        "text": "Version 1.3.14"
       },
       {
         "kind": "paragraph",
-        "text": "Accept thermostat endpoints reached through repeated Fahrenheit steps despite tiny floating-point rounding differences. The supported temperature limits and half-degree Celsius resolution are unchanged; genuinely out-of-range values remain rejected."
-      },
-      {
-        "kind": "heading2",
-        "text": "Version 1.3.12"
+        "text": "Uses whole-degree Fahrenheit input steps so the native thermostat can reach its supported 41-86 F range. Displayed readings reflect the actual hub temperature; supported Celsius targets remain 5-30 C in half-degree increments."
       },
       {
         "kind": "paragraph",
-        "text": "Keep rooms in Auto when changing their target temperature during a schedule refresh. If usable schedule information is unavailable, refuse the change without switching to Manual or cancelling an existing override."
-      },
-      {
-        "kind": "heading2",
-        "text": "Version 1.3.11"
+        "text": "Keeps rooms in Auto when changing their target during a schedule refresh. If usable schedule information is unavailable, refuses the change without switching to Manual or cancelling an existing override. Tiny numerical rounding differences at an exact temperature endpoint are accepted; genuinely out-of-range values remain rejected."
       },
       {
         "kind": "paragraph",
-        "text": "Includes this illustrated help and dependency notices in the submission package. Retains the schedule selection, editor conflict protection, room readiness and command-result fixes from version 1.3.8, using WiserHeatAPIv2 1.1.2. Corrects Celsius/Fahrenheit display and command conversion, aligns adjustable ranges with the supported physical limits, and preserves Off settings until an explicit heating target is chosen."
+        "text": "Retains the schedule selection, editor conflict protection, room readiness and command-result fixes from version 1.3.8, using WiserHeatAPIv2 1.1.2. Corrects Celsius/Fahrenheit display and command conversion and preserves Off settings until an explicit heating target is chosen."
       },
       {
         "kind": "paragraph",
-        "text": "Loads the driver definition independently of the submission assembly name. Routine unchanged room polling no longer repeats schedule diagnostics; actual schedule changes and failures remain visible."
+        "text": "Loads the driver definition independently of its assembly filename. Routine unchanged room polling no longer repeats schedule diagnostics; actual schedule changes and failures remain visible."
       }
     ],
     "license": [

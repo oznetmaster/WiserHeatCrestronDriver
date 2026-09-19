@@ -162,7 +162,7 @@ public sealed partial class PlatformDiscoveryTests
 		}
 
 	[TestCase ("Celsius", 20, 21, 5, 30, 0.5)]
-	[TestCase ("Fahrenheit", 68, 69.8, 41, 86, 0.9)]
+	[TestCase ("Fahrenheit", 68, 69.8, 41, 86, 1)]
 	public async Task TemperatureDisplay_InitialReadingsAndAllRangesMatchUnits (string units, double current, double target, double minimum, double maximum, double step)
 		{
 		Set ("_temperatureUnits", units);
@@ -201,6 +201,22 @@ public sealed partial class PlatformDiscoveryTests
 		Assert.That (requested, Is.EqualTo (WiserUnits.Metric));
 		Assert.That (Entities["room_4"].CurrentTemperature, Is.EqualTo (68));
 		Assert.That (Entities["room_4"].TargetTemperature, Is.EqualTo (69.8));
+		}
+
+	[TestCase (false, 41.9, 41, 50)]
+	[TestCase (true, 85.1, 86, 300)]
+	public async Task TemperatureDisplay_ClientStepGridReachesFahrenheitEndpoint (bool raise, double feedback, double endpoint, int expected)
+		{
+		Set ("_temperatureUnits", "Fahrenheit");
+		await Refresh ("""[{"id":4,"Name":"Synthetic","Mode":"Manual","CurrentSetPoint":190}]""");
+		var range = Entities["room_4"].GetState ().Definition.Properties["targetTemperature"].TypeDef.Range;
+		double step = Convert.ToDouble (range.StepSize, CultureInfo.InvariantCulture);
+		// Retained Android requests matched snapping feedback to a zero-origin grid before stepping.
+		// Both declared endpoints must remain reachable without an out-of-range request.
+		double request = Math.Round (Math.Round (feedback / step, MidpointRounding.AwayFromZero) * step + (raise ? step : -step), 1);
+		Assert.That (request, Is.InRange (Convert.ToDouble (range.Minimum, CultureInfo.InvariantCulture), Convert.ToDouble (range.Maximum, CultureInfo.InvariantCulture)));
+		Assert.That (request, Is.EqualTo (endpoint));
+		await WriteNativeTemperatureCommandAsync ("Fahrenheit", request, expected);
 		}
 
 	[TestCase ("Celsius", 5, 50)]

@@ -122,6 +122,11 @@ public sealed class RoomTemperatureCycleTests
 				bool boost = action == RoomTemperatureAction.BoostOn;
 				int target = action == RoomTemperatureAction.PrepareOff ? -200 : action == RoomTemperatureAction.ResumeHeating ? 50 :
 					RoomTemperatureRestoration.Room (State.Gateway.Hub, 9).GetProperty ("CurrentSetPoint").GetInt32 () + (boost ? (int)(State.BoostSettings!.DeltaCelsius * 10) : action == RoomTemperatureAction.Raise ? 5 : -5);
+				if (State.TemperatureUnits == "Fahrenheit" && action is RoomTemperatureAction.Raise or RoomTemperatureAction.Lower)
+					{
+					double input = Math.Round (State.HomeTarget, MidpointRounding.AwayFromZero) + (action == RoomTemperatureAction.Raise ? 1 : -1);
+					target = (int)(Math.Round ((input - 32) * 5 / 9 / 0.5, MidpointRounding.AwayFromZero) * 5);
+					}
 				if (boost && Behavior == "wrong-boost-target") target += 5;
 				State = Edit (State, d =>
 					{
@@ -231,7 +236,7 @@ public sealed class RoomTemperatureCycleTests
 		}
 	[TestCase (false, false, false), TestCase (false, false, true), TestCase (false, true, false), TestCase (false, true, true)]
 	[TestCase (true, false, false), TestCase (true, false, true), TestCase (true, true, false), TestCase (true, true, true)]
-	public async Task BoundaryWalkUsesOnlyConfirmedHalfDegreeInputsAndRestoresPolicy (bool manual, bool fahrenheit, bool maximum)
+	public async Task BoundaryWalkUsesConfirmedDisplayStepsAndRestoresPolicy (bool manual, bool fahrenheit, bool maximum)
 		{
 		var session = new Session (manual);
 		if (fahrenheit)
@@ -242,7 +247,7 @@ public sealed class RoomTemperatureCycleTests
 		Assert.That (session.Targets.Last (), Is.EqualTo (maximum ? 300 : 50));
 		Assert.That (session.Targets, Has.All.InRange (50, 300));
 		Assert.That (session.Inputs, Has.All.EqualTo (maximum ? RoomTemperatureAction.Raise : RoomTemperatureAction.Lower));
-		Assert.That (session.Inputs.Count, Is.EqualTo (maximum ? 24 : 26));
+		Assert.That (session.Inputs.Count, Is.EqualTo (fahrenheit ? maximum ? 22 : 23 : maximum ? 24 : 26));
 		Assert.That (session.Records, Does.Contain ("boundary-observed"));
 		Assert.That (session.Records.Count (p => p.StartsWith ("input-", StringComparison.Ordinal) && p.EndsWith ("-observed", StringComparison.Ordinal)), Is.EqualTo (session.Inputs.Count));
 		RoomTemperatureRestoration.RequireRestored (RoomTemperatureRestoration.Capture (RoomTemperatureRestoration.Room (original.Gateway.Hub, 9)), RoomTemperatureRestoration.Room (session.State.Gateway.Hub, 9));

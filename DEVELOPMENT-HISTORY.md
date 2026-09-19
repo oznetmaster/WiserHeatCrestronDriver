@@ -1,5 +1,15 @@
 # Development and validation history
 
+## Fahrenheit display-step compatibility and candidate 1.3.14 - 19 September 2026
+
+The 1.3.13 maximum test still failed. Retained Android logs show requests 82.8, 83.7, 84.6 and 85.5 F after feedback 81.5, 82.4, 83.3 and 84.2 F, with no matching request for the final press. These values fit snapping to a zero-origin 0.9 F grid, which would put the next request at 86.4 F beyond the declared 86 F limit. This is an inference from observed app messages, not inspection of Crestron's implementation. The earlier roundoff regression remains valid but did not resolve the physical maximum case.
+
+The room returned to its scheduled target, and independent reconciliation verified its original Auto/manual policy, restored Celsius, removed the owned child and released reservations. A redundant private cleanup comparison initially rejected the hub's omission of an inactive OverrideType=None field; explicit room-restoration and household guards confirmed the equivalent inactive state before cleanup continued. No active override or other household change was ignored. The failed run remains failed.
+
+The candidate now advertises a whole-degree Fahrenheit input step. Both 41 and 86 lie on that grid, while underlying targets retain the hub's half-degree Celsius resolution. Two local endpoint-grid cases failed before the metadata change and passed after; all 22 temperature-focused cases, 199 desktop driver tests and the net472 build pass. Three desktop real-hub cases were skipped. The native acceptance producer predicts the exact quantized physical target from the displayed step and stops at the observed endpoint; it no longer assumes every Fahrenheit input is 0.5 C. Its 113 focused control/recovery cases and all 725 control tests pass. Physical validation of 1.3.14 is still pending.
+
+The completed 1.3.11 endurance evidence remains identified as 1.3.11. These input-path changes do not automatically trigger another passive 24-hour run. The final submission must disclose the revisions and use applicable final-candidate regression and functionality evidence; no claim of Crestron acceptance is made.
+
 ## Fahrenheit endpoint roundoff and candidate 1.3.13 preparation - 19 September 2026
 
 Candidate 1.3.12 passed the Fahrenheit minimum exercise with 28 accepted inputs and verified restoration. The maximum exercise accepted 21 inputs to 29.5 C but did not accept the final increase. The test failed and retained its reservation. Independent reconciliation confirmed the original Auto mode and saved manual target, cleared only the temporary override, restored Celsius and removed the owned child. The failed test remains failed.

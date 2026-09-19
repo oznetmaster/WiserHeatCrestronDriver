@@ -41,6 +41,22 @@ public static class RoomTemperatureCycle
 		"Fahrenheit" => snapshot.HomeTarget == -20 ? -200 : (snapshot.HomeTarget - 32) / 0.18d,
 		_ => double.NaN
 		};
+	private static int SteppedTarget (RoomTemperatureSnapshot snapshot, RoomTemperatureAction action)
+		{
+		int direction = action == RoomTemperatureAction.Raise ? 1 : -1;
+		int target;
+		if (snapshot.TemperatureUnits == "Fahrenheit")
+			{
+			// Home steps on the advertised whole-degree display grid. The hub stores half-degree Celsius values.
+			double requested = Math.Round (snapshot.HomeTarget, MidpointRounding.AwayFromZero) + direction;
+			target = (int)(Math.Round ((requested - 32) / 1.8 * 2, MidpointRounding.AwayFromZero) * 5);
+			}
+		else
+			target = Room (snapshot).GetProperty ("CurrentSetPoint").GetInt32 () + direction * 5;
+		if (target is < 50 or > 300)
+			throw new InvalidDataException ("The next displayed step would exceed the supported hub range.");
+		return target;
+		}
 	private static bool Restored (RoomTemperatureRestorePlan plan, RoomTemperatureSnapshot snapshot, bool verifyUi = true)
 		{
 		try
@@ -164,8 +180,7 @@ public static class RoomTemperatureCycle
 				}
 			foreach (var action in actions)
 				{
-				int target = maximum.HasValue ? Room (current).GetProperty ("CurrentSetPoint").GetInt32 () + (action == RoomTemperatureAction.Raise ? 5 : -5)
-					: off ? submitted == 0 ? -200 : 50 : submitted == 0 ? start + delta : start;
+				int target = boost ? 0 : off ? submitted == 0 ? -200 : 50 : SteppedTarget (current, action);
 				Func<RoomTemperatureSnapshot, bool> nextDelivered = boost
 					? action == RoomTemperatureAction.BoostOn
 						? value => RoomTemperatureRestoration.Origin (Room (value)) == "FromBoost" && Room (value).GetProperty ("OverrideTimeoutUnixTime").GetInt64 () > DateTimeOffset.UtcNow.ToUnixTimeSeconds ()
@@ -207,6 +222,8 @@ public static class RoomTemperatureCycle
 					Snapshot = current,
 					Seconds = elapsed.Elapsed.TotalSeconds
 					});
+				if (maximum.HasValue && Room (current).GetProperty ("CurrentSetPoint").GetInt32 () == (maximum.Value ? 300 : 50))
+					break;
 				}
 			if (maximum.HasValue)
 				{

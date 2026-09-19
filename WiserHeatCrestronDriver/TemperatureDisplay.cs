@@ -16,12 +16,14 @@ internal static class TemperatureDisplay
 	internal static string NormalizeUnits (string? units) => IsFahrenheit (units) ? "Fahrenheit" : "Celsius";
 	internal static double FromCelsius (double value, string? units) => IsFahrenheit (units) ? Math.Round (value * 9 / 5 + 32, 1) : value;
 	internal static double SetpointFromCelsius (double value, string? units) => value == WiserHeatApiV2.Constants.TEMP_OFF ? value : FromCelsius (value, units);
-	internal static double Step (string? units) => IsFahrenheit (units) ? 0.9 : StepCelsius;
+	// A whole-degree Fahrenheit grid contains both endpoints (41 and 86).
+	// This avoids the observed Home step/range mismatch at the Fahrenheit upper limit.
+	internal static double Step (string? units) => IsFahrenheit (units) ? 1 : StepCelsius;
 
 	internal static bool TrySetpoint (double displayed, string? units, out double celsius)
 		{
 		celsius = IsFahrenheit (units) ? (displayed - 32) * 5 / 9 : displayed;
-		// Repeated UI steps can accumulate binary roundoff at an exact endpoint.
+		// Arithmetic can accumulate binary roundoff at an exact endpoint.
 		// Accept only numerical noise before rounding to the supported half-degree grid.
 		if (double.IsNaN (celsius) || double.IsInfinity (celsius) || celsius < MinimumCelsius - BoundaryToleranceCelsius || celsius > MaximumCelsius + BoundaryToleranceCelsius)
 			return false;
