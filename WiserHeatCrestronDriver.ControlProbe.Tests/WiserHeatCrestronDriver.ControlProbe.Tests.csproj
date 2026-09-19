@@ -2,6 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><IsTestProject>true</IsTestProject><IsPackable>false</IsPackable></PropertyGroup>
   <ItemGroup>
+    <Compile Include="../WiserHeatCrestronDriver.AndroidControlTests/ThermostatTemperatureRendering.cs" Link="ThermostatTemperatureRendering.cs" />
     <Compile Include="../WiserHeatCrestronDriver.AndroidControlTests/ScheduleControlCycle.cs" Link="ScheduleControlCycle.cs" />
     <Compile Include="../WiserHeatCrestronDriver.AndroidControlTests/ScheduleControlRepetition.cs" Link="ScheduleControlRepetition.cs" />
     <Compile Include="../WiserHeatCrestronDriver.AndroidControlTests/RoomPeerObservation.cs" Link="RoomPeerObservation.cs" />

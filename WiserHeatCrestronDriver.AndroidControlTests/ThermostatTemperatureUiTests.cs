@@ -10,6 +10,8 @@ using CrestronHomeNUnit.Android;
 
 using NUnit.Framework;
 
+using static WiserHeatCrestronDriver.AndroidTests.ThermostatTemperatureRendering;
+
 namespace WiserHeatCrestronDriver.AndroidTests;
 
 public sealed partial class GatewayUiTests
@@ -18,8 +20,6 @@ public sealed partial class GatewayUiTests
 		{
 		public bool AllowThermostatTemperatureObservation { get; init; }
 		}
-	private sealed record HubTemperatures (int Id, int Current, int Target);
-	private sealed record RenderedTemperatures (string Current, string Label, string Target);
 
 	[Test, Category ("LiveReadOnly")]
 	public async Task NativeThermostatTemperaturesMatchHubAndReturnHome ()
@@ -42,6 +42,12 @@ public sealed partial class GatewayUiTests
 			var binding = _settings.Rooms.Single (room => room.DeviceId == control.DeviceId);
 			using var timeout = new CancellationTokenSource (TimeSpan.FromMinutes (5));
 			var original = await ReadRoomAsync (binding, timeout.Token);
+			string units = original.PropertyValues["temperatureUnits"].GetString () switch
+				{
+				"Celsius" => "Celsius",
+				"Fahrenheit" => "Fahrenheit",
+				_ => throw new InvalidDataException ("The observed thermostat must use Celsius or Fahrenheit.")
+				};
 			string check = "wiser.room-" + binding.DeviceId.ToString (CultureInfo.InvariantCulture) + ".temperatures";
 			async Task<HubTemperatures> ReadHub (CancellationToken token)
 				{
@@ -54,8 +60,9 @@ public sealed partial class GatewayUiTests
 			void VerifyIdentity (DeviceInfo device, HubTemperatures observed)
 				{
 				if (device.Id != original.Id || device.Name != original.Name || device.ParentDeviceId != original.ParentDeviceId || device.LocationId != original.LocationId ||
-					device.PropertyValues["controlDeviceId"].GetString () != host + "/room/" + observed.Id.ToString (CultureInfo.InvariantCulture))
-					throw new InvalidDataException ("The observed hub room and processor thermostat identity differ.");
+					device.PropertyValues["controlDeviceId"].GetString () != host + "/room/" + observed.Id.ToString (CultureInfo.InvariantCulture) ||
+					device.PropertyValues["temperatureUnits"].GetString () != units)
+					throw new InvalidDataException ("The observed thermostat identity or temperature units changed.");
 				}
 			await _navigation!.InspectRoomExtensionPagesAsync (check, binding.RoomName, original.Name!, binding.PageTitle, async (pages, token) =>
 				{
@@ -82,12 +89,9 @@ public sealed partial class GatewayUiTests
 						.All (key => JsonElement.DeepEquals (first.PropertyValues[key], last.PropertyValues[key]));
 					// These ranges exclude the hub's unavailable/error sentinels. An unavailable reading cannot prove temperature rendering.
 					bool ordinary = firstHub.Current is >= 0 and <= 600 && firstHub.Target is >= 50 and <= 300;
-					double current = firstHub.Current / 10d, targetValue = firstHub.Target / 10d;
-					bool matches = stable && ordinary && last.PropertyValues["temperatureUnits"].GetString () == "Celsius" &&
-						Math.Abs (last.PropertyValues["currentTemperature"].GetDouble () - current) < 0.001 &&
-						Math.Abs (last.PropertyValues["targetTemperature"].GetDouble () - targetValue) < 0.001 &&
-						shown == new RenderedTemperatures (current.ToString ("0.0", CultureInfo.InvariantCulture) + "°C", current.ToString ("0.0", CultureInfo.InvariantCulture) + "°", targetValue.ToString ("0.0", CultureInfo.InvariantCulture) + "°C") &&
-						shown.Label == last.PropertyValues["currentTemperatureLabel"].GetString ();
+					bool matches = stable && ordinary && ThermostatTemperatureRendering.Matches (firstHub,
+						new ProcessorTemperatures (units, last.PropertyValues["currentTemperature"].GetDouble (),
+							last.PropertyValues["targetTemperature"].GetDouble (), last.PropertyValues["currentTemperatureLabel"].GetString ()!), shown);
 					await File.WriteAllTextAsync (Path.Combine (_session!.Context.EvidenceDirectory, check + ".sample-" + attempt.ToString (CultureInfo.InvariantCulture) + ".json"), JsonSerializer.Serialize (new
 						{
 							ObservedUtc = DateTimeOffset.UtcNow, _session.Context.RunId, _session.Context.PackageSha256,
@@ -104,7 +108,8 @@ public sealed partial class GatewayUiTests
 			await File.WriteAllTextAsync (Path.Combine (_session!.Context.EvidenceDirectory, check + ".result.json"), JsonSerializer.Serialize (new
 				{
 					Passed = true, HomeRestored = _navigation.HomeRestored, PhysicalCommandsSent = false,
-					Scope = "Displayed Celsius current temperature, label and heating target compared with stable independent hub readings; gauge presence only, not pixel position."
+					TemperatureUnits = units,
+					Scope = "Displayed current temperature, label and heating target compared with stable independent hub readings in the original configured units; gauge presence only, not pixel position."
 					}), timeout.Token);
 			}
 		}

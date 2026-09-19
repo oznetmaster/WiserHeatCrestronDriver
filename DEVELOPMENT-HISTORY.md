@@ -1,5 +1,9 @@
 # Development and validation history
 
+## Read-only temperature inspection in either unit - 19 September 2026
+
+The read-only native thermostat fixture now accepts the original Celsius or Fahrenheit configuration and independently compares hub temperatures, processor feedback and rendered text at the documented display precision. It rejects unit changes, mismatched labels, unavailable readings and nonfinite values. This removes a Celsius-only limitation in the test harness without operating the hub, changing the driver or claiming gauge calibration. Offline comparison coverage supports preparation; the expanded physical case still requires execution.
+
 ## Room command failure and busy-state coverage - 19 September 2026
 
 The desktop/processor fixture sources now exercise rejected HTTP writes, transport exceptions and failed confirmation reads through the room's public commands and the real library with a synthetic HTTP transport. A burst of mode, boost, temperature and schedule-selection inputs is refused while the first write is pending. Controls remain unavailable through the confirmation read, recover after failure, and accept one new explicit command without replaying the failed request. The desktop lifecycle suite passed; physical and rendered Android busy/error acceptance remains separate. No production source or frozen candidate package changed.
