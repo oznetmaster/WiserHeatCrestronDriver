@@ -23,7 +23,8 @@ namespace WiserHeat.CrestronDriver;
 public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	{
 	private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds (10);
-	private static readonly TimeSpan ScheduleRefreshInterval = TimeSpan.FromSeconds (30);
+	private static readonly TimeSpan ScheduleRefreshInterval = RefreshInterval;
+	internal TimeSpan HubReadTimeout { get; set; } = TimeSpan.FromSeconds (4);
 
 	private readonly DriverControllerCreationArgs _args;
 	private readonly DriverImplementationResources _resources;
@@ -422,7 +423,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				{
 				await Task.Delay (RefreshInterval, cancellationToken).ConfigureAwait (false);
 
-				if (cancellationToken.IsCancellationRequested || _api == null || !OnlineIndicatorIsOnline)
+				if (cancellationToken.IsCancellationRequested || _api == null)
 					continue;
 
 				try
@@ -865,7 +866,8 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				newApi = null;
 				_workQueue.SetClient (_api);
 				}
-			await RefreshSystemStateAsync ().ConfigureAwait (false);
+			if (!await RefreshSystemStateAsync ().ConfigureAwait (false))
+				throw new InvalidOperationException ("The initial Wiser hub refresh failed.");
 			lock (_entitiesLock)
 				{
 				if (_disposed || generation != _connectionGeneration)
@@ -911,17 +913,41 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			api = _api;
 			generation = _connectionGeneration;
 			}
-		bool readHub = refreshSchedules || ShouldRefreshSchedules ();
+		void MarkUnavailable ()
+			{
+			lock (_entitiesLock)
+				{
+				if (_disposed || generation != _connectionGeneration || !ReferenceEquals (api, _api))
+					return;
+				SetOnline (false);
+				foreach (WiserRoomEntity room in _roomEntities.Values)
+					room.SetOnline (false);
+				UpdatePlatformOptionsState ();
+				UpdateStatus ("Offline", "Unable to refresh Wiser hub state. Retrying automatically.");
+				}
+			}
+		bool readHub = refreshSchedules || !OnlineIndicatorIsOnline || ShouldRefreshSchedules ();
 		if (readHub)
 			{
 			try
 				{
-				if (!await api.ReadHubDataAsync (CancellationToken.None).ConfigureAwait (false))
+				// Bound the complete read, including retries, so a disconnected hub does
+				// not leave its tiles online for the library's longer default timeout.
+				using var deadline = new CancellationTokenSource (HubReadTimeout);
+				if (!await api.ReadHubDataAsync (deadline.Token).ConfigureAwait (false))
+					{
+					MarkUnavailable ();
 					return false;
+					}
 				}
 			catch when (_disposed || generation != _connectionGeneration || !ReferenceEquals (api, _api))
 				{
 				return false;
+				}
+			catch
+				{
+				MarkUnavailable ();
+				throw;
 				}
 			}
 		lock (_entitiesLock)
@@ -1022,6 +1048,8 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				}
 
 			ManagedDevices = managed;
+			if (readHub)
+				SetOnline (true);
 			UpdatePlatformOptionsState ();
 
 			if (ManagedDevices.Count == 0)

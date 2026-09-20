@@ -802,6 +802,7 @@ public sealed partial class PlatformDiscoveryTests
 		internal bool FailScheduleReadAfterWrite;
 		internal string LastScheduleWrite;
 		internal bool HoldNextDomain;
+		internal bool StallDomainUntilCancelled;
 		internal readonly TaskCompletionSource<bool> Entered = new (TaskCreationOptions.RunContinuationsAsynchronously);
 		internal readonly TaskCompletionSource<bool> Release = new (TaskCreationOptions.RunContinuationsAsynchronously);
 		protected override async Task<HttpResponseMessage> SendAsync (HttpRequestMessage request, CancellationToken cancellationToken)
@@ -865,6 +866,8 @@ public sealed partial class PlatformDiscoveryTests
 				return new HttpResponseMessage (HttpStatusCode.BadRequest) { Content = new StringContent ("{}") };
 			if (path.EndsWith ("/domain/"))
 				DomainReads++;
+			if (path.EndsWith ("/domain/") && StallDomainUntilCancelled)
+				await Task.Delay (Timeout.Infinite, cancellationToken);
 			if (path.EndsWith ("/domain/") && HoldNextDomain)
 				{
 				HoldNextDomain = false;
