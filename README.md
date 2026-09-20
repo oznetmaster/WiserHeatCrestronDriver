@@ -182,17 +182,17 @@ Build the processor project in Debug in Visual Studio to build and deploy using 
 
 ### Command state refresh
 
-After a state-changing command completes, the driver reads fresh hub state before publishing the result. Hot-water and Away buttons therefore show the observed state before they become available again; boost, schedule and setpoint controls also refresh immediately. Routine polling remains throttled.
+After a state-changing command completes, the driver reads fresh hub state before publishing the result. Hot-water and Away buttons therefore show the observed state before they become available again; boost, schedule and setpoint controls also refresh immediately. Background polling requests fresh hub data approximately every ten seconds. A failed bounded read marks the gateway and its thermostats offline; polling continues, and a successful fresh read restores availability automatically while preserving room controllers and saved settings.
 
 The opt-in Android boundary fixture also exercises both directions at the temperature limits for each current row, including rows revealed by scrolling, then verifies Cancel and unchanged independent hub schedules. Its endpoint preparation is separate from the Android button inputs. See the [control-test setup and scope](WiserHeatCrestronDriver.AndroidControlTests/README.md).
 
-SDK command regressions also verify schedule-editor temperature limits, non-finite input, half-degree rounding, Cancel restoration and continued hub refresh after an ignored command. Version 1.3.8 ignores temperatures outside the advertised 5-35 degree range before starting an edit. See the [release notes](RELEASE-NOTES.md) and [submission validation status](submission/ValidationStatus.md) for their separate validation scopes.
+SDK command regressions also verify schedule-editor temperature limits, non-finite input, half-degree rounding, Cancel restoration and continued hub refresh after an ignored command. The supported heating range is 5-30 C / 41-86 F. Fahrenheit controls use whole-degree input steps, while physical targets retain the hub's half-degree Celsius resolution; invalid or out-of-range values are rejected before starting an edit. See the [release notes](RELEASE-NOTES.md) and [submission validation status](submission/ValidationStatus.md) for their separate validation scopes.
 
 ### Expanded driver behavior tests
 
 The SDK and processor fixtures exercise every one of the ten schedule editor positions, verify slot-specific time/temperature notifications and Cancel restoration, and check clearing/restoration as the selected day changes its number of entries. These fixtures use simulated hub responses and send no commands to a physical room. Actual Android rendering and live save/conflict behavior remain separate checks.
 
-Cover room discovery, stable child identity, renamed/removed rooms, cleared settings, overlapping connections and late refresh/login completion. Clearing or disposing the platform now removes its children and prevents old work from restoring them. Update WiserHeatAPIv2 to 1.1.0.6.
+Cover room discovery, stable child identity, renamed/removed rooms, cleared settings, overlapping connections and late refresh/login completion. Clearing or disposing the platform now removes its children and prevents old work from restoring them. The runtime dependency is WiserHeatAPIv2 1.1.2.
 
 Saved schedules can be reopened and saved again; integer lists and arrays are copied independently before editing; the root entity can be created and disposed repeatedly.
 

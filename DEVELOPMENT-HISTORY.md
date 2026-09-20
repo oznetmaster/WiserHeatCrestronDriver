@@ -1,5 +1,15 @@
 # Development and validation history
 
+## Offline recovery validation and 1.3.15 release - 20 September 2026
+
+The driver passed 203 desktop lifecycle/regression cases, including the background recovery path, failed reads, cancellation deadlines and preservation of existing room controllers. The outage regression was reproduced against the former implementation before restoring the fixed source. Release packaging and embedded version checks passed locally.
+
+On the CP4-R, blocking the household hub's network for more than 60 seconds produced gateway and child offline status within a conservative 12-second bound and visible Home offline feedback within 15 seconds. Both became available again after fresh reads, within 39 seconds of the recovery observation bound, without a command or reconfiguration. All seven saved gateway settings were preserved. This was hub network isolation, not physical power loss or processor network isolation.
+
+An initial supplemental observation recorded an 11-second offline interval followed by automatic recovery; its exact cause is unproven and its failed result is retained. A separate one-hour submission observation is still in progress at release preparation. It is not a release prerequisite or a claimed completed result. The earlier 24-hour record remains associated with candidate 1.3.11. Crestron submission, review and acceptance remain separate from this public patch release.
+
+The normal GitHub/NuGet package and the frozen submission package have different filenames. Normal packaging uses the existing ManifestUtil 27 workflow; the submission package with supporting PDF uses ManifestUtil 29. Neither a public build nor this documentation update replaces the candidate currently under observation.
+
 ## Fahrenheit display-step compatibility and candidate 1.3.14 - 19 September 2026
 
 The 1.3.13 maximum test still failed. Retained Android logs show requests 82.8, 83.7, 84.6 and 85.5 F after feedback 81.5, 82.4, 83.3 and 84.2 F, with no matching request for the final press. These values fit snapping to a zero-origin 0.9 F grid, which would put the next request at 86.4 F beyond the declared 86 F limit. This is an inference from observed app messages, not inspection of Crestron's implementation. The earlier roundoff regression remains valid but did not resolve the physical maximum case.

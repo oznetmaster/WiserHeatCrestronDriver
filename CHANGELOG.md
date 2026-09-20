@@ -2,6 +2,15 @@
 
 This changelog records shipped features, fixes, compatibility and runtime dependency changes. See [development and validation history](DEVELOPMENT-HISTORY.md) for tests, CI, build tooling and work not yet released.
 
+## 1.3.15 - 2026-09-20
+
+- Detect loss of communication with the hub, mark the gateway and its thermostats offline, and recover automatically after a successful fresh read. Preserve room controllers and saved settings during the interruption.
+- Correct Celsius/Fahrenheit display, conversion, temperature limits and endpoint handling. Show Off as a state and preserve automatic control when changing a target during a schedule-index rebuild.
+- Load the correct embedded manifest when the package is renamed for submission, and suppress unchanged polling diagnostics.
+- Update WiserHeatAPIv2 to 1.1.2.
+
+See [release notes](RELEASE-NOTES.md) for validation and [development history](DEVELOPMENT-HISTORY.md) for the intervening candidate builds and submission work.
+
 ## 1.3.8 - 2026-09-18
 
 - Keep schedule choices current and retain the confirmed assignment when a selection is invalid, rejected or pending.
