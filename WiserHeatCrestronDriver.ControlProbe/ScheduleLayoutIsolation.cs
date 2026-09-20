@@ -19,7 +19,7 @@ public static partial class ScheduleSaveIsolation
 		string day, IReadOnlyList<int> entryCounts, TimeSpan observationTimeout, CancellationToken token)
 		{
 		if (roomId <= 0 || !Enum.GetNames<DayOfWeek> ().Contains (day) || entryCounts.Count is < 2 or > 20 ||
-			entryCounts.Any (count => count is < 1 or > 10) || entryCounts.Distinct ().Count () < 2 ||
+			entryCounts.Any (count => count is < 1 or > 8) || entryCounts.Distinct ().Count () < 2 ||
 			observationTimeout <= TimeSpan.Zero || observationTimeout > TimeSpan.FromMinutes (2))
 			throw new ArgumentException ("Select a room, day, two or more distinct supported layouts and bounded observation timeout.");
 		ScheduleHubSnapshot? original = null;

@@ -453,7 +453,7 @@ public static partial class ScheduleSaveIsolation
 			{
 			int[] times = day.GetProperty ("Time").EnumerateArray ().Select (t => t.GetInt32 ()).ToArray ();
 			int[] temperatures = day.GetProperty ("DegreesC").EnumerateArray ().Select (t => t.GetInt32 ()).ToArray ();
-			if (times.Length is < 1 or > 10 || times.Length != temperatures.Length ||
+			if (times.Length is < 1 or > 8 || times.Length != temperatures.Length ||
 				times.Any (t => t is < 0 or > 2330 || t % 100 is not (0 or 30)) || times.Distinct ().Count () != times.Length ||
 				!times.SequenceEqual (times.Order ()) || temperatures.Any (t => t is < 50 or > 300 || t % 5 != 0))
 				throw new InvalidDataException ("The original schedule cannot be represented by this editor.");

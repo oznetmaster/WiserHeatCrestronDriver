@@ -58,7 +58,7 @@ public static class ScheduleEditorRendering
 			Is (node, "statusLabels_description") && Text (node).StartsWith ("TIME ", StringComparison.Ordinal) || Is (node, "customdeviceraiselowerwithtext_label")))
 			{
 			bool temperature = Is (label, "customdeviceraiselowerwithtext_label");
-			var match = Regex.Match (Text (label), temperature ? @"^SETPOINT ([1-9]|10)$" : @"^TIME ([1-9]|10)$");
+			var match = Regex.Match (Text (label), temperature ? @"^SETPOINT ([1-8])$" : @"^TIME ([1-8])$");
 			if (!match.Success) throw new InvalidDataException ("Unexpected editor slot label.");
 			int slot = int.Parse (match.Groups[1].Value, CultureInfo.InvariantCulture);
 			string kind = temperature ? "Temperature" : "Time";
@@ -92,7 +92,7 @@ public static class ScheduleEditorRendering
 			result.Add (new (slot, kind, expected));
 			}
 		if (requireComplete)
-			foreach (int slot in Enumerable.Range (1, 10).Where (slot => editor.GetProperty ("editSlot" + slot.ToString (CultureInfo.InvariantCulture) + "Visible").GetBoolean ()))
+			foreach (int slot in Enumerable.Range (1, 8).Where (slot => editor.GetProperty ("editSlot" + slot.ToString (CultureInfo.InvariantCulture) + "Visible").GetBoolean ()))
 				foreach (string kind in new[] { "Time", "Temperature" })
 					if (!result.Any (value => value.Slot == slot && value.Kind == kind))
 						throw new InvalidDataException ("Not every expected editor control was completely visible and checked.");

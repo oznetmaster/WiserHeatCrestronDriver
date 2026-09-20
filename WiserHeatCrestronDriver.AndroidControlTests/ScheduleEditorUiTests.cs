@@ -283,7 +283,7 @@ public sealed partial class GatewayUiTests
 			controls = ScheduleEditorRendering.RequireValues (front.MaskedXml, editor, requireComplete: false);
 			Assert.That (controls, Is.Not.Empty, "The editor must expose at least one complete control row.");
 			}, token);
-		int expected = Enumerable.Range (1, 10).Count (slot => editor.GetProperty ("editSlot" + slot.ToString (CultureInfo.InvariantCulture) + "Visible").GetBoolean ()) * 2;
+		int expected = Enumerable.Range (1, 8).Count (slot => editor.GetProperty ("editSlot" + slot.ToString (CultureInfo.InvariantCulture) + "Visible").GetBoolean ()) * 2;
 		await record (phase, new { Editor = editor, Controls = controls, AllCurrentControlsObserved = controls!.Count == expected,
 			Scope = "Fully visible rows on this editor page; clipped or off-screen controls do not establish coverage." });
 		}

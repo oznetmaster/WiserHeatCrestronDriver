@@ -24,20 +24,20 @@ public sealed partial class PlatformDiscoveryTests
 	[TestCase (30.01)]
 	public async Task ScheduleEditor_InvalidTemperatureCommandPreservesPendingValues (double value)
 		{
-		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Ten slots\",\"Monday\":" + EditorDay (10) + "}]";
+		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Eight slots\",\"Monday\":" + EditorDay (8) + "}]";
 		await _api.ReadHubDataAsync ();
 		await Refresh ("[{\"id\":4,\"Name\":\"Editor room\",\"ScheduleId\":7}]");
 		var room = Entities["room_4"];
 		room.OpenEditSchedule ();
 		room.SetEditSelectedDay ("Monday");
-		foreach (int slot in new[] { 1, 10 })
+		foreach (int slot in new[] { 1, 8 })
 			{
 			var completion = new TaskCompletionSource<bool> (TaskCreationOptions.RunContinuationsAsynchronously);
 			room.ExecuteCommand ("setEditSlot" + slot.ToString (CultureInfo.InvariantCulture) + "Temperature",
 				new Dictionary<string, DriverEntityValue> { ["value"] = new DriverEntityValue (value) }, result => completion.TrySetResult (result.Failed));
 			await TestSupport.Complete (completion.Task);
 			var state = room.GetState ().PropertyValues;
-			for (int index = 1; index <= 10; index++)
+			for (int index = 1; index <= 8; index++)
 				Assert.That (state["editSlot" + index + "Temperature"].GetValue<double> (), Is.EqualTo (16 + (index - 1) * 0.5), "Rejected input must not poison any pending slot.");
 			}
 		Assert.That (_transport.ScheduleWrites, Is.Zero);
@@ -50,13 +50,13 @@ public sealed partial class PlatformDiscoveryTests
 	[TestCase (29.75, 30.0)]
 	public async Task ScheduleEditor_BoundaryTemperatureCommandIsAcceptedAndCancelRestores (double value, double expected)
 		{
-		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Ten slots\",\"Monday\":" + EditorDay (10) + "}]";
+		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Eight slots\",\"Monday\":" + EditorDay (8) + "}]";
 		await _api.ReadHubDataAsync ();
 		await Refresh ("[{\"id\":4,\"Name\":\"Editor room\",\"ScheduleId\":7}]");
 		var room = Entities["room_4"];
 		room.OpenEditSchedule ();
 		room.SetEditSelectedDay ("Monday");
-		foreach (int slot in new[] { 1, 10 })
+		foreach (int slot in new[] { 1, 8 })
 			{
 			var completion = new TaskCompletionSource<bool> (TaskCreationOptions.RunContinuationsAsynchronously);
 			room.ExecuteCommand ("setEditSlot" + slot.ToString (CultureInfo.InvariantCulture) + "Temperature",
@@ -67,7 +67,7 @@ public sealed partial class PlatformDiscoveryTests
 			}
 		room.CancelEditSchedule ();
 		Assert.That (room.GetState ().PropertyValues["editSlot1Temperature"].GetValue<double> (), Is.EqualTo (16));
-		Assert.That (room.GetState ().PropertyValues["editSlot10Temperature"].GetValue<double> (), Is.EqualTo (20.5));
+		Assert.That (room.GetState ().PropertyValues["editSlot8Temperature"].GetValue<double> (), Is.EqualTo (19.5));
 		Assert.That (_transport.ScheduleWrites, Is.Zero);
 		}
 	[TestCase (4.5)]

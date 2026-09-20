@@ -32,7 +32,7 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 	private DriverEntityAvailableValue[] _scheduleValues = [];
 	private DriverEntityAvailableValue[]? _publishedScheduleValues;
 	private WiserRoom _room;
-	private const int MAX_EDITABLE_SCHEDULE_SLOTS = 10;
+	private const int MAX_EDITABLE_SCHEDULE_SLOTS = 8;
 	private static readonly string[] _editableScheduleDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 	private static readonly DriverEntityAvailableValue[] EditTimeValues = BuildEditTimeAvailableValues ();
 	private readonly Dictionary<string, List<EditableScheduleSlot>> _editDaySlots = new (StringComparer.OrdinalIgnoreCase);
@@ -465,22 +465,6 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 		private set => _editSlotTimes[7] = value ?? string.Empty;
 		}
 
-	[EntityProperty (Id = "editSlot9Time", FriendlyName = "Edit Slot 9 Time", Type = DriverEntityValueType.String, AvailableValues = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLabels = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLocalizationKeys = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" })]
-	[EntityPropertyMetadata (ExtensionUiProperty = true)]
-	public string EditSlot9Time
-		{
-		get => _editSlotTimes[8] ?? string.Empty;
-		private set => _editSlotTimes[8] = value ?? string.Empty;
-		}
-
-	[EntityProperty (Id = "editSlot10Time", FriendlyName = "Edit Slot 10 Time", Type = DriverEntityValueType.String, AvailableValues = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLabels = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" }, AvailableValuesLocalizationKeys = new[] { "00:00", "00:30", "01:00", "01:30", "02:00", "02:30", "03:00", "03:30", "04:00", "04:30", "05:00", "05:30", "06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00", "22:30", "23:00", "23:30" })]
-	[EntityPropertyMetadata (ExtensionUiProperty = true)]
-	public string EditSlot10Time
-		{
-		get => _editSlotTimes[9] ?? string.Empty;
-		private set => _editSlotTimes[9] = value ?? string.Empty;
-		}
-
 	[EntityProperty (Id = "editSlot1Temperature", FriendlyName = "Edit Slot 1 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 30.0, RangeStepSize = 0.5)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public double EditSlot1Temperature
@@ -545,22 +529,6 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 		private set => _editSlotTemperatures[7] = value;
 		}
 
-	[EntityProperty (Id = "editSlot9Temperature", FriendlyName = "Edit Slot 9 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 30.0, RangeStepSize = 0.5)]
-	[EntityPropertyMetadata (ExtensionUiProperty = true)]
-	public double EditSlot9Temperature
-		{
-		get => _editSlotTemperatures[8];
-		private set => _editSlotTemperatures[8] = value;
-		}
-
-	[EntityProperty (Id = "editSlot10Temperature", FriendlyName = "Edit Slot 10 Temperature", Type = DriverEntityValueType.Number, RangeMinimum = 5.0, RangeMaximum = 30.0, RangeStepSize = 0.5)]
-	[EntityPropertyMetadata (ExtensionUiProperty = true)]
-	public double EditSlot10Temperature
-		{
-		get => _editSlotTemperatures[9];
-		private set => _editSlotTemperatures[9] = value;
-		}
-
 	[EntityCommand (Id = "setEditSlot1Time", FriendlyName = "Set Edit Slot 1 Time")]
 	public void SetEditSlot1Time (
 		[EntityParameter (Id = "value", Type = DriverEntityValueType.String)]
@@ -600,16 +568,6 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 	public void SetEditSlot8Time (
 		[EntityParameter (Id = "value", Type = DriverEntityValueType.String)]
 		string value) => SetEditSlotTimeProperty (7, "editSlot8Time", value);
-
-	[EntityCommand (Id = "setEditSlot9Time", FriendlyName = "Set Edit Slot 9 Time")]
-	public void SetEditSlot9Time (
-		[EntityParameter (Id = "value", Type = DriverEntityValueType.String)]
-		string value) => SetEditSlotTimeProperty (8, "editSlot9Time", value);
-
-	[EntityCommand (Id = "setEditSlot10Time", FriendlyName = "Set Edit Slot 10 Time")]
-	public void SetEditSlot10Time (
-		[EntityParameter (Id = "value", Type = DriverEntityValueType.String)]
-		string value) => SetEditSlotTimeProperty (9, "editSlot10Time", value);
 
 	[EntityCommand (Id = "setEditSlot1Temperature", FriendlyName = "Set Edit Slot 1 Temperature")]
 	public void SetEditSlot1Temperature (
@@ -651,16 +609,6 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 		[EntityParameter (Id = "value", Type = DriverEntityValueType.Number)]
 		double value) => SetEditSlotTemperatureProperty (7, "editSlot8Temperature", value);
 
-	[EntityCommand (Id = "setEditSlot9Temperature", FriendlyName = "Set Edit Slot 9 Temperature")]
-	public void SetEditSlot9Temperature (
-		[EntityParameter (Id = "value", Type = DriverEntityValueType.Number)]
-		double value) => SetEditSlotTemperatureProperty (8, "editSlot9Temperature", value);
-
-	[EntityCommand (Id = "setEditSlot10Temperature", FriendlyName = "Set Edit Slot 10 Temperature")]
-	public void SetEditSlot10Temperature (
-		[EntityParameter (Id = "value", Type = DriverEntityValueType.Number)]
-		double value) => SetEditSlotTemperatureProperty (9, "editSlot10Temperature", value);
-
 	[EntityProperty (Id = "editSlot1Visible", FriendlyName = "Edit Slot 1 Visible", Type = DriverEntityValueType.Boolean)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public bool EditSlot1Visible => _editSlotVisible[0];
@@ -693,14 +641,6 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public bool EditSlot8Visible => _editSlotVisible[7];
 
-	[EntityProperty (Id = "editSlot9Visible", FriendlyName = "Edit Slot 9 Visible", Type = DriverEntityValueType.Boolean)]
-	[EntityPropertyMetadata (ExtensionUiProperty = true)]
-	public bool EditSlot9Visible => _editSlotVisible[8];
-
-	[EntityProperty (Id = "editSlot10Visible", FriendlyName = "Edit Slot 10 Visible", Type = DriverEntityValueType.Boolean)]
-	[EntityPropertyMetadata (ExtensionUiProperty = true)]
-	public bool EditSlot10Visible => _editSlotVisible[9];
-
 	[EntityProperty (Id = "editSlot1Error", FriendlyName = "Edit Slot 1 Error", Type = DriverEntityValueType.String)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public string EditSlot1Error => _editSlotErrors[0] ?? string.Empty;
@@ -732,14 +672,6 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 	[EntityProperty (Id = "editSlot8Error", FriendlyName = "Edit Slot 8 Error", Type = DriverEntityValueType.String)]
 	[EntityPropertyMetadata (ExtensionUiProperty = true)]
 	public string EditSlot8Error => _editSlotErrors[7] ?? string.Empty;
-
-	[EntityProperty (Id = "editSlot9Error", FriendlyName = "Edit Slot 9 Error", Type = DriverEntityValueType.String)]
-	[EntityPropertyMetadata (ExtensionUiProperty = true)]
-	public string EditSlot9Error => _editSlotErrors[8] ?? string.Empty;
-
-	[EntityProperty (Id = "editSlot10Error", FriendlyName = "Edit Slot 10 Error", Type = DriverEntityValueType.String)]
-	[EntityPropertyMetadata (ExtensionUiProperty = true)]
-	public string EditSlot10Error => _editSlotErrors[9] ?? string.Empty;
 
 	[EntityCommand (Id = "boost", FriendlyName = "Boost")]
 	[EntityCommandMetadata (Programmable = true)]

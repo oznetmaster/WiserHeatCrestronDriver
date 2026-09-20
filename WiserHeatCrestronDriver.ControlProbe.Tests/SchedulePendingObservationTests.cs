@@ -20,7 +20,7 @@ public sealed class SchedulePendingObservationTests
 	private static JsonObject Editor ()
 		{
 		var editor = new JsonObject { ["editSelectedDay"] = "Monday", ["editScheduleEnabled"] = true, ["editScheduleError"] = "" };
-		for (int i = 1; i <= 10; i++)
+		for (int i = 1; i <= 8; i++)
 			{
 			editor[$"editSlot{i}Visible"] = i == 1;
 			editor[$"editSlot{i}Time"] = "04:30";
@@ -34,7 +34,7 @@ public sealed class SchedulePendingObservationTests
 		yield return new ("editSelectedDay", "\"Tuesday\"");
 		yield return new ("editScheduleEnabled", "false");
 		yield return new ("editScheduleError", "\"Conflict\"");
-		for (int i = 1; i <= 10; i++)
+		for (int i = 1; i <= 8; i++)
 			{
 			yield return new ($"editSlot{i}Visible", i == 1 ? "false" : "true");
 			yield return new ($"editSlot{i}Time", "\"05:00\"");

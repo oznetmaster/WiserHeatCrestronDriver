@@ -68,16 +68,6 @@
           <raiselowerwithtext id="EditSlot8Temperature" label="^EditScheduleTemperature8Label" value="{editSlot8Temperature}" valueformat="^EditScheduleTemperatureFormat" visible="{editSlot8HasTemperature}" />
           <statusandbutton id="EditSlot8Off" label="^EditScheduleTemperature8Label" status="^HeatingOffLabel" buttonlabel="{minimumHeatingLabel}" buttonaction="command:resumeEditSlot8" visible="{editSlot8IsOff}" />
         </controlgroup>
-        <controlgroup visible="{editSlot9Visible}">
-          <selectorbutton id="EditSlot9Time" label="^EditScheduleTime9Label" value="{editSlot9Time}" />
-          <raiselowerwithtext id="EditSlot9Temperature" label="^EditScheduleTemperature9Label" value="{editSlot9Temperature}" valueformat="^EditScheduleTemperatureFormat" visible="{editSlot9HasTemperature}" />
-          <statusandbutton id="EditSlot9Off" label="^EditScheduleTemperature9Label" status="^HeatingOffLabel" buttonlabel="{minimumHeatingLabel}" buttonaction="command:resumeEditSlot9" visible="{editSlot9IsOff}" />
-        </controlgroup>
-        <controlgroup visible="{editSlot10Visible}">
-          <selectorbutton id="EditSlot10Time" label="^EditScheduleTime10Label" value="{editSlot10Time}" />
-          <raiselowerwithtext id="EditSlot10Temperature" label="^EditScheduleTemperature10Label" value="{editSlot10Temperature}" valueformat="^EditScheduleTemperatureFormat" visible="{editSlot10HasTemperature}" />
-          <statusandbutton id="EditSlot10Off" label="^EditScheduleTemperature10Label" status="^HeatingOffLabel" buttonlabel="{minimumHeatingLabel}" buttonaction="command:resumeEditSlot10" visible="{editSlot10IsOff}" />
-        </controlgroup>
         <buttongroup visible="{editScheduleEnabled}">
           <button id="SaveEditScheduleDayBtn" label="^EditScheduleSaveDayLabel" action="command:saveEditScheduleDay" />
           <button id="SaveEditScheduleAllDaysBtn" label="^EditScheduleSaveAllDaysLabel" action="command:saveEditScheduleAllDays" />

@@ -16,10 +16,10 @@ public sealed partial class PlatformDiscoveryTests
 		"],\"DegreesC\":[" + string.Join (",", Enumerable.Range (0, count).Select (index => 160 + index * 5)) + "]}";
 
 	[Test, Combinatorial]
-	public async Task ScheduleEditor_EachSlotPublishesOnlyItsOwnPendingChangeAndCancelRestoresIt ([Range (1, 10)] int slot, [Values (false, true)] bool temperature)
+	public async Task ScheduleEditor_EachSlotPublishesOnlyItsOwnPendingChangeAndCancelRestoresIt ([Range (1, 8)] int slot, [Values (false, true)] bool temperature)
 		{
 		const string rooms = "[{\"id\":4,\"Name\":\"Editor room\",\"ScheduleId\":7}]";
-		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Ten slots\",\"Monday\":" + EditorDay (10) + "}]";
+		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Eight slots\",\"Monday\":" + EditorDay (8) + "}]";
 		await _api.ReadHubDataAsync ();
 		await Refresh (rooms);
 		var room = Entities["room_4"];
@@ -45,7 +45,7 @@ public sealed partial class PlatformDiscoveryTests
 		setter.Invoke (room, new object[] { temperature ? (object)changedTemperature : changedTime });
 		await TestSupport.Complete (observed.Task);
 		var edited = room.GetState ().PropertyValues;
-		for (int index = 1; index <= 10; index++)
+		for (int index = 1; index <= 8; index++)
 			{
 			string prefix = "editSlot" + index.ToString (CultureInfo.InvariantCulture);
 			Assert.That (edited[prefix + "Visible"].GetValue<bool> (), Is.True);
@@ -60,10 +60,10 @@ public sealed partial class PlatformDiscoveryTests
 		}
 
 	[Test]
-	public async Task ScheduleEditor_ChangingDayClearsEveryHiddenSlotAndRestoresAllTenOnReturn ([Range (1, 10)] int visibleSlots)
+	public async Task ScheduleEditor_ChangingDayClearsEveryHiddenSlotAndRestoresAllEightOnReturn ([Range (1, 8)] int visibleSlots)
 		{
 		const string rooms = "[{\"id\":4,\"Name\":\"Editor room\",\"ScheduleId\":7}]";
-		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Variable day lengths\",\"Monday\":" + EditorDay (10) + ",\"Tuesday\":" + EditorDay (visibleSlots) + "}]";
+		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Variable day lengths\",\"Monday\":" + EditorDay (8) + ",\"Tuesday\":" + EditorDay (visibleSlots) + "}]";
 		await _api.ReadHubDataAsync ();
 		await Refresh (rooms);
 		var room = Entities["room_4"];
@@ -71,7 +71,7 @@ public sealed partial class PlatformDiscoveryTests
 		room.SetEditSelectedDay ("Monday");
 		room.SetEditSelectedDay ("Tuesday");
 		var shortened = room.GetState ().PropertyValues;
-		for (int index = 1; index <= 10; index++)
+		for (int index = 1; index <= 8; index++)
 			{
 			string prefix = "editSlot" + index.ToString (CultureInfo.InvariantCulture);
 			Assert.That (shortened[prefix + "Visible"].GetValue<bool> (), Is.EqualTo (index <= visibleSlots));
@@ -80,7 +80,7 @@ public sealed partial class PlatformDiscoveryTests
 			}
 		room.SetEditSelectedDay ("Monday");
 		var expanded = room.GetState ().PropertyValues;
-		for (int index = 1; index <= 10; index++)
+		for (int index = 1; index <= 8; index++)
 			{
 			string prefix = "editSlot" + index.ToString (CultureInfo.InvariantCulture);
 			Assert.That (expanded[prefix + "Visible"].GetValue<bool> (), Is.True);

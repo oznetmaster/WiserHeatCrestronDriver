@@ -79,7 +79,7 @@ public sealed class ScheduleLayoutIsolationTests
 		return value;
 		}
 	private static Task<ScheduleSaveIsolationResult> Run (Session session, CancellationToken token = default) =>
-		ScheduleSaveIsolation.RunLayoutsAsync (session, 1, "Monday", [1, 10, 1], TimeSpan.FromMilliseconds (650), token);
+		ScheduleSaveIsolation.RunLayoutsAsync (session, 1, "Monday", [1, 8, 1], TimeSpan.FromMilliseconds (650), token);
 
 	[Test]
 	public async Task GrowingThenShrinkingLayouts_AreObservedAndCompleteOriginalRestored ()
@@ -88,12 +88,12 @@ public sealed class ScheduleLayoutIsolationTests
 		var original = await session.ReadAsync (default);
 		var result = await Run (session);
 		Assert.That (result.Passed && result.RestorationConfirmed, Is.True, result.Detail);
-		Assert.That (session.Observed, Is.EqualTo (new[] { 1, 10, 1 }));
+		Assert.That (session.Observed, Is.EqualTo (new[] { 1, 8, 1 }));
 		Assert.That (session.Writes, Is.EqualTo (4));
 		Assert.That (session.Records, Does.Contain ("layout-2-hub-observed"));
 		ScheduleSaveIsolation.RequireOriginal (original, await session.ReadAsync (default));
 		}
-	[TestCase (0), TestCase (11)]
+	[TestCase (0), TestCase (9), TestCase (10), TestCase (11)]
 	public void UnsupportedLayout_IsRefusedBeforeAnyWrite (int count)
 		{
 		var session = new Session ();

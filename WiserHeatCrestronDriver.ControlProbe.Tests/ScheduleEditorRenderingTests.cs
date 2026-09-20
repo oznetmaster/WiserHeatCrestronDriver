@@ -23,7 +23,7 @@ public sealed class ScheduleEditorRenderingTests
 		{
 		var viewport = Node ("customdevices_componentRecyclerView", bounds: "[0,0][100,1000]");
 		var editor = new JsonObject { ["editScheduleEnabled"] = true };
-		for (int slot = 1; slot <= 10; slot++)
+		for (int slot = 1; slot <= 8; slot++)
 			{
 			string prefix = "editSlot" + slot.ToString (CultureInfo.InvariantCulture);
 			editor[prefix + "Visible"] = slot <= count;
@@ -48,7 +48,7 @@ public sealed class ScheduleEditorRenderingTests
 		ScheduleEditorRendering.RequireValues (page.Xml.ToString (), JsonSerializer.SerializeToElement (page.Editor), complete);
 
 	[Test]
-	public void EverySupportedSlotCountHasItsOwnVerifiedValues ([Range (1, 10)] int slots)
+	public void EverySupportedSlotCountHasItsOwnVerifiedValues ([Range (1, 8)] int slots)
 		{
 		var rows = Check (Page (slots));
 		Assert.That (rows.Count, Is.EqualTo (slots * 2));

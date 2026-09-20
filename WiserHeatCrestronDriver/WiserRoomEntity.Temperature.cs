@@ -86,10 +86,4 @@ internal sealed partial class WiserRoomEntity
 
 	[EntityCommand (Id = "resumeEditSlot8", FriendlyName = "Set Slot 8 to Minimum Temperature")]
 	public void ResumeEditSlot8 () => ResumeEditSlot (7);
-
-	[EntityCommand (Id = "resumeEditSlot9", FriendlyName = "Set Slot 9 to Minimum Temperature")]
-	public void ResumeEditSlot9 () => ResumeEditSlot (8);
-
-	[EntityCommand (Id = "resumeEditSlot10", FriendlyName = "Set Slot 10 to Minimum Temperature")]
-	public void ResumeEditSlot10 () => ResumeEditSlot (9);
 	}

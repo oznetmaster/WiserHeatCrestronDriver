@@ -36,7 +36,7 @@ public sealed partial class PlatformDiscoveryTests
 		Assert.That ((string)Control ("HeatingOffStatus").Attribute ("visible"), Is.EqualTo ("{isHeatingOff}"));
 		Assert.That (state.PropertyValues["hasHeatingTarget"].GetValue<bool> (), Is.False);
 		Assert.That (state.Definition.Commands.Keys, Does.Contain ("resumeHeating"));
-		for (int slot = 1; slot <= 10; slot++)
+		for (int slot = 1; slot <= 8; slot++)
 			{
 			Assert.That ((string)Control ("EditSlot" + slot + "Temperature").Attribute ("visible"), Is.EqualTo ("{editSlot" + slot + "HasTemperature}"));
 			var off = Control ("EditSlot" + slot + "Off");
@@ -44,6 +44,13 @@ public sealed partial class PlatformDiscoveryTests
 			Assert.That ((string)off.Attribute ("buttonaction"), Is.EqualTo ("command:resumeEditSlot" + slot));
 			Assert.That (state.Definition.Commands.Keys, Does.Contain ("resumeEditSlot" + slot));
 			Assert.That (state.Definition.Properties.Keys, Does.Contain ("editSlot" + slot + "IsOff").And.Contain ("editSlot" + slot + "HasTemperature"));
+			}
+		foreach (int unsupported in new[] { 9, 10 })
+			{
+			string prefix = "editSlot" + unsupported;
+			Assert.That (state.Definition.Properties.Keys.Any (key => key.StartsWith (prefix, StringComparison.Ordinal)), Is.False);
+			Assert.That (state.Definition.Commands.Keys.Any (key => key.IndexOf ("EditSlot" + unsupported, StringComparison.Ordinal) >= 0), Is.False);
+			Assert.That (ui.Descendants ().Any (element => ((string)element.Attribute ("id") ?? "").StartsWith ("EditSlot" + unsupported, StringComparison.Ordinal)), Is.False);
 			}
 		Assert.That (TemperatureCommand (File.ReadAllText (Path.Combine (TestSupport.DataDirectory, "translations", "en-US.json"))).Element ("HeatingOffLabel").Value, Is.EqualTo ("Off"));
 		}
@@ -104,19 +111,19 @@ public sealed partial class PlatformDiscoveryTests
 	public async Task OffScheduleSlots_ResumeOnlyTheSelectedPendingSlotAndCancelRestores (string units, double minimum)
 		{
 		Set ("_temperatureUnits", units);
-		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Synthetic\",\"Monday\":{\"Time\":[0,100,200,300,400,500,600,700,800,900],\"DegreesC\":[-200,-200,-200,-200,-200,-200,-200,-200,-200,-200]}}]";
+		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Synthetic\",\"Monday\":{\"Time\":[0,100,200,300,400,500,600,700],\"DegreesC\":[-200,-200,-200,-200,-200,-200,-200,-200]}}]";
 		await Refresh ("""[{"id":4,"Name":"Synthetic","Mode":"Auto","ScheduleId":7,"CurrentSetPoint":-200}]""");
 		var room = Entities["room_4"];
 		room.OpenEditSchedule ();
 		room.SetEditSelectedDay ("Monday");
-		for (int slot = 1; slot <= 10; slot++)
+		for (int slot = 1; slot <= 8; slot++)
 			{
 			var completion = new TaskCompletionSource<bool> (TaskCreationOptions.RunContinuationsAsynchronously);
 			room.ExecuteCommand ("resumeEditSlot" + slot, new Dictionary<string, DriverEntityValue> (), result => completion.TrySetResult (result.Failed));
 			await TestSupport.Complete (completion.Task);
 			Assert.That (await completion.Task, Is.False);
 			var state = room.GetState ().PropertyValues;
-			for (int index = 1; index <= 10; index++)
+			for (int index = 1; index <= 8; index++)
 				{
 				Assert.That (state["editSlot" + index + "Temperature"].GetValue<double> (), Is.EqualTo (index == slot ? minimum : Constants.TEMP_OFF));
 				Assert.That (state["editSlot" + index + "IsOff"].GetValue<bool> (), Is.EqualTo (index != slot));
@@ -176,7 +183,7 @@ public sealed partial class PlatformDiscoveryTests
 		room.SetEditSelectedDay ("Monday");
 		Assert.That (room.EditSlot1Temperature, Is.EqualTo (target));
 		var properties = room.GetState ().Definition.Properties;
-		foreach (string id in new[] { "targetTemperature" }.Concat (Enumerable.Range (1, 10).Select (slot => $"editSlot{slot}Temperature")))
+		foreach (string id in new[] { "targetTemperature" }.Concat (Enumerable.Range (1, 8).Select (slot => $"editSlot{slot}Temperature")))
 			{
 			var definition = properties[id].TypeDef;
 			Assert.That (definition.Range.Minimum, Is.EqualTo (minimum), id);

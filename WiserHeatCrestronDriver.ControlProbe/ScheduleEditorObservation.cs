@@ -37,7 +37,7 @@ public static class ScheduleEditorObservation
 
 	public static JsonElement Editor (IReadOnlyDictionary<string, JsonElement> properties)
 		{
-		string[] keys = ["editSelectedDay", "editScheduleEnabled", "editScheduleError", .. Enumerable.Range (1, 10)
+		string[] keys = ["editSelectedDay", "editScheduleEnabled", "editScheduleError", .. Enumerable.Range (1, 8)
 			.SelectMany (index => new[] { $"editSlot{index}Visible", $"editSlot{index}Time", $"editSlot{index}Temperature" })];
 		return JsonSerializer.SerializeToElement (keys.ToDictionary (key => key, key => properties[key]));
 		}
@@ -53,9 +53,9 @@ public static class ScheduleEditorObservation
 		var entries = schedule.GetProperty (day);
 		var times = entries.GetProperty ("Time").EnumerateArray ().ToArray ();
 		var temperatures = entries.GetProperty ("DegreesC").EnumerateArray ().ToArray ();
-		if (times.Length is < 1 or > 10 || times.Length != temperatures.Length)
+		if (times.Length is < 1 or > 8 || times.Length != temperatures.Length)
 			throw new InvalidDataException ("The hub schedule cannot be represented by this editor.");
-		for (int index = 0; index < 10; index++)
+		for (int index = 0; index < 8; index++)
 			{
 			string prefix = "editSlot" + (index + 1).ToString (CultureInfo.InvariantCulture);
 			if (editor.GetProperty (prefix + "Visible").GetBoolean () != (index < times.Length))

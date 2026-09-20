@@ -18,7 +18,7 @@ public sealed class ScheduleEditorObservationTests
 	private static JsonObject Editor ()
 		{
 		var result = new JsonObject { ["editSelectedDay"] = "Monday", ["editScheduleEnabled"] = true, ["editScheduleError"] = "" };
-		for (int index = 1; index <= 10; index++)
+		for (int index = 1; index <= 8; index++)
 			{
 			result[$"editSlot{index}Visible"] = index <= 2;
 			result[$"editSlot{index}Time"] = index == 1 ? "04:30" : "22:30";
