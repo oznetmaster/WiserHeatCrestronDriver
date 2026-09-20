@@ -2,13 +2,19 @@
 
 See the [changelog](CHANGELOG.md) for shipped product changes and the [release notes](RELEASE-NOTES.md) for the current update. This document describes tests and development tooling, including the limits of their results.
 
+## 1.3.16 validation - 20 September 2026
+
+The updated dependency passed its complete 211-test library suite on the processor, including real HTTP peers that withhold headers or stall successful and error response bodies. Both desktop targets also passed. Released library assembly hashes match the tested CI artifact.
+
+The driver passed 197 desktop unit/lifecycle cases and 196 corresponding processor cases. The extra desktop case checks the packaged entry-point definition. Offline control-probe and endurance-probe regressions also passed. These results validate the updated dependency and eight-entry editor; they do not claim a new physical outage or endurance run for this build.
+
 ## 1.3.15 validation - 20 September 2026
 
 The fixed driver passed 203 desktop lifecycle/regression cases, covering background recovery, failed reads, cancellation deadlines, stable room controllers and stale connection callbacks. The new outage regression reproduced the defect in the previous implementation. Local release packaging, the NuGet distribution wrapper and embedded version checks passed.
 
 A hub network block longer than 60 seconds produced gateway and child offline feedback and automatic fresh-read recovery on a CP4-R, preserving the installed child and all seven saved gateway settings. Conservative observed bounds were 12 seconds for API offline status, 15 seconds for visible Home feedback and 39 seconds for recovery. The room tile was not separately captured during the interruption. This did not test physical power loss or simultaneous processor network loss.
 
-A separate observation recorded an 11-second offline interval and automatic recovery. Its cause remains unresolved and its failed result is retained. A later observation does not erase that failure. No completed one-hour result is claimed here.
+A separate observation recorded an 11-second offline interval and automatic recovery. Its cause remains unresolved and its failed result is retained. A later one-hour observation completed 83 full snapshots and 1,807 availability checks without an offline state or read error; it does not erase the earlier failure. A subsequent network-block observation exposed delayed offline feedback. The response-body cancellation defect fixed in library 1.1.3 was reproduced independently, but that does not prove it was the sole cause of the delayed feedback.
 
 ## Temperature and control validation - 19 September 2026
 

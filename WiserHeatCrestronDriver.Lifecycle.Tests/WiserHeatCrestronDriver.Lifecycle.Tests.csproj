@@ -11,7 +11,7 @@
     <Reference Include="Newtonsoft.Json.Compact" Condition="Exists('$(CompactJsonPath)')">
       <HintPath>$(CompactJsonPath)</HintPath><Private>true</Private>
     </Reference>
-    <PackageReference Include="WiserHeatAPIv2" Version="1.1.2" />
+    <PackageReference Include="WiserHeatAPIv2" Version="1.1.3" />
     <PackageReference Include="Crestron.DeviceDrivers.DevKit" Version="27.0.24" />
     <PackageReference Include="Hafner.Compatibility.MetaPackage" Version="1.9.0" />
     <PackageReference Include="NUnit" Version="4.6.1" />

@@ -188,9 +188,9 @@ SDK command regressions also verify schedule-editor temperature limits, non-fini
 
 ### Expanded driver behavior tests
 
-The SDK and processor fixtures exercise every one of the ten schedule editor positions, verify slot-specific time/temperature notifications and Cancel restoration, and check clearing/restoration as the selected day changes its number of entries. These fixtures use simulated hub responses and send no commands to a physical room. Actual Android rendering and live save/conflict behavior remain separate checks.
+The SDK and processor fixtures exercise every one of the eight schedule editor positions, verify slot-specific time/temperature notifications and Cancel restoration, and check clearing/restoration as the selected day changes its number of entries. These fixtures use simulated hub responses and send no commands to a physical room. Actual Android rendering and live save/conflict behavior remain separate checks.
 
-Cover room discovery, stable child identity, renamed/removed rooms, cleared settings, overlapping connections and late refresh/login completion. Clearing or disposing the platform now removes its children and prevents old work from restoring them. The runtime dependency is WiserHeatAPIv2 1.1.2.
+Cover room discovery, stable child identity, renamed/removed rooms, cleared settings, overlapping connections and late refresh/login completion. Clearing or disposing the platform now removes its children and prevents old work from restoring them. The runtime dependency is WiserHeatAPIv2 1.1.3.
 
 Saved schedules can be reopened and saved again; integer lists and arrays are copied independently before editing; the root entity can be created and disposed repeatedly.
 

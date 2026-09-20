@@ -2,6 +2,11 @@
 
 This changelog records shipped features, fixes, compatibility and runtime dependency changes. See [development and validation history](DEVELOPMENT-HISTORY.md) for tests, CI, build tooling and work not yet released.
 
+## 1.3.16 - 2026-09-20
+
+- Update WiserHeatAPIv2 to 1.1.3 so the hub-read deadline also cancels stalled HTTP response bodies on the processor's Mono runtime, including error responses.
+- Limit the schedule editor to the hub's eight supported entries per day, removing the unused ninth and tenth rows.
+
 ## 1.3.15 - 2026-09-20
 
 - Detect loss of communication with the hub, mark the gateway and its thermostats offline, and recover automatically after a successful fresh read. Preserve room controllers and saved settings during the interruption.
