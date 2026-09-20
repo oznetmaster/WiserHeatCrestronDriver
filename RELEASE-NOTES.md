@@ -6,7 +6,7 @@ This patch fixes hub offline detection and automatic recovery, thermostat temper
 - Keep installed room controllers and saved configuration throughout a communication interruption, and ignore late state updates from a replaced connection.
 - Correct Celsius/Fahrenheit conversion, display and supported heating limits of 5-30 C / 41-86 F. Fahrenheit controls use whole-degree input steps; physical targets retain the hub's half-degree Celsius resolution. Accept tiny floating-point roundoff at valid endpoints.
 - Display Off without treating it as a numeric temperature. Preserve an Auto room's control mode when its target changes while the global schedule index is rebuilding.
-- Resolve the embedded manifest explicitly so the driver starts with its submission filename, and avoid logging unchanged schedule data on every poll.
+- Resolve the embedded manifest explicitly so the driver starts with an alternate assembly filename, and avoid logging unchanged schedule data on every poll.
 - Update the runtime dependency WiserHeatAPIv2 to 1.1.2.
 
 ## Installation
@@ -19,4 +19,4 @@ The fixed driver passed 203 desktop lifecycle/regression cases. The outage regre
 
 Live validation used the Drayton Wiser second-generation, three-channel HubR. Current v1 hub compatibility and other Wiser-branded product families remain unverified. A separate observation recorded a brief offline interval and automatic recovery, with its cause unresolved; that result is retained in the [development and validation history](DEVELOPMENT-HISTORY.md).
 
-Crestron submission evidence and endurance observations are separate from this release. This release makes no claim of Crestron acceptance or certification. See the [changelog](CHANGELOG.md) for product history.
+See the [changelog](CHANGELOG.md) for product history.

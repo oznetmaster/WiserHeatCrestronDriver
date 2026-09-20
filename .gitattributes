@@ -3,12 +3,6 @@
 ###############################################################################
 * text=auto
 
-# Keep reviewed submission coverage blueprint digests stable across checkouts.
-submission/*-coverage-plan.json text eol=lf
-submission/dependency-notices.json text eol=lf
-# Preserve reviewed upstream license and notice bytes exactly.
-submission/license-sources/** -text -whitespace
-
 ###############################################################################
 # Set default behavior for command prompt diff.
 #

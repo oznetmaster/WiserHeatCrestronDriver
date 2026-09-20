@@ -8,4 +8,4 @@ The desktop SDK requires the same privately provisioned `CompactJsonPath` depend
 dotnet run --project tools/PackageSmokeTest/PackageSmokeTest.csproj -c Release -- path/to/driver.pkg
 ```
 
-The test workflow builds the driver with its submission assembly name and runs this check. That catches assembly-name-dependent resource lookup failures that source-level tests and successful ManifestUtil packaging can miss. The check prints the package hash and version it exercised. It does not establish processor compatibility, embedded-help correctness, live operation or submission acceptance; those remain separate gates for the final package.
+The test workflow builds the driver with an alternate assembly name and runs this check. That catches assembly-name-dependent resource lookup failures that source-level tests and successful ManifestUtil packaging can miss. The check prints the package hash and version it exercised. It does not establish processor compatibility, embedded-help correctness or live operation; those remain separate gates for the final package.

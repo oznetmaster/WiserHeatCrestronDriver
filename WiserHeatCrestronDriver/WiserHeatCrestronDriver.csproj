@@ -87,22 +87,7 @@ Licensed under the MIT License with Commons Clause. See LICENSE in the repositor
     <PackageDriverIgnoreExitCode Condition="'$(PackageDriverIgnoreExitCode)' == ''">true</PackageDriverIgnoreExitCode>
   </PropertyGroup>
 
-  <!-- Submission builds are opt-in while the help content is still being completed. -->
-  <PropertyGroup Condition="'$(CrestronSubmission)' == 'true' And '$(BuildForTests)' != 'true' And '$(DesignTimeBuild)' != 'true'">
-    <AssemblyName>NeilColvin_Thermostat_WiserHeat_IP_V2</AssemblyName>
-    <SubmissionHelpContent>$(MSBuildProjectDirectory)/../submission/help-content.json</SubmissionHelpContent>
-    <SubmissionDependencyNotices>$(MSBuildProjectDirectory)/../submission/dependency-notices.json</SubmissionDependencyNotices>
-    <SubmissionDeveloperToken>NeilColvin</SubmissionDeveloperToken>
-    <SubmissionSupportWebsite>https://github.com/oznetmaster/WiserHeatCrestronDriver</SubmissionSupportWebsite>
-  </PropertyGroup>
-  <Import Project="$(SubmissionToolsDirectory)/CrestronSubmissionHelp.targets" Condition="'$(CrestronSubmission)' == 'true' And Exists('$(SubmissionToolsDirectory)/CrestronSubmissionHelp.targets')" />
-  <Target Name="ValidateCrestronSubmission" Condition="'$(CrestronSubmission)' == 'true' And '$(BuildForTests)' != 'true' And '$(DesignTimeBuild)' != 'true'">
-    <Error Condition="'$(SubmissionHelpTargetsImported)' != 'true'" Text="Set SubmissionToolsDirectory to the pinned CrestronHomeDevTools tools/submission directory." />
-    <Error Condition="'$(SubmissionDependencyNoticesSupported)' != 'true'" Text="The selected submission tooling must support reviewed dependency notices; use the pinned current tooling source." />
-    <CallTarget Targets="ValidateSubmissionHelpSettings" />
-  </Target>
-
-  <Target Name="BumpDriverVersion" BeforeTargets="BeforeBuild" DependsOnTargets="ValidateCrestronSubmission" Condition="'$(BuildForTests)' != 'true' And '$(DesignTimeBuild)' != 'true'">
+  <Target Name="BumpDriverVersion" BeforeTargets="BeforeBuild" Condition="'$(BuildForTests)' != 'true' And '$(DesignTimeBuild)' != 'true'">
     <Exec Command="pwsh -NoProfile -NonInteractive -File &quot;$(MSBuildProjectDirectory)\BumpDriverVersion.ps1&quot; -ManifestPath &quot;$(MSBuildProjectDirectory)\Thermostat_WiserHeat_IP_V2.json&quot; -Configuration &quot;$(Configuration)&quot; -ReleaseVersion &quot;$(DriverReleaseVersion)&quot;" />
   </Target>
 
@@ -139,9 +124,7 @@ Licensed under the MIT License with Commons Clause. See LICENSE in the repositor
       <IncludeInPkgFiles Include="$(MSBuildProjectDirectory)\IncludeInPkg\**\*" Exclude="$(MSBuildProjectDirectory)\IncludeInPkg\**\*.xsd" />
     </ItemGroup>
     <Copy SourceFiles="@(IncludeInPkgFiles)" DestinationFiles="@(IncludeInPkgFiles->'$(TargetDir)patched\IncludeInPkg\%(RecursiveDir)%(Filename)%(Extension)')" />
-    <CallTarget Targets="StageSubmissionHelp" Condition="'$(CrestronSubmission)' == 'true'" />
     <Exec Command="&quot;$(ManifestUtilExe)&quot; --file &quot;$(TargetDir)patched\$(AssemblyName).dll&quot; --lib &quot;$(TargetDir.TrimEnd('\'))&quot; --output &quot;$(TargetDir.TrimEnd('\'))&quot;" ContinueOnError="$(PackageDriverContinueOnError)" IgnoreExitCode="$(PackageDriverIgnoreExitCode)" />
-    <CallTarget Targets="VerifySubmissionHelp" Condition="'$(CrestronSubmission)' == 'true'" />
   </Target>
 
   <Target Name="ValidateNuGetPkgInput" BeforeTargets="GenerateNuspec" Condition="'$(IsPacking)' == 'true'">

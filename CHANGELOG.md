@@ -6,10 +6,10 @@ This changelog records shipped features, fixes, compatibility and runtime depend
 
 - Detect loss of communication with the hub, mark the gateway and its thermostats offline, and recover automatically after a successful fresh read. Preserve room controllers and saved settings during the interruption.
 - Correct Celsius/Fahrenheit display, conversion, temperature limits and endpoint handling. Show Off as a state and preserve automatic control when changing a target during a schedule-index rebuild.
-- Load the correct embedded manifest when the package is renamed for submission, and suppress unchanged polling diagnostics.
+- Load the correct embedded manifest when the package assembly is renamed, and suppress unchanged polling diagnostics.
 - Update WiserHeatAPIv2 to 1.1.2.
 
-See [release notes](RELEASE-NOTES.md) for validation and [development history](DEVELOPMENT-HISTORY.md) for the intervening candidate builds and submission work.
+See [release notes](RELEASE-NOTES.md) for validation and [development history](DEVELOPMENT-HISTORY.md) for the intervening builds and test work.
 
 ## 1.3.8 - 2026-09-18
 
@@ -19,7 +19,7 @@ See [release notes](RELEASE-NOTES.md) for validation and [development history](D
 - Require successful follow-up reads for room commands and a confirmed schedule assignment before enabling automatic control. Update WiserHeatAPIv2 to 1.1.1 for schedule failure reporting.
 - Keep action captions visible, use GitHub for public support, and expose driver lifetime and successful hub-refresh diagnostics.
 
-See [release notes](RELEASE-NOTES.md) for validation scope. Submission preparation and CI details remain in [development history](DEVELOPMENT-HISTORY.md).
+See [release notes](RELEASE-NOTES.md) for validation scope. Test and CI details remain in [development history](DEVELOPMENT-HISTORY.md).
 
 ## 1.3.7 - 2026-09-16
 
