@@ -10,6 +10,8 @@ See [CHANGELOG.md](CHANGELOG.md) for product changes and [development history](D
 
 ## Dealer support
 
-For installation questions, driver problems or support requests, contact Neil Colvin using the [Wiser Heat driver support form](https://github.com/oznetmaster/WiserHeatCrestronDriver/issues/new). A free GitHub account is required to submit the form. Requests are public: do not include hub secrets, passwords or other credentials.
+**Support:** Contact Neil Colvin using the [driver and library support form](https://oznetmaster.github.io/support/). No GitHub account or registration is required. Requests are delivered privately; please do not include hub secrets, passwords or other credentials.
 
-Include the driver version, Crestron Home version, Wiser hub model and a description of the issue. The [existing support requests](https://github.com/oznetmaster/WiserHeatCrestronDriver/issues) may also contain an answer.
+**Project:** The [Wiser Heat driver repository](https://github.com/oznetmaster/WiserHeatCrestronDriver) contains documentation, releases and public issue tracking. A GitHub account is required only if you choose to create a public issue.
+
+Include the driver version, Crestron Home version, Wiser hub model and a description of the issue.
