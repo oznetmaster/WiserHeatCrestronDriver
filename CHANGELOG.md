@@ -4,6 +4,8 @@ This changelog records shipped features, fixes, compatibility and runtime depend
 
 ## 1.3.16 - 2026-09-20
 
+Published in the Crestron production driver database on **25 September 2026** as `1.3.016.0000`.
+
 - Update WiserHeatAPIv2 to 1.1.3 so the hub-read deadline also cancels stalled HTTP response bodies on the processor's Mono runtime, including error responses.
 - Limit the schedule editor to the hub's eight supported entries per day, removing the unused ninth and tenth rows.
 

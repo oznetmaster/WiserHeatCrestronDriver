@@ -1,5 +1,9 @@
 # WiserHeatCrestronDriver v1.3.16
 
+**Published by Crestron:** Wiser Heat **1.3.16** was added to the Crestron production driver database on **25 September 2026** (catalog version `1.3.016.0000`).
+
+Catalog entry: **Drayton Wiser / Wiser Heat Gateway**; device type **Platform**; developer **Neil Colvin**.
+
 This patch updates WiserHeatAPIv2 to 1.1.3 so a hub that stalls partway through an HTTP response cannot bypass the driver's read-cancellation deadline on Mono. It covers both successful and error response bodies. Saved hub and room configuration remains compatible.
 
 The schedule editor now has eight entries per day, matching the hub's supported limit; the unused ninth and tenth rows have been removed.

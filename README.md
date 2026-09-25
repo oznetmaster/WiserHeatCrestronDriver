@@ -1,5 +1,18 @@
 # WiserHeatCrestronDriver
 
+## Crestron availability
+
+**Published by Crestron:** Wiser Heat **1.3.16** was added to the Crestron production driver database on **25 September 2026** (catalog version `1.3.016.0000`).
+
+Look for the following entry in the Crestron Home driver catalog:
+
+| Field | Catalog entry |
+|---|---|
+| Developer | Neil Colvin |
+| Device type | Platform |
+| Manufacturer | Drayton Wiser |
+| Model | Wiser Heat Gateway |
+
 For shipped changes, see the [changelog](CHANGELOG.md). Test, CI and build history is recorded separately in [development and validation history](DEVELOPMENT-HISTORY.md).
 
 
@@ -61,7 +74,9 @@ Other regional systems and product families sold under the Wiser name have not b
 
 ## Installation
 
-The best way to download and install this driver on a Crestron Home system is to use the [Crestron Home Driver Feed Installer](https://github.com/oznetmaster/Crestron-Home-Driver-Feed-Installer) repository and application.
+Version **1.3.16** is published in the Crestron production driver database. In the Crestron Home configuration UI, look for **Wiser Heat Gateway** under **Drayton Wiser** (developer **Neil Colvin**).
+
+For community-distributed releases, you can also use the [Crestron Home Driver Feed Installer](https://github.com/oznetmaster/Crestron-Home-Driver-Feed-Installer) repository and application. The GitHub and NuGet release histories are independent of the version listed by Crestron.
 
 If you prefer to install manually, use the attached `Thermostat_WiserHeat_IP_V2.pkg` asset from the relevant GitHub Release. The automatic GitHub `Source code (zip)` and `Source code (tar.gz)` assets are repository snapshots, not installable Crestron driver packages.
 
