@@ -140,14 +140,14 @@ public sealed class ObservationTests
 	[TestCase (2)]
 	[TestCase (9)]
 	[TestCase (17)]
-	public void LostOwnershipIsNotConvertedToPassingEvidence (int check)
-		=> Assert.ThrowsAsync<IOException> (() => Run (new Source { FailOwnerCheck = check }));
+	public async System.Threading.Tasks.Task LostOwnershipIsNotConvertedToPassingEvidence (int check)
+		=> await Assert.ThrowsAsync<IOException> (() => Run (new Source { FailOwnerCheck = check }));
 
 	[Test]
-	public void CancelledObservationDoesNotReadAnything ()
+	public async System.Threading.Tasks.Task CancelledObservationDoesNotReadAnything ()
 		{
 		var source = new Source ();
-		Assert.CatchAsync<OperationCanceledException> (() => Observation.RunAsync (Binding, Plan, Files, source, new CancellationToken (true)));
+		await Assert.CatchAsync<OperationCanceledException> (() => Observation.RunAsync (Binding, Plan, Files, source, new CancellationToken (true)));
 		Assert.That (source.Reads, Is.Empty);
 		}
 
@@ -245,10 +245,10 @@ public sealed class ObservationTests
 		}
 
 	[Test]
-	public void GrowingStreamsCannotExceedHashOrJsonLimits ()
+	public async System.Threading.Tasks.Task GrowingStreamsCannotExceedHashOrJsonLimits ()
 		{
-		Assert.ThrowsAsync<InvalidDataException> (() => Input.HashBoundedAsync (new MemoryStream (new byte[101]), 100, default));
-		Assert.ThrowsAsync<InvalidDataException> (() => Input.ReadBoundedAsync (new MemoryStream (new byte[101]), 100, default));
+		await Assert.ThrowsAsync<InvalidDataException> (() => Input.HashBoundedAsync (new MemoryStream (new byte[101]), 100, default));
+		await Assert.ThrowsAsync<InvalidDataException> (() => Input.ReadBoundedAsync (new MemoryStream (new byte[101]), 100, default));
 		}
 
 	private const string Domain = """{"Device":[{"ProductType":"Controller","UUID":"hub-uuid","ModelIdentifier":"CCTFR6313G2"}],"HotWater":[{"id":2,"WaterHeatingState":"Off"}],"System":{"OverrideType":"None"}}""";

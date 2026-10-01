@@ -216,7 +216,7 @@ public sealed partial class ScheduleControlCycleTests
 		}
 
 	[Test]
-	public void UnknownStartingStateIsRejected () => Assert.ThrowsAsync<ArgumentOutOfRangeException> (() =>
+	public async System.Threading.Tasks.Task UnknownStartingStateIsRejected () => await Assert.ThrowsAsync<ArgumentOutOfRangeException> (() =>
 		ScheduleControlCycle.RunAsync (new Session (), TimeSpan.FromSeconds (5), default, false, (ScheduleManualTargetRequirement)99));
 
 	[Test]

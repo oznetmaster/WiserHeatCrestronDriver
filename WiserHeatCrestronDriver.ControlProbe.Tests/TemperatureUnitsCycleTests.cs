@@ -129,7 +129,7 @@ public sealed class TemperatureUnitsCycleTests
 		{
 		var session = new Session ();
 		if (target == "Kelvin")
-			Assert.ThrowsAsync<ArgumentException> (async () => await Run (session, target));
+			await Assert.ThrowsAsync<ArgumentException> (async () => await Run (session, target));
 		else
 			Assert.That ((await Run (session, target)).Passed, Is.False);
 		Assert.That (session.Writes, Is.Empty);

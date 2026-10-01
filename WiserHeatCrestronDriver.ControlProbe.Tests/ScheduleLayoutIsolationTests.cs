@@ -94,10 +94,10 @@ public sealed class ScheduleLayoutIsolationTests
 		ScheduleSaveIsolation.RequireOriginal (original, await session.ReadAsync (default));
 		}
 	[TestCase (0), TestCase (9), TestCase (10), TestCase (11)]
-	public void UnsupportedLayout_IsRefusedBeforeAnyWrite (int count)
+	public async System.Threading.Tasks.Task UnsupportedLayout_IsRefusedBeforeAnyWrite (int count)
 		{
 		var session = new Session ();
-		Assert.ThrowsAsync<ArgumentException> (() => ScheduleSaveIsolation.RunLayoutsAsync (session, 1, "Monday", [1, count], TimeSpan.FromSeconds (1), default));
+		await Assert.ThrowsAsync<ArgumentException> (() => ScheduleSaveIsolation.RunLayoutsAsync (session, 1, "Monday", [1, count], TimeSpan.FromSeconds (1), default));
 		Assert.That (session.Writes, Is.Zero);
 		}
 	[Test]

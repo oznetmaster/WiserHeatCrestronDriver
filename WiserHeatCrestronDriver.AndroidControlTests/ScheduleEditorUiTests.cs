@@ -30,10 +30,10 @@ public sealed partial class GatewayUiTests
 		}
 
 	[TestCase ("day"), TestCase ("time"), Category ("LiveControl")]
-	public void ScheduleEditorInterruptionRestoresOriginalState (string phase)
+	public async System.Threading.Tasks.Task ScheduleEditorInterruptionRestoresOriginalState (string phase)
 		{
 		Assert.That (_settings!.ControlRooms.Length, Is.EqualTo (1), "Each interruption case requires one explicitly bound room.");
-		var failure = Assert.ThrowsAsync<EditorTestInterruptionException> (() => ExerciseEditorSelectionsAsync (phase));
+		var failure = await Assert.ThrowsAsync<EditorTestInterruptionException> (() => ExerciseEditorSelectionsAsync (phase));
 		Assert.That (failure!.Phase, Is.EqualTo (phase));
 		Assert.That (_roomStatePreserved && _navigation!.HomeRestored, Is.True);
 		AndroidWorkflowSession.VerifyContext (_session!.Context);

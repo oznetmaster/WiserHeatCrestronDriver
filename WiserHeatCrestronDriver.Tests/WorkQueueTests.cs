@@ -49,7 +49,7 @@ public sealed class WorkQueueTests
 	public async Task FailedOperation_ReleasesQueueForFollowingWork ()
 		{
 		var error = new InvalidOperationException ("synthetic failure");
-		Assert.That (Assert.ThrowsAsync<InvalidOperationException> (async () => await TestSupport.Complete (_queue.EnqueueAsync (c => Task.FromException (error)))), Is.SameAs (error));
+		Assert.That (await Assert.ThrowsAsync<InvalidOperationException> (async () => await TestSupport.Complete (_queue.EnqueueAsync (c => Task.FromException (error)))), Is.SameAs (error));
 		bool ran = false;
 		await TestSupport.Complete (_queue.EnqueueAsync (c => { ran = true; return Task.CompletedTask; }));
 		Assert.That (ran, Is.True);
@@ -82,12 +82,12 @@ public sealed class WorkQueueTests
 			_queue.ClearClient ();
 			}
 		finally { release.TrySetResult (true); await TestSupport.Complete (first); }
-		Assert.ThrowsAsync<InvalidOperationException> (async () => await TestSupport.Complete (pending));
+		await Assert.ThrowsAsync<InvalidOperationException> (async () => await TestSupport.Complete (pending));
 		Assert.That (ran, Is.False);
 		_queue.SetClient (_client);
 		await TestSupport.Complete (_queue.EnqueueAsync (c => { ran = true; return Task.CompletedTask; }));
 		Assert.That (ran, Is.True);
 		}
-	[Test] public void NullWork_IsRejected () => Assert.ThrowsAsync<ArgumentNullException> (async () => await _queue.EnqueueAsync (null));
+	[Test] public async Task NullWork_IsRejected () => await Assert.ThrowsAsync<ArgumentNullException> (async () => await _queue.EnqueueAsync (null));
 	[Test] public void NullClient_IsRejected () => Assert.Throws<ArgumentNullException> (() => _queue.SetClient (null));
 	}

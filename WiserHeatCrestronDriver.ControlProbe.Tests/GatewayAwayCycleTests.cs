@@ -217,10 +217,10 @@ public sealed class GatewayAwayCycleTests
 		Assert.That (session.Inputs.Count, Is.EqualTo (2), "No further action may follow a foreign setting change.");
 		}
 	[TestCase (0), TestCase (4)]
-	public void InvalidRepetitionCountStopsBeforeCreatingASession (int cycles)
+	public async System.Threading.Tasks.Task InvalidRepetitionCountStopsBeforeCreatingASession (int cycles)
 		{
 		int created = 0;
-		Assert.ThrowsAsync<ArgumentOutOfRangeException> (async () => await GatewayAwayRepetition.RunAsync (_ => { created++; return new Session (); }, cycles, TimeSpan.FromSeconds (1), CancellationToken.None));
+		await Assert.ThrowsAsync<ArgumentOutOfRangeException> (async () => await GatewayAwayRepetition.RunAsync (_ => { created++; return new Session (); }, cycles, TimeSpan.FromSeconds (1), CancellationToken.None));
 		Assert.That (created, Is.Zero);
 		}
 	[TestCase ("lost-change"), TestCase ("lost-restore")]

@@ -761,8 +761,8 @@ public sealed class RoomTemperatureCycleTests
 		}
 
 	[TestCase (0), TestCase (4)]
-	public void RepeatedBoostRejectsAnUnboundedOrEmptyRun (int cycles)
+	public async System.Threading.Tasks.Task RepeatedBoostRejectsAnUnboundedOrEmptyRun (int cycles)
 		{
-		Assert.ThrowsAsync<ArgumentOutOfRangeException> (async () => await RoomBoostRepetition.RunAsync (_ => throw new AssertionException ("No session should open."), cycles, TimeSpan.FromSeconds (1), CancellationToken.None));
+		await Assert.ThrowsAsync<ArgumentOutOfRangeException> (async () => await RoomBoostRepetition.RunAsync (_ => throw new AssertionException ("No session should open."), cycles, TimeSpan.FromSeconds (1), CancellationToken.None));
 		}
 	}

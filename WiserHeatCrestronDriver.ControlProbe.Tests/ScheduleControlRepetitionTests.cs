@@ -80,6 +80,6 @@ public sealed partial class ScheduleControlCycleTests
 
 	[TestCase (0)]
 	[TestCase (4)]
-	public void InvalidRepetitionCountNeverCreatesASession (int count) => Assert.ThrowsAsync<ArgumentOutOfRangeException> (() =>
+	public async System.Threading.Tasks.Task InvalidRepetitionCountNeverCreatesASession (int count) => await Assert.ThrowsAsync<ArgumentOutOfRangeException> (() =>
 		ScheduleControlRepetition.RunAsync (_ => throw new AssertionException ("No session should be created."), count, TimeSpan.FromSeconds (5), default));
 	}
