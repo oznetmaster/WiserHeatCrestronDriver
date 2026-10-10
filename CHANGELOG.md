@@ -2,14 +2,14 @@
 
 This changelog records shipped features, fixes, compatibility and runtime dependency changes. See [development and validation history](DEVELOPMENT-HISTORY.md) for tests, CI, build tooling and work not yet released.
 
-## 1.3.16 - 2026-09-20
+## 1.3.16 — 2026-09-20
 
 Published in the Crestron production driver database on **25 September 2026** as `1.3.016.0000`.
 
 - Update WiserHeatAPIv2 to 1.1.3 so the hub-read deadline also cancels stalled HTTP response bodies on the processor's Mono runtime, including error responses.
 - Limit the schedule editor to the hub's eight supported entries per day, removing the unused ninth and tenth rows.
 
-## 1.3.15 - 2026-09-20
+## 1.3.15 — 2026-09-20
 
 - Detect loss of communication with the hub, mark the gateway and its thermostats offline, and recover automatically after a successful fresh read. Preserve room controllers and saved settings during the interruption.
 - Correct Celsius/Fahrenheit display, conversion, temperature limits and endpoint handling. Show Off as a state and preserve automatic control when changing a target during a schedule-index rebuild.
@@ -18,7 +18,7 @@ Published in the Crestron production driver database on **25 September 2026** as
 
 See [release notes](RELEASE-NOTES.md) for validation and [development history](DEVELOPMENT-HISTORY.md) for the intervening builds and test work.
 
-## 1.3.8 - 2026-09-18
+## 1.3.8 — 2026-09-18
 
 - Keep schedule choices current and retain the confirmed assignment when a selection is invalid, rejected or pending.
 - Preserve unsaved schedule edits during polling, refuse stale saves, refresh displayed editor values and enforce the supported temperature range.
@@ -28,13 +28,13 @@ See [release notes](RELEASE-NOTES.md) for validation and [development history](D
 
 See [release notes](RELEASE-NOTES.md) for validation scope. Test and CI details remain in [development history](DEVELOPMENT-HISTORY.md).
 
-## 1.3.7 - 2026-09-16
+## 1.3.7 — 2026-09-16
 
 - Guard schedule selection against overlapping room commands and expose room identity/activity for installed-driver verification.
 
 - See [release notes](RELEASE-NOTES.md) for the exact validation scope and limitations.
 
-## 1.3.6 - 2026-09-15
+## 1.3.6 — 2026-09-15
 
 - Read fresh hub state after hot-water, Away, boost/cancel, schedule advance and schedule enable/disable commands instead of waiting for the polling throttle. This fixes delayed UI updates and repeated hot-water button presses. Routine polling and the public API are unchanged.
 
