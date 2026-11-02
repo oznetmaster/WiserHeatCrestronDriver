@@ -54,9 +54,7 @@
           "shell": "pwsh"
         }
       ],
-      "results": [
-        "TestResults/$project/**/*.trx"
-      ]
+      "results": []
     },
     "tests-tests-run-desktop-sdk-lifecycle-harness": {
       "commands": [
