@@ -32,35 +32,33 @@ jobs:
       - name: Install processor packaging tools
         run: ../CrestronHomeNUnit/tools/InstallCiTools.ps1
       - name: Verify discovery coverage guards
-        run: ./tools/Test-DiscoveredCoverageGuards.ps1
+        uses: oznetmaster/BuildAutomation@ae6f311e530a18dc705971dcc655fc97de03e368
+        with:
+          task: tests-tests-verify-discovery-coverage-guards
+          root: driver
       - name: Run NUnit driver tests
-        run: |
-          ./tools/Test-DiscoveredCoverage.ps1 -Stage Desktop -Project WiserHeatCrestronDriver.Tests/WiserHeatCrestronDriver.Tests.csproj -Framework net472 -AllowProcessorSkips -ResultsDirectory TestResults
+        uses: oznetmaster/BuildAutomation@ae6f311e530a18dc705971dcc655fc97de03e368
+        with:
+          task: tests-tests-run-nunit-driver-tests
+          root: driver
       - name: Validate independent room observation
-        run: |
-          dotnet test WiserHeatCrestronDriver.ControlProbe.Tests/WiserHeatCrestronDriver.ControlProbe.Tests.csproj -c Release --logger "trx;LogFileName=control-probe.trx" --results-directory TestResults/ControlProbe
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        uses: oznetmaster/BuildAutomation@ae6f311e530a18dc705971dcc655fc97de03e368
+        with:
+          task: tests-tests-validate-independent-room-observation
+          root: driver
       - name: Validate read-only endurance producer
-        run: |
-          ./tools/Test-DiscoveredCoverage.ps1 -Stage Desktop -Project WiserHeatCrestronDriver.EnduranceProbe.Tests/WiserHeatCrestronDriver.EnduranceProbe.Tests.csproj -Framework net10.0 -OfflineOnly -ResultsDirectory TestResults
+        uses: oznetmaster/BuildAutomation@ae6f311e530a18dc705971dcc655fc97de03e368
+        with:
+          task: tests-tests-validate-read-only-endurance-producer
+          root: driver
       - name: Verify Android tests remain offline without a workflow
+        uses: oznetmaster/BuildAutomation@ae6f311e530a18dc705971dcc655fc97de03e368
+        with:
+          task: tests-tests-verify-android-tests-remain-offline-without-a-workflow
+          root: driver
         env:
           CRESTRON_HOME_ANDROID_CONTEXT: ''
           CRESTRON_HOME_WISER_UI_SETTINGS: ''
-        run: |
-          foreach ($project in @('WiserHeatCrestronDriver.AndroidTests', 'WiserHeatCrestronDriver.AndroidControlTests')) {
-            dotnet test "$project/$project.csproj" -c Release --logger "trx;LogFileName=offline.trx" --results-directory "TestResults/$project"
-            if ($LASTEXITCODE -ne 0) { throw 'Offline Android test validation failed.' }
-            [xml]$result = Get-Content "TestResults/$project/offline.trx" -Raw
-            $counts = $result.TestRun.ResultSummary.Counters
-            $cases = @($result.SelectNodes("/*[local-name()='TestRun']/*[local-name()='Results']/*[local-name()='UnitTestResult']"))
-            # NUnit's TRX writer can leave notExecuted at zero for skipped cases;
-            # use each recorded outcome and require that none actually executed.
-            if ($cases.Count -le 0 -or [int]$counts.total -ne $cases.Count -or [int]$counts.executed -ne 0 -or
-                @($cases | Where-Object { $_.outcome -ne 'NotExecuted' }).Count -ne 0 -or [int]$counts.failed -ne 0 -or [int]$counts.passed -ne 0) {
-              throw 'Every Android fixture must remain skipped when no processor workflow is active.'
-            }
-          }
       - name: Restore private desktop SDK dependency
         env:
           COMPACT_1: ${{ secrets.CI_COMPACT_JSON_1 }}
@@ -79,29 +77,25 @@ jobs:
           if ((Get-FileHash $path -Algorithm SHA256).Hash -ne '8b9567057419e97b20702a4364283b0b5c34d5e00e006e329e1c92b74638ef90') { throw 'Unexpected desktop SDK dependency checksum.' }
           "CompactJsonPath=$path" >> $env:GITHUB_ENV
       - name: Run desktop SDK lifecycle harness
-        run: |
-          ./tools/Test-DiscoveredCoverage.ps1 -Stage Desktop -Project WiserHeatCrestronDriver.Lifecycle.Tests/WiserHeatCrestronDriver.Lifecycle.Tests.csproj -Framework net10.0 -ResultsDirectory TestResults
+        uses: oznetmaster/BuildAutomation@ae6f311e530a18dc705971dcc655fc97de03e368
+        with:
+          task: tests-tests-run-desktop-sdk-lifecycle-harness
+          root: driver
       - name: Build processor package
-        run: |
-          dotnet build WiserHeatCrestronDriver.ProcessorTests/WiserHeatCrestronDriver.ProcessorTests.csproj -c Release -p:BuildProcessorTestPackages=true -p:ReleaseVersion=1.1.0 -p:DeployAfterBuild=false "-p:ManifestUtilExe=$env:MANIFEST_UTIL_EXE"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        uses: oznetmaster/BuildAutomation@ae6f311e530a18dc705971dcc655fc97de03e368
+        with:
+          task: tests-tests-build-processor-package
+          root: driver
       - name: Validate renamed driver package startup
-        run: |
-          $frameworkReferences = Join-Path ${env:ProgramFiles(x86)} 'Reference Assemblies/Microsoft/Framework/.NETFramework/v4.7.2'
-          $frameworkRuntime = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319'
-          dotnet build WiserHeatCrestronDriver/WiserHeatCrestronDriver.csproj -c Release -p:DeployAfterBuild=false -p:AssemblyName=NeilColvin_Thermostat_WiserHeat_IP_V2 "-p:ManifestUtilExe=$env:MANIFEST_UTIL_EXE" "-p:LocalNet472ReferenceAssemblies=$frameworkReferences" "-p:LocalNetFxRuntimeDir=$frameworkRuntime" -p:MergeDependenciesContinueOnError=false -p:PackageDriverContinueOnError=false -p:PackageDriverIgnoreExitCode=false
-          if ($LASTEXITCODE -ne 0) { throw 'Renamed driver package build failed.' }
-          dotnet run --project tools/PackageSmokeTest/PackageSmokeTest.csproj -c Release -- WiserHeatCrestronDriver/bin/Release/net472/NeilColvin_Thermostat_WiserHeat_IP_V2.pkg
-          if ($LASTEXITCODE -ne 0) { throw 'Packaged entry point could not initialize.' }
+        uses: oznetmaster/BuildAutomation@ae6f311e530a18dc705971dcc655fc97de03e368
+        with:
+          task: tests-tests-validate-renamed-driver-package-startup
+          root: driver
       - name: Run the packaged unit suite twice
-        run: |
-          $output = Join-Path $PWD 'WiserHeatCrestronDriver.ProcessorTests/bin/Release/net472'
-          $extracted = Join-Path $env:RUNNER_TEMP 'driver-package-tests'
-          [IO.Compression.ZipFile]::ExtractToDirectory((Join-Path $output 'WiserHeatCrestronDriver.ProcessorTests.pkg'), $extracted)
-          # Compare against the project actually embedded in the package. The desktop
-          # harness also includes a manifest-resource test which cannot run in the host.
-          ./tools/Test-DiscoveredCoverage.ps1 -Stage Package -SdkRoot ../CrestronHomeNUnit -PackageAssembly (Join-Path $extracted 'WiserHeatCrestronDriver.ProcessorTests.dll') -SourceInventory TestResults/WiserHeatCrestronDriver.Tests/inventory.json -ResultsDirectory TestResults
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        uses: oznetmaster/BuildAutomation@ae6f311e530a18dc705971dcc655fc97de03e368
+        with:
+          task: tests-tests-run-the-packaged-unit-suite-twice
+          root: driver
       - uses: actions/upload-artifact@v4
         if: always()
         with:

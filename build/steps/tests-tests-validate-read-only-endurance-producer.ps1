@@ -1,0 +1,1 @@
+./tools/Test-DiscoveredCoverage.ps1 -Stage Desktop -Project WiserHeatCrestronDriver.EnduranceProbe.Tests/WiserHeatCrestronDriver.EnduranceProbe.Tests.csproj -Framework net10.0 -OfflineOnly -ResultsDirectory TestResults
