@@ -21,7 +21,9 @@ public sealed partial class PlatformDiscoveryTests
 		await Refresh (rooms);
 		Entities["room_4"].StartPolling ();
 		var logger = (TestLogger)_logger.AppLogger;
-		while (logger.Entries.TryDequeue (out _)) { }
+		while (logger.Entries.TryDequeue (out _))
+			{
+			}
 		for (int iteration = 0; iteration < 20; iteration++)
 			await Refresh (rooms);
 		Assert.That (logger.Entries, Is.Empty, "An unchanged hub snapshot must not fill the processor log, even in Debug builds.");
@@ -37,12 +39,19 @@ public sealed partial class PlatformDiscoveryTests
 		await Refresh (rooms);
 		Entities["room_4"].StartPolling ();
 		var logger = (TestLogger)_logger.AppLogger;
-		while (logger.Entries.TryDequeue (out _)) { }
+		while (logger.Entries.TryDequeue (out _))
+			{
+			}
 		_transport.HeatingSchedules = "[{\"id\":7,\"Name\":\"Renamed\"}]";
 		await _api.ReadHubDataAsync ();
 		await Refresh (rooms);
 		await Refresh (rooms);
+#if DEBUG
 		Assert.That (logger.Entries.Count (entry => entry.Message.Contains ("Schedule selector changed")), Is.EqualTo (1));
+#else
+		Assert.That (logger.Entries.Count (entry => entry.Message.Contains ("Schedule selector changed")), Is.Zero,
+			"Release builds must not emit routine diagnostic information.");
+#endif
 		_driver.ApiFactory = (_, _, _) => throw new System.InvalidOperationException ("Synthetic connection failure.");
 		await TestSupport.Complete (Connect ());
 		Assert.That (logger.Entries.Any (entry => entry.Level == LogEntryLevel.Error), Is.True,

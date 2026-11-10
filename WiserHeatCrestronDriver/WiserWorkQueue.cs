@@ -34,7 +34,9 @@ internal sealed class WiserWorkQueue
 		_api = null!;
 		}
 
-	public async Task EnqueueAsync (Func<WiserAPI, Task> work)
+	public Task EnqueueAsync (Func<WiserAPI, Task> work) => EnqueueAsync (_api, work);
+
+	private async Task EnqueueAsync (WiserAPI expected, Func<WiserAPI, Task> work)
 		{
 		if (_stopped)
 			return;
@@ -48,7 +50,9 @@ internal sealed class WiserWorkQueue
 			if (_stopped)
 				return;
 
-			WiserAPI api = _api ?? throw new InvalidOperationException ("Wiser API client is required.");
+			WiserAPI api = _api;
+			if (api == null || !ReferenceEquals (api, expected))
+				return;
 
 			await work (api).ConfigureAwait (false);
 			}
@@ -56,5 +60,18 @@ internal sealed class WiserWorkQueue
 			{
 			_ = _gate.Release ();
 			}
+		}
+
+	public async Task<bool> ExecuteAsync (Func<WiserAPI, Task<bool>> work)
+		{
+		bool result = false;
+		await EnqueueAsync (async api => { result = await work (api).ConfigureAwait (false); }).ConfigureAwait (false);
+		return result;
+		}
+
+	public async Task DrainAsync ()
+		{
+		await _gate.WaitAsync ().ConfigureAwait (false);
+		_gate.Release ();
 		}
 	}

@@ -1,0 +1,15 @@
+{
+  "name": "WiserHeatCrestronDriver",
+  "version": "1.3.17",
+  "packages": [
+    {
+      "id": "CrestronHomeDriver.Wiser.WiserHeat",
+      "project": "WiserHeatCrestronDriver/WiserHeatCrestronDriver.csproj",
+      "manifest": "WiserHeatCrestronDriver/Thermostat_WiserHeat_IP_V2.json",
+      "payload": "Thermostat_WiserHeat_IP_V2.pkg",
+      "displayName": "WiserHeatCrestronDriver",
+      "vendor": "Wiser Heat",
+      "category": "Thermostat"
+    }
+  ]
+}

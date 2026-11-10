@@ -82,7 +82,7 @@ public sealed class WorkQueueTests
 			_queue.ClearClient ();
 			}
 		finally { release.TrySetResult (true); await TestSupport.Complete (first); }
-		await Assert.ThrowsAsync<InvalidOperationException> (async () => await TestSupport.Complete (pending));
+		await TestSupport.Complete (pending);
 		Assert.That (ran, Is.False);
 		_queue.SetClient (_client);
 		await TestSupport.Complete (_queue.EnqueueAsync (c => { ran = true; return Task.CompletedTask; }));

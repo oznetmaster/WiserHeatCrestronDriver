@@ -799,9 +799,12 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 		NotifyPropertyChanged ("onlineIndicator:isOnline", new DriverEntityValue (online));
 		}
 
+	private int _stopped;
+	private int _lifecycleGeneration;
 	public void StartPolling ()
 		{
 		LogBreadcrumb ($"StartPolling entered; roomId={_room.Id}, frameworkReady={_frameworkReady}, online={OnlineIndicatorIsOnline}");
+		Interlocked.Exchange (ref _stopped, 0);
 		Interlocked.Exchange (ref _debugLoggingEnabled, 1);
 		ReadyIndicatorIsReady = true;
 
@@ -825,6 +828,8 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 	public void StopPolling ()
 		{
+		Interlocked.Exchange (ref _stopped, 1);
+		Interlocked.Increment (ref _lifecycleGeneration);
 		Interlocked.Exchange (ref _debugLoggingEnabled, 0);
 		ReadyIndicatorIsReady = false;
 		SetOnline (false);
@@ -832,7 +837,9 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 	internal bool IsDebugLoggingEnabled => Volatile.Read (ref _debugLoggingEnabled) != 0;
 
-	private async Task FireAndForgetAsync (Func<Task<bool>> action, string operation)
+	private Task FireAndForgetAsync (Func<Task<bool>> action, string operation) => FireAndForgetAsync (action, operation, Volatile.Read (ref _lifecycleGeneration));
+
+	private async Task FireAndForgetAsync (Func<Task<bool>> action, string operation, int generation)
 		{
 		try
 			{
@@ -848,7 +855,10 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 			}
 		finally
 			{
-			EndRoomAction ();
+			if (generation == Volatile.Read (ref _lifecycleGeneration) && Volatile.Read (ref _stopped) == 0)
+				EndRoomAction ();
+			else
+				Interlocked.Exchange (ref _roomActionInProgress, 0);
 			}
 		}
 
@@ -857,11 +867,13 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 		if (!TryBeginRoomAction ())
 			return Task.CompletedTask;
 
-		return FireAndForgetAsync (action, operation);
+		return FireAndForgetAsync (action, operation, Volatile.Read (ref _lifecycleGeneration));
 		}
 
 	private bool TryBeginRoomAction ()
 		{
+		if (Volatile.Read (ref _stopped) != 0)
+			return false;
 		if (Interlocked.Exchange (ref _roomActionInProgress, 1) != 0)
 			return false;
 
@@ -1131,9 +1143,9 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 	internal static bool ScheduleDaysMatch (IDictionary<string, object> expected, IDictionary<string, object> current) =>
 		_editableScheduleDays.All (day =>
 			{
-			bool before = expected.TryGetValue (day, out object original);
-			bool now = current.TryGetValue (day, out object value);
-			return before == now && (!before || ScheduleValuesMatch (original, value));
+				bool before = expected.TryGetValue (day, out object original);
+				bool now = current.TryGetValue (day, out object value);
+				return before == now && (!before || ScheduleValuesMatch (original, value));
 			});
 
 	private static bool ScheduleValuesMatch (object? expected, object? current)
@@ -1142,7 +1154,10 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 		// Compare numeric values without treating strings or booleans as numbers.
 		if (IsScheduleNumber (expected) && IsScheduleNumber (current))
 			{
-			try { return Convert.ToDecimal (expected, CultureInfo.InvariantCulture) == Convert.ToDecimal (current, CultureInfo.InvariantCulture); }
+			try
+				{
+				return Convert.ToDecimal (expected, CultureInfo.InvariantCulture) == Convert.ToDecimal (current, CultureInfo.InvariantCulture);
+				}
 			catch (OverflowException) { return false; }
 			}
 		if (expected is IDictionary<string, object> left && current is IDictionary<string, object> right)
@@ -1168,6 +1183,7 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 	private async Task<bool> SaveEditedScheduleAsync (bool applyToAllDays)
 		{
+		int generation = Volatile.Read (ref _lifecycleGeneration);
 		RefreshEditorFromHub ();
 		if (_editScheduleChanged)
 			return false;
@@ -1200,6 +1216,8 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 
 		SetEditError (string.Empty, notify: true);
 		bool saved = await _platform.SaveHeatingScheduleAsync (_room.Id, _editScheduleId, scheduleData, _editScheduleData).ConfigureAwait (false);
+		if (generation != Volatile.Read (ref _lifecycleGeneration) || Volatile.Read (ref _stopped) != 0)
+			return false;
 		if (!saved)
 			{
 			SetEditError (_editScheduleChanged ? "Schedule changed. Cancel and reopen." : "Unable to save schedule changes", notify: true);
@@ -1614,6 +1632,7 @@ internal sealed partial class WiserRoomEntity : ReflectedAttributeDriverEntity
 		_logger.Log (_driverLogId, LogEntryLevel.Info, $"Room '{ControllerId}': {message}");
 		}
 
+	[Conditional ("DEBUG")]
 	private void LogBreadcrumb (string message) =>
 		_logger.Log (_driverLogId, LogEntryLevel.Info, $"Room '{ControllerId}': {message}");
 

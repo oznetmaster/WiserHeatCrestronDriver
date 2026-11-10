@@ -60,34 +60,40 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	internal string TemperatureUnits => _temperatureUnits;
 	internal double BoostDelta => _boostDelta;
 	internal int BoostDurationMinutes => _boostDurationMinutes;
-	internal bool HasHeatingSchedules => _api.Schedules?.HeatingSchedules?.Count > 0;
-	internal IReadOnlyList<WiserHeatingSchedule> HeatingSchedules => _api.Schedules?.HeatingSchedules?
-		.OrderBy (schedule => schedule.Name ?? string.Empty)
-		.ThenBy (schedule => schedule.Id)
-		.ToList () ?? [];
+	private IReadOnlyList<WiserHeatingSchedule> _heatingSchedules = Array.Empty<WiserHeatingSchedule> ();
+	private IReadOnlyDictionary<int, WiserHeatingSchedule> _assignedSchedules = new Dictionary<int, WiserHeatingSchedule> ();
+	internal bool HasHeatingSchedules => HeatingSchedules.Count > 0;
+	internal IReadOnlyList<WiserHeatingSchedule> HeatingSchedules => Volatile.Read (ref _heatingSchedules);
+	internal WiserHeatingSchedule? GetAssignedScheduleForRoom (int roomId) => Volatile.Read (ref _assignedSchedules).TryGetValue (roomId, out WiserHeatingSchedule? schedule) ? schedule : null;
 
-	internal WiserHeatingSchedule? GetAssignedScheduleForRoom (int roomId) =>
-		_api.Schedules?.GetByRoomId (roomId);
+	internal Task<bool> SaveHeatingScheduleAsync (int roomId, int scheduleId, IDictionary<string, object> scheduleData, IDictionary<string, object> expectedSchedule) => _workQueue.ExecuteAsync (_ => SaveHeatingScheduleCoreAsync (roomId, scheduleId, scheduleData, expectedSchedule));
+	internal Task<bool> RefreshSystemStateAsync (bool refreshSchedules = false) => _workQueue.ExecuteAsync (_ => RefreshSystemStateCoreAsync (refreshSchedules));
+	internal Task<bool> AdjustRoomSetpointAsync (int roomId, double delta) => _workQueue.ExecuteAsync (_ => AdjustRoomSetpointCoreAsync (roomId, delta));
+	internal Task<bool> SetRoomSetpointAsync (int roomId, double setpoint) => _workQueue.ExecuteAsync (_ => SetRoomSetpointCoreAsync (roomId, setpoint));
+	internal Task<bool> TriggerRoomBoostAsync (int roomId) => _workQueue.ExecuteAsync (_ => TriggerRoomBoostCoreAsync (roomId));
+	internal Task<bool> AdvanceRoomScheduleAsync (int roomId) => _workQueue.ExecuteAsync (_ => AdvanceRoomScheduleCoreAsync (roomId));
+	internal Task<bool> SetRoomAssignedScheduleAsync (int roomId, int scheduleId) => _workQueue.ExecuteAsync (_ => SetRoomAssignedScheduleCoreAsync (roomId, scheduleId));
+	internal Task<bool> SetRoomScheduleEnabledAsync (int roomId, bool enabled) => _workQueue.ExecuteAsync (_ => SetRoomScheduleEnabledCoreAsync (roomId, enabled));
 
-	internal async Task<bool> SaveHeatingScheduleAsync (int roomId, int scheduleId, IDictionary<string, object> scheduleData, IDictionary<string, object> expectedSchedule)
+	internal async Task<bool> SaveHeatingScheduleCoreAsync (int roomId, int scheduleId, IDictionary<string, object> scheduleData, IDictionary<string, object> expectedSchedule)
 		{
 		if (scheduleData == null)
 			return false;
 
 		// Refresh before writing: an open editor must not overwrite a changed shared
 		// schedule or save through a room that has since been assigned elsewhere.
-		if (!await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false))
+		if (!await RefreshSystemStateCoreAsync (refreshSchedules: true).ConfigureAwait (false))
 			return false;
 		WiserHeatingSchedule? schedule = GetAssignedScheduleForRoom (roomId);
 		if (schedule == null || schedule.Id != scheduleId || !WiserRoomEntity.ScheduleDaysMatch (expectedSchedule, schedule.ScheduleData))
 			return false;
 
 		Log ($"SaveHeatingScheduleAsync saving scheduleId={scheduleId} name='{schedule.Name ?? string.Empty}'");
-		bool succeeded = await schedule.SetScheduleAsync (scheduleData, CancellationToken.None).ConfigureAwait (false);
+		bool succeeded = await schedule.SetScheduleAsync (scheduleData, _sessionCancellation.Token).ConfigureAwait (false);
 		if (!succeeded)
 			return false;
 
-		if (!await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false))
+		if (!await RefreshSystemStateCoreAsync (refreshSchedules: true).ConfigureAwait (false))
 			return false;
 		WiserHeatingSchedule? observed = GetAssignedScheduleForRoom (roomId);
 		if (observed == null || observed.Id != scheduleId || !WiserRoomEntity.ScheduleDaysMatch (scheduleData, observed.ScheduleData))
@@ -261,7 +267,10 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		private set => SetAndNotify ("awayModeActionLabel", value, ref field);
 		} = string.Empty;
 
-	private bool _disposed;
+	private volatile bool _disposed;
+	private CancellationTokenSource _sessionCancellation = new ();
+	private readonly SemaphoreSlim _connectionGate = new (1, 1);
+	internal Task Shutdown { get; private set; } = Task.CompletedTask;
 	private long _connectionGeneration;
 	internal Func<string, string, WiserUnits, WiserAPI> ApiFactory { get; set; } = (host, secret, units) => new WiserAPI (host, secret, units);
 
@@ -314,9 +323,9 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			_connectionGeneration++;
 			StopRefreshLoop ();
 			_workQueue.Stop ();
-			DisposeApi ();
+			_sessionCancellation.Cancel ();
 			RemoveRooms ();
-			base.Dispose ();
+			Shutdown = CloseConnectionAsync (_connectionGeneration, terminal: true);
 			}
 		}
 
@@ -385,6 +394,24 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 		_api = null!;
 		}
 
+	private async Task CloseConnectionAsync (long generation, bool terminal = false)
+		{
+		await _connectionGate.WaitAsync ().ConfigureAwait (false);
+		try
+			{
+			await _workQueue.DrainAsync ().ConfigureAwait (false);
+			lock (_entitiesLock)
+				{
+				if (generation != _connectionGeneration)
+					return;
+				DisposeApi ();
+				if (terminal)
+					base.Dispose ();
+				}
+			}
+		finally { _connectionGate.Release (); }
+		}
+
 	private void StartRefreshLoop ()
 		{
 		StopRefreshLoop ();
@@ -411,7 +438,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			{
 			}
 
-		cancellationTokenSource.Dispose ();
+		// Retain the cancelled source while its worker unwinds.
 		_refreshLoopTask = null;
 		}
 
@@ -433,7 +460,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 							if (cancellationToken.IsCancellationRequested || !ReferenceEquals (api, _api))
 								return;
 
-							await RefreshSystemStateAsync ().ConfigureAwait (false);
+							await RefreshSystemStateCoreAsync ().ConfigureAwait (false);
 						}).ConfigureAwait (false);
 					}
 				catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -556,8 +583,9 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 					{
 					_connectionGeneration++;
 					StopRefreshLoop ();
-					DisposeApi ();
+					_sessionCancellation.Cancel ();
 					_workQueue.ClearClient ();
+					_ = CloseConnectionAsync (_connectionGeneration);
 					RemoveRooms ();
 					_hubIpAddress = string.Empty;
 					_hubSecret = string.Empty;
@@ -668,6 +696,8 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 	private void UpdatePlatformOptionsState ()
 		{
+		if (_disposed)
+			return;
 		HotWaterVisible = _enableWholeHouseHotWater;
 		AwayModeVisible = _allowAwayMode;
 		PlatformOptionsVisible = HotWaterVisible || AwayModeVisible;
@@ -765,10 +795,10 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 						return;
 
 					bool requestedOn = !HotWaterIsOn;
-					bool success = await hotwater.OverrideStateAsync (requestedOn ? "On" : "Off", CancellationToken.None).ConfigureAwait (false);
+					bool success = await hotwater.OverrideStateAsync (requestedOn ? "On" : "Off", _sessionCancellation.Token).ConfigureAwait (false);
 					if (success)
 						// Command acknowledgements do not refresh the API snapshot. Read the hub before enabling another toggle.
-						await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
+						await RefreshSystemStateCoreAsync (refreshSchedules: true).ConfigureAwait (false);
 				}).ConfigureAwait (false);
 
 			UpdatePlatformOptionsState ();
@@ -806,7 +836,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 					bool requestedOn = !system.AwayModeEnabled;
 					system.AwayModeEnabled = requestedOn;
-					await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
+					await RefreshSystemStateCoreAsync (refreshSchedules: true).ConfigureAwait (false);
 				}).ConfigureAwait (false);
 
 			UpdatePlatformOptionsState ();
@@ -840,28 +870,40 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	private async Task ConnectAndDiscoverAsync ()
 		{
 		long generation;
-		WiserAPI? newApi = null;
+		string host;
+		string secret;
 		lock (_entitiesLock)
 			{
 			if (_disposed)
 				return;
 			generation = ++_connectionGeneration;
+			host = _hubIpAddress;
+			secret = _hubSecret;
 			StopRefreshLoop ();
+			_workQueue.ClearClient ();
+			_sessionCancellation.Cancel ();
 			UpdateStatus ("Connecting", string.Empty);
 			SetReady (false);
 			}
+		await _connectionGate.WaitAsync ().ConfigureAwait (false);
+		WiserAPI? newApi = null;
 		try
 			{
-			// Hub models and raw schedule dictionaries share a Celsius representation.
-			// Room entities convert only values crossing the user interface boundary.
-			newApi = ApiFactory (_hubIpAddress, _hubSecret, WiserUnits.Metric)
-				?? throw new InvalidOperationException ("Wiser API client creation returned null.");
-			await newApi.InitializeAsync (CancellationToken.None).ConfigureAwait (false);
+			await _workQueue.DrainAsync ().ConfigureAwait (false);
 			lock (_entitiesLock)
 				{
 				if (_disposed || generation != _connectionGeneration)
 					return;
 				DisposeApi ();
+				_sessionCancellation = new CancellationTokenSource ();
+				}
+			newApi = ApiFactory (host, secret, WiserUnits.Metric)
+				?? throw new InvalidOperationException ("Wiser API client creation returned null.");
+			await newApi.InitializeAsync (_sessionCancellation.Token).ConfigureAwait (false);
+			lock (_entitiesLock)
+				{
+				if (_disposed || generation != _connectionGeneration)
+					return;
 				_api = newApi;
 				newApi = null;
 				_workQueue.SetClient (_api);
@@ -885,24 +927,29 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				if (_disposed || generation != _connectionGeneration)
 					return;
 				StopRefreshLoop ();
-				DisposeApi ();
 				_workQueue.ClearClient ();
+				_sessionCancellation.Cancel ();
 				foreach (WiserRoomEntity entity in _roomEntities.Values)
 					entity.StopPolling ();
-				LogError ("Wiser connection failed: " + ex);
+				LogError ("Wiser connection failed: " + ex.GetType ().Name);
 				SetOnline (false);
 				SetReady (false);
 				UpdatePlatformOptionsState ();
 				UpdateStatus ("Offline", ex.Message);
 				}
+			await _workQueue.DrainAsync ().ConfigureAwait (false);
+			lock (_entitiesLock)
+				if (generation == _connectionGeneration)
+					DisposeApi ();
 			}
 		finally
 			{
 			newApi?.Dispose ();
+			_connectionGate.Release ();
 			}
 		}
 
-	internal async Task<bool> RefreshSystemStateAsync (bool refreshSchedules = false)
+	internal async Task<bool> RefreshSystemStateCoreAsync (bool refreshSchedules = false)
 		{
 		WiserAPI api;
 		long generation;
@@ -933,7 +980,8 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				{
 				// Bound the complete read, including retries, so a disconnected hub does
 				// not leave its tiles online for the library's longer default timeout.
-				using var deadline = new CancellationTokenSource (HubReadTimeout);
+				using var deadline = CancellationTokenSource.CreateLinkedTokenSource (_sessionCancellation.Token);
+				deadline.CancelAfter (HubReadTimeout);
 				if (!await api.ReadHubDataAsync (deadline.Token).ConfigureAwait (false))
 					{
 					MarkUnavailable ();
@@ -957,6 +1005,12 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			if (readHub)
 				_lastScheduleRefreshUtc = DateTimeOffset.UtcNow;
 			List<WiserRoom> rooms = api.Rooms?.All ?? [];
+			Volatile.Write (ref _heatingSchedules, Array.AsReadOnly ((api.Schedules?.HeatingSchedules ?? []).OrderBy (schedule => schedule.Name ?? string.Empty).ThenBy (schedule => schedule.Id).ToArray ()));
+			var assignedSchedules = new Dictionary<int, WiserHeatingSchedule> ();
+			foreach (WiserRoom room in rooms)
+				if (api.Schedules?.GetByRoomId (room.Id) is WiserHeatingSchedule schedule)
+					assignedSchedules[room.Id] = schedule;
+			Volatile.Write (ref _assignedSchedules, assignedSchedules);
 			LogDiscoveryCountChanged (rooms.Count);
 
 			var managed = new Dictionary<string, PlatformManagedDevice> (StringComparer.OrdinalIgnoreCase);
@@ -1066,20 +1120,20 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 	private bool ShouldRefreshSchedules () =>
 		(DateTimeOffset.UtcNow - _lastScheduleRefreshUtc) >= ScheduleRefreshInterval;
 
-	internal async Task<bool> AdjustRoomSetpointAsync (int roomId, double delta)
+	internal async Task<bool> AdjustRoomSetpointCoreAsync (int roomId, double delta)
 		{
 		WiserRoom? room = _api.Rooms?.GetById (roomId);
 		if (room == null)
 			return false;
 
 		double newSetpoint = Math.Round (room.CurrentTargetTemperature + delta, 1, MidpointRounding.AwayFromZero);
-		await room.SetTargetTemperatureAsync (newSetpoint, CancellationToken.None).ConfigureAwait (false);
-		return await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
+		await room.SetTargetTemperatureAsync (newSetpoint, _sessionCancellation.Token).ConfigureAwait (false);
+		return await RefreshSystemStateCoreAsync (refreshSchedules: true).ConfigureAwait (false);
 		}
 
 	internal string ControlHubAddress => _hubIpAddress.Trim ().ToLowerInvariant ();
 
-	internal async Task<bool> SetRoomSetpointAsync (int roomId, double setpoint)
+	internal async Task<bool> SetRoomSetpointCoreAsync (int roomId, double setpoint)
 		{
 		WiserRoom? room = _api.Rooms?.GetById (roomId);
 		if (room == null)
@@ -1093,41 +1147,41 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 			return false;
 
 		if (room.IsBoost)
-			if (!await room.CancelBoostAsync (CancellationToken.None).ConfigureAwait (false))
+			if (!await room.CancelBoostAsync (_sessionCancellation.Token).ConfigureAwait (false))
 				return false;
 
 		bool accepted = scheduled
-			? await room.SetTargetTemperatureForDurationOfScheduleAsync (setpoint, CancellationToken.None).ConfigureAwait (false)
-			: await room.SetManualTemperatureAsync (setpoint, CancellationToken.None).ConfigureAwait (false);
+			? await room.SetTargetTemperatureForDurationOfScheduleAsync (setpoint, _sessionCancellation.Token).ConfigureAwait (false)
+			: await room.SetManualTemperatureAsync (setpoint, _sessionCancellation.Token).ConfigureAwait (false);
 
-		return accepted && await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
+		return accepted && await RefreshSystemStateCoreAsync (refreshSchedules: true).ConfigureAwait (false);
 		}
 
-	internal async Task<bool> TriggerRoomBoostAsync (int roomId)
+	internal async Task<bool> TriggerRoomBoostCoreAsync (int roomId)
 		{
 		WiserRoom? room = _api.Rooms?.GetById (roomId);
 		if (room == null)
 			return false;
 
 		if (room.IsBoost)
-			await room.CancelBoostAsync (CancellationToken.None).ConfigureAwait (false);
+			await room.CancelBoostAsync (_sessionCancellation.Token).ConfigureAwait (false);
 		else
-			await room.BoostAsync (_boostDelta, _boostDurationMinutes, CancellationToken.None).ConfigureAwait (false);
+			await room.BoostAsync (_boostDelta, _boostDurationMinutes, _sessionCancellation.Token).ConfigureAwait (false);
 
-		return await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
+		return await RefreshSystemStateCoreAsync (refreshSchedules: true).ConfigureAwait (false);
 		}
 
-	internal async Task<bool> AdvanceRoomScheduleAsync (int roomId)
+	internal async Task<bool> AdvanceRoomScheduleCoreAsync (int roomId)
 		{
 		WiserRoom? room = _api.Rooms?.GetById (roomId);
 		if (room == null)
 			return false;
 
-		await room.ScheduleAdvanceAsync (CancellationToken.None).ConfigureAwait (false);
-		return await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
+		await room.ScheduleAdvanceAsync (_sessionCancellation.Token).ConfigureAwait (false);
+		return await RefreshSystemStateCoreAsync (refreshSchedules: true).ConfigureAwait (false);
 		}
 
-	internal async Task<bool> SetRoomAssignedScheduleAsync (int roomId, int scheduleId)
+	internal async Task<bool> SetRoomAssignedScheduleCoreAsync (int roomId, int scheduleId)
 		{
 		WiserRoom? room = _api.Rooms?.GetById (roomId);
 		List<WiserHeatingSchedule> schedules = HeatingSchedules.ToList ();
@@ -1145,15 +1199,15 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 		Log ($"SetRoomAssignedScheduleAsync assigning roomId={roomId} to scheduleId={scheduleId} name='{targetSchedule.Name ?? string.Empty}'");
 
-		bool accepted = await targetSchedule.AssignScheduleAsync ([roomId], true, CancellationToken.None).ConfigureAwait (false);
+		bool accepted = await targetSchedule.AssignScheduleAsync ([roomId], true, _sessionCancellation.Token).ConfigureAwait (false);
 		// Refresh even after a rejected or uncertain reply; never replay the assignment.
-		bool refreshed = await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
+		bool refreshed = await RefreshSystemStateCoreAsync (refreshSchedules: true).ConfigureAwait (false);
 		bool succeeded = accepted && refreshed && GetAssignedScheduleForRoom (roomId)?.Id == scheduleId;
 		Log ($"SetRoomAssignedScheduleAsync completed roomId={roomId}, scheduleId={scheduleId}, success={succeeded}");
 		return succeeded;
 		}
 
-	internal async Task<bool> SetRoomScheduleEnabledAsync (int roomId, bool enabled)
+	internal async Task<bool> SetRoomScheduleEnabledCoreAsync (int roomId, bool enabled)
 		{
 		WiserRoom? room = _api.Rooms?.GetById (roomId);
 		if (room == null)
@@ -1168,7 +1222,7 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 				if (schedules.Count == 0)
 					return false;
 
-				if (!await SetRoomAssignedScheduleAsync (roomId, schedules[0].Id).ConfigureAwait (false))
+				if (!await SetRoomAssignedScheduleCoreAsync (roomId, schedules[0].Id).ConfigureAwait (false))
 					return false;
 
 				// The confirmed refresh replaces the room snapshot; use it for the next command.
@@ -1179,18 +1233,18 @@ public sealed class WiserPlatformDriver : ReflectedAttributeDriverEntity
 
 			string? autoMode = FindPreferredRoomMode (room, "Auto", "Scheduled", "Schedule");
 			if (!string.IsNullOrWhiteSpace (autoMode))
-				await room.SetModeAsync (autoMode!, CancellationToken.None).ConfigureAwait (false);
+				await room.SetModeAsync (autoMode!, _sessionCancellation.Token).ConfigureAwait (false);
 			}
 		else
 			{
 			string? manualMode = FindPreferredRoomMode (room, "Manual", "Fixed");
 			if (!string.IsNullOrWhiteSpace (manualMode))
-				await room.SetModeAsync (manualMode!, CancellationToken.None).ConfigureAwait (false);
+				await room.SetModeAsync (manualMode!, _sessionCancellation.Token).ConfigureAwait (false);
 			else
-				await room.SetManualTemperatureAsync (room.CurrentTargetTemperature, CancellationToken.None).ConfigureAwait (false);
+				await room.SetManualTemperatureAsync (room.CurrentTargetTemperature, _sessionCancellation.Token).ConfigureAwait (false);
 			}
 
-		return await RefreshSystemStateAsync (refreshSchedules: true).ConfigureAwait (false);
+		return await RefreshSystemStateCoreAsync (refreshSchedules: true).ConfigureAwait (false);
 		}
 
 	private static string? FindPreferredRoomMode (WiserRoom room, params string[] preferredModes)

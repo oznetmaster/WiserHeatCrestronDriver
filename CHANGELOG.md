@@ -2,6 +2,13 @@
 
 This changelog records shipped features, fixes, compatibility and runtime dependency changes. See [development and validation history](DEVELOPMENT-HISTORY.md) for tests, CI, build tooling and work not yet released.
 
+## [1.3.17](https://github.com/oznetmaster/WiserHeatCrestronDriver/releases/tag/v1.3.17) - 2026-11-10
+
+- Use WiserHeatAPIv2 1.1.4.
+- Serialize room commands and complete shared-schedule read/validate/write/readback transactions through the connection queue.
+- Reject queued operations for replaced connections, drain active work before client retirement and suppress stopped-room completions. Publish owned schedule snapshots for UI reads.
+- Compile diagnostic breadcrumbs out of Release builds while retaining warnings and errors; preserve room identities and schedule-conflict checks.
+
 ## [1.3.16](https://github.com/oznetmaster/WiserHeatCrestronDriver/releases/tag/v1.3.16) — 2026-09-20
 
 Published in the Crestron production driver database on **25 September 2026** as `1.3.016.0000`.

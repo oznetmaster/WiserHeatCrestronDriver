@@ -47,6 +47,7 @@ public sealed partial class PlatformDiscoveryTests
 		_api = (WiserAPI)constructor.Invoke (new object[] { "hub.invalid", "synthetic-secret", WiserUnits.Metric, _transport });
 		await _api.InitializeAsync ();
 		Set ("_api", _api);
+		Field<WiserWorkQueue> ("_workQueue").SetClient (_api);
 		Set ("_lastScheduleRefreshUtc", DateTimeOffset.UtcNow);
 		}
 	[Test]
@@ -108,10 +109,12 @@ public sealed partial class PlatformDiscoveryTests
 		}
 
 	[TearDown]
-	public void TearDown ()
+	public async Task TearDown ()
 		{
 		_transport?.Release.TrySetResult (true);
 		_driver?.Dispose ();
+		if (_driver != null)
+			await TestSupport.Complete (_driver.Shutdown);
 		_api?.Dispose ();
 		_logger?.Dispose ();
 		}
@@ -133,10 +136,10 @@ public sealed partial class PlatformDiscoveryTests
 		var readded = new TaskCompletionSource<bool> (TaskCreationOptions.RunContinuationsAsynchronously);
 		dispatcher.ControllerIdsChanged += (_, _) =>
 			{
-			if (!dispatcher.ControllerIds.Contains ("room_4"))
-				withdrawn.TrySetResult (true);
-			else if (withdrawn.Task.IsCompleted)
-				readded.TrySetResult (true);
+				if (!dispatcher.ControllerIds.Contains ("room_4"))
+					withdrawn.TrySetResult (true);
+				else if (withdrawn.Task.IsCompleted)
+					readded.TrySetResult (true);
 			};
 		Assert.That (dispatcher.GetState ("room_4").PropertyValues.Keys, Does.Contain ("extension:uiDefinition"));
 		await Task.WhenAny (withdrawn.Task, Task.Delay (500));
@@ -153,9 +156,9 @@ public sealed partial class PlatformDiscoveryTests
 		await Refresh ("[{\"id\":4,\"Name\":\"Test room\"}]");
 		Assert.Multiple (() =>
 			{
-			Assert.That (_driver.ManagedDevices["room_4"].UxCategory, Is.EqualTo (DeviceUxCategory.Hvac),
-				"Crestron's DeviceUxCategory contract categorizes thermostats as Hvac.");
-			Assert.That (Entities["room_4"].UxCategory, Is.EqualTo (DeviceUxCategory.Hvac));
+				Assert.That (_driver.ManagedDevices["room_4"].UxCategory, Is.EqualTo (DeviceUxCategory.Hvac),
+					"Crestron's DeviceUxCategory contract categorizes thermostats as Hvac.");
+				Assert.That (Entities["room_4"].UxCategory, Is.EqualTo (DeviceUxCategory.Hvac));
 			});
 		}
 	[TestCase (false)]
@@ -172,13 +175,13 @@ public sealed partial class PlatformDiscoveryTests
 		var second = dispatcher.GetState ("room_4");
 		Assert.Multiple (() =>
 			{
-			foreach (var state in new[] { first, second })
-				{
-				Assert.That (state.PropertyValues["readyIndicator:isReady"].GetValue<bool> (), Is.True);
-				Assert.That (state.PropertyValues["onlineIndicator:isOnline"].GetValue<bool> (), Is.True);
-				Assert.That (state.PropertyValues["targetTemperature"].GetValue<double> (), Is.EqualTo (20.5));
-				}
-			Assert.That (dispatcher.GetStatus ("room_4"), Is.EqualTo (DriverControllerStatus.Running));
+				foreach (var state in new[] { first, second })
+					{
+					Assert.That (state.PropertyValues["readyIndicator:isReady"].GetValue<bool> (), Is.True);
+					Assert.That (state.PropertyValues["onlineIndicator:isOnline"].GetValue<bool> (), Is.True);
+					Assert.That (state.PropertyValues["targetTemperature"].GetValue<double> (), Is.EqualTo (20.5));
+					}
+				Assert.That (dispatcher.GetStatus ("room_4"), Is.EqualTo (DriverControllerStatus.Running));
 			});
 		}
 
@@ -193,11 +196,11 @@ public sealed partial class PlatformDiscoveryTests
 		var recovered = dispatcher.GetState ("room_4");
 		Assert.Multiple (() =>
 			{
-			foreach (string property in new[] { "readyIndicator:isReady", "onlineIndicator:isOnline" })
-				{
-				Assert.That (stopped.PropertyValues[property].GetValue<bool> (), Is.False);
-				Assert.That (recovered.PropertyValues[property].GetValue<bool> (), Is.True);
-				}
+				foreach (string property in new[] { "readyIndicator:isReady", "onlineIndicator:isOnline" })
+					{
+					Assert.That (stopped.PropertyValues[property].GetValue<bool> (), Is.False);
+					Assert.That (recovered.PropertyValues[property].GetValue<bool> (), Is.True);
+					}
 			});
 		}
 
@@ -213,11 +216,11 @@ public sealed partial class PlatformDiscoveryTests
 		dispatcher.ControllerIdsChanged += (_, _) => registrations.Enqueue (dispatcher.ControllerIds.Contains ("room_4"));
 		dispatcher.ValuesChanged += (_, args) =>
 			{
-			if (args.ControllerId == "room_5" && args.Update.Changes.ContainsKey ("extension:uiDefinition"))
-				{
-				Interlocked.Increment (ref uiAnnouncements);
-				announced.TrySetResult (true);
-				}
+				if (args.ControllerId == "room_5" && args.Update.Changes.ContainsKey ("extension:uiDefinition"))
+					{
+					Interlocked.Increment (ref uiAnnouncements);
+					announced.TrySetResult (true);
+					}
 			};
 		await Refresh ("[{\"id\":4,\"Name\":\"First room\"},{\"id\":5,\"Name\":\"Second room\"}]");
 		await TestSupport.Complete (announced.Task);
@@ -309,16 +312,16 @@ public sealed partial class PlatformDiscoveryTests
 		var published = new TaskCompletionSource<bool> (TaskCreationOptions.RunContinuationsAsynchronously);
 		dispatcher.ValuesChanged += (_, args) =>
 			{
-			if (args.ControllerId != "room_4")
-				return;
-			foreach (var change in args.Update.Changes)
-				if (change.Value.Value.HasValue)
-					observed[change.Key] = change.Value.Value.Value;
-			bool Match<T> (string key, T expected) => observed.TryGetValue (key, out var value) && Equals (value.GetValue<T> (), expected);
-			bool complete = selection == "time" ? Match ("editSlot1Time", "07:00") : selection == "temperature" ? Match ("editSlot1Temperature", 22d) :
-				Match ("editSelectedDay", "Tuesday") && Match ("editSlot1Time", "09:00") && Match ("editSlot1Temperature", 19d) && Match ("editSlot2Visible", false);
-			if (complete)
-				published.TrySetResult (true);
+				if (args.ControllerId != "room_4")
+					return;
+				foreach (var change in args.Update.Changes)
+					if (change.Value.Value.HasValue)
+						observed[change.Key] = change.Value.Value.Value;
+				bool Match<T> (string key, T expected) => observed.TryGetValue (key, out var value) && Equals (value.GetValue<T> (), expected);
+				bool complete = selection == "time" ? Match ("editSlot1Time", "07:00") : selection == "temperature" ? Match ("editSlot1Temperature", 22d) :
+					Match ("editSelectedDay", "Tuesday") && Match ("editSlot1Time", "09:00") && Match ("editSlot1Temperature", 19d) && Match ("editSlot2Visible", false);
+				if (complete)
+					published.TrySetResult (true);
 			};
 		if (selection == "day")
 			room.SetEditSelectedDay ("Tuesday");
@@ -636,12 +639,12 @@ public sealed partial class PlatformDiscoveryTests
 		await TestSupport.Complete (Connect ());
 		Assert.Multiple (() =>
 			{
-			Assert.That (_driver.ReadyIndicatorIsReady, Is.True);
-			Assert.That (Entities["room_4"], Is.SameAs (room));
-			Assert.That (room.ReadyIndicatorIsReady, Is.True, "A recovered gateway must not leave its existing room permanently not ready.");
-			Assert.That (room.OnlineIndicatorIsOnline, Is.True);
-			Assert.That (room.TargetTemperature, Is.EqualTo (21.5));
-			Assert.That (registrationChanges, Is.Zero, "Recover state without withdrawing an installed controller.");
+				Assert.That (_driver.ReadyIndicatorIsReady, Is.True);
+				Assert.That (Entities["room_4"], Is.SameAs (room));
+				Assert.That (room.ReadyIndicatorIsReady, Is.True, "A recovered gateway must not leave its existing room permanently not ready.");
+				Assert.That (room.OnlineIndicatorIsOnline, Is.True);
+				Assert.That (room.TargetTemperature, Is.EqualTo (21.5));
+				Assert.That (registrationChanges, Is.Zero, "Recover state without withdrawing an installed controller.");
 			});
 		}
 
@@ -689,7 +692,10 @@ public sealed partial class PlatformDiscoveryTests
 			{
 			await TestSupport.Complete (older.Entered.Task);
 			_driver.ApiFactory = (host, secret, units) => CreateApi (newer);
-			await TestSupport.Complete (Connect ());
+			Task newerConnect = Connect ();
+			Assert.That (newerConnect.IsCompleted, Is.False, "The retired client's admitted work must drain before its replacement starts.");
+			older.Release.TrySetResult (true);
+			await TestSupport.Complete (newerConnect);
 			current = Field<WiserAPI> ("_api");
 			}
 		finally { older.Release.TrySetResult (true); }

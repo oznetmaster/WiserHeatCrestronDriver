@@ -1,21 +1,18 @@
-# WiserHeatCrestronDriver v1.3.16
+# WiserHeatCrestronDriver 1.3.17
 
-**Published by Crestron:** Wiser Heat **1.3.16** was added to the Crestron production driver database on **25 September 2026** (catalog version `1.3.016.0000`).
+This patch corrects the dependency and lifecycle issues described below.
 
-Catalog entry: **Drayton Wiser / Wiser Heat Gateway**; device type **Platform**; developer **Neil Colvin**.
+- Use WiserHeatAPIv2 1.1.4.
+- Serialize room commands and complete shared-schedule read/validate/write/readback transactions through the connection queue.
+- Reject queued operations for replaced connections, drain active work before client retirement and suppress stopped-room completions. Publish owned schedule snapshots for UI reads.
+- Compile diagnostic breadcrumbs out of Release builds while retaining warnings and errors; preserve room identities and schedule-conflict checks.
 
-This patch updates WiserHeatAPIv2 to 1.1.3 so a hub that stalls partway through an HTTP response cannot bypass the driver's read-cancellation deadline on Mono. It covers both successful and error response bodies. Saved hub and room configuration remains compatible.
+## Installation
 
-The schedule editor now has eight entries per day, matching the hub's supported limit; the unused ninth and tenth rows have been removed.
+Use the driver package from [GitHub](https://github.com/oznetmaster/WiserHeatCrestronDriver/releases/tag/v1.3.17) or the matching NuGet distribution. Import the package, then update the existing driver in Home Setup or Configure Pro. Importing alone does not update the running instance. Existing pairing and configuration formats are retained; removal and re-add is not a routine update step.
 
-Install the attached `Thermostat_WiserHeat_IP_V2.pkg` through the normal driver update process. The `CrestronHomeDriver.Wiser.WiserHeat` NuGet distribution wraps that installable package and is not a library reference.
+## Validation
 
-See [CHANGELOG.md](CHANGELOG.md) for product changes and [development history](DEVELOPMENT-HISTORY.md) for validation scope.
+Passed 236 workstation Debug and 236 Release test executions, plus 201 native net472/Mono processor tests. Processor validation used fake transports and synthetic credentials; no new physical-device acceptance or endurance run is claimed. Existing processor configuration and all pairing files were preserved. See [development history](DEVELOPMENT-HISTORY.md) for provenance and limits.
 
-## Dealer support
-
-**Support:** Contact Neil Colvin using the [driver and library support form](https://oznetmaster.github.io/support/). No GitHub account or registration is required. Requests are delivered privately; please do not include hub secrets, passwords or other credentials.
-
-**Project:** The [Wiser Heat driver repository](https://github.com/oznetmaster/WiserHeatCrestronDriver) contains documentation, releases and public issue tracking. A GitHub account is required only if you choose to create a public issue.
-
-Include the driver version, Crestron Home version, Wiser hub model and a description of the issue.
+This GitHub/NuGet release does not replace any submitted Crestron package. Submission-specific PDFs and correspondence are excluded from public artifacts.

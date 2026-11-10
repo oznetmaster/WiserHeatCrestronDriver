@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "name": "WiserHeatCrestronDriver",
+  "versionFile": "build/ReleaseVersion.props",
+  "versionXPath": "/Project/PropertyGroup/Version",
+  "notesFile": "release-notes/v{version}.md",
+  "packages": [
+    {
+      "frameworks": [],
+      "project": "WiserHeatCrestronDriver/WiserHeatCrestronDriver.csproj",
+      "id": "CrestronHomeDriver.Wiser.WiserHeat",
+      "symbols": false
+    }
+  ],
+  "applications": [],
+  "documents": [
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "rawLibraries": false,
+  "libraryArchive": false
+}

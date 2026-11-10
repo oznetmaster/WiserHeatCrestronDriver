@@ -1,5 +1,9 @@
 # WiserHeatCrestronDriver
 
+## Current GitHub/NuGet release: 1.3.17
+
+[Download 1.3.17](https://github.com/oznetmaster/WiserHeatCrestronDriver/releases/tag/v1.3.17) or use the matching NuGet driver distribution. This patch includes the audited dependency and lifecycle corrections; see [release notes](RELEASE-NOTES.md). Existing configuration and pairing formats are retained. Crestron catalog/submission versions below retain their separate attribution.
+
 ## Crestron availability
 
 **Published by Crestron:** Wiser Heat **1.3.16** was added to the Crestron production driver database on **25 September 2026** (catalog version `1.3.016.0000`).
